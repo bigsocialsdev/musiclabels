@@ -22,6 +22,10 @@ const schema = z.object({
   RESEND_API_KEY: z.string().min(1),
   EMAIL_FROM: z.string().min(1),
   OPS_ALERT_EMAIL: z.email(),
+  // Phone OTP via MSG91, called from Supabase's "Send SMS" auth hook. Checked at use, so dev needs none.
+  SEND_SMS_HOOK_SECRET: z.string().optional(), // "v1,whsec_<base64>" from the Supabase dashboard
+  MSG91_AUTH_KEY: z.string().optional(),
+  MSG91_OTP_TEMPLATE_ID: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;
@@ -45,4 +49,9 @@ let cached: Env | undefined;
 /** Validated server env, parsed on first use so `next build` needs no secrets until a handler runs. */
 export function getEnv(): Env {
   return (cached ??= parseEnv(process.env));
+}
+
+/** Tests only: forget the cached parse after changing process.env. */
+export function resetEnvCache(): void {
+  cached = undefined;
 }

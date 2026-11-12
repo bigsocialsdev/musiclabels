@@ -11,7 +11,7 @@ Phase 3 — Plan (Architect): outputs written (docs/PLAN.md, root CLAUDE.md) —
 | 1. Understand | Done — docs/PRD-analysis.md written; open questions resolved via assumptions |
 | 2. Critique | Done — docs/PRD-critique.md written; all recommendations ACCEPTED by user (2026-11-11) |
 | 3. Plan | Done pending [GATE] — docs/PLAN.md + CLAUDE.md written (2026-11-12) |
-| 4. Build | In progress — S3-M0 done (see changelog); next S3-M1 |
+| 4. Build | In progress — S3-M0 merged, S3-M1 in PR (see changelog); next S3-M2 |
 | 5. Review | Not started |
 
 ## Decisions Made
@@ -127,6 +127,20 @@ Assumptions / deviations:
 - `mrm_append_only(tbl)` SQL helper is the mechanism for the append-only list in CLAUDE.md; later migrations call it per table.
 - CI starts only the Supabase Postgres container (`supabase start -x …`); M1 will need `auth` schema, so that exclude list must drop `gotrue` then. CI is green on GitHub (PR #1); Supabase CLI comes from `supabase/setup-cli`, not an npm dependency. `vercel-deploy.yml` fails until `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` repo secrets exist. Lockfile gotcha: regenerate `package-lock.json` in a clean directory (no `node_modules`) with npm 11, otherwise npm records only the local platform's optional binaries and Linux `npm ci` breaks.
 - Versions follow PLAN (TS 5, ESLint 9, Vitest 4, Node 22) rather than newest majors.
+
+### S3-M1 Identity & legal, 2026-11-12 (Sonnet)
+Built: tables `users`, `organizations`, `memberships`, `legal_documents`, `acceptances` (RLS on; the last two append-only via `mrm_append_only`). `identity` slice: `loadSession` (user validated by Supabase `getUser`, AAL from verified `getClaims`), `requireVerified` / `requireAal2` / `requireAdmin(permission)` (role and permissions read from the DB each call; superadmin implies all; AAL2 required for admins), `ensureUser`, `createOrganization` (org + owner membership in one transaction), `getMembershipRole`, `safeNext` (open-redirect guard), MSG91 phone-OTP via Supabase "Send SMS" hook (`/api/auth/sms-hook`: Standard Webhooks signature, +91 numbers only). `legal` slice: `publishLegalDocument` (superadmin, consecutive versions under an advisory lock, sha256, audit row in the same transaction), `getCurrentDocument`, `recordAcceptance` (idempotent per user and version), `checkAcceptance` (the gate; re-gates on a new version; fails closed when nothing is published). Pages: `/auth/sign-in` (email OTP, phone OTP, Google), `/auth/mfa` (TOTP enrol/verify), `/auth/callback`, `/legal/accept`; `proxy.ts` refreshes the session; local Supabase TOTP MFA enabled in `supabase/config.toml`.
+Tests (real Postgres): admin at AAL1 blocked, unverified/anonymous blocked, role read from DB, org tenant scoping, ToS gate (blocked until accepted, row stores version/ip/time, new version re-gates), append-only, concurrent publishes, hook signature and MSG91 request shape.
+Assumptions / deviations:
+- No FK from `users.id` to `auth.users`: the row is created by `ensureUser` after sign-in (sign-in form action and OAuth callback), so the app schema does not depend on Supabase's auth schema and CI keeps starting only Postgres.
+- `acceptances.org_id` is nullable (a user can accept before they have an org); unique per (user, document).
+- "Checkout blocked until ToS accepted" is `checkAcceptance(db, userId, ['tos'])`; M4's `createOrder` must call it. Admin pages must call `requireAdmin` (no route gating in `proxy.ts`, by design).
+- Impersonation stays in S4-M10. GSTIN validation is not in M1 (arrives with GST, M4/M7).
+- **Not verified end to end**: the auth UI, Supabase cookie session and TOTP flows, Google OAuth and the MSG91 call need a running Supabase Auth stack plus MSG91/Google credentials and were not exercised here (guards and gate are tested with session objects). MSG91's OTP endpoint parameters are from its docs, untested against a live DLT template. Needs a manual pass with `supabase start` (full stack) before launch; hosted setup: enable the Send SMS hook, Google provider and TOTP in the Supabase dashboard.
+- Code-review fixes (same PR): `safeNext` rejects control characters and backslashes; `/legal/accept` and `/auth/mfa` call `ensureUser` first; the accept page uses `legal.acceptPending` (one transaction) instead of touching tables; sign-in (OTP and OAuth) sends users with a stale ToS/privacy version to `/legal/accept`; `ensureUser` no longer nulls a stored email/phone; client IP prefers `x-vercel-forwarded-for` / `x-real-ip`.
+- `users.totp_enabled` (PLAN §3.1) is **not** stored: factor state lives in Supabase Auth and a copy would go stale. Admin gating uses the session AAL, not this column.
+- **Verify manually**: that Supabase refuses enrolling a second TOTP factor from an AAL1 session once the user already has a verified one (otherwise `/auth/mfa` could weaken the admin AAL2 guard). Open: OTP-request rate limiting on the SMS hook (S4-M11).
+- Dev environment note: Docker was unavailable on the build machine, so local tests ran on a standalone Postgres on port 54322; CI uses the Supabase Postgres container.
 
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.

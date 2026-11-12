@@ -20,7 +20,7 @@ export const extractSamples: SampleExtractor = async (audioFile, durationMs) => 
     for (const [i, frac] of SAMPLE_POSITIONS.entries()) {
       const start = Math.max(0, Math.min(seconds * frac, seconds - SAMPLE_SECONDS));
       const file = path.join(work, `s${i}.wav`);
-      const r = await runFfmpeg(['-y', '-ss', start.toFixed(2), '-t', String(SAMPLE_SECONDS), '-i', audioFile, '-ac', '1', '-ar', '8000', file], {
+      const r = await runFfmpeg(['-y', '-ss', start.toFixed(2), '-t', String(SAMPLE_SECONDS), '-protocol_whitelist', 'file', '-f', 'mp3', '-i', audioFile, '-ac', '1', '-ar', '8000', file], {
         timeoutMs: 60_000,
       });
       if (r.code !== 0) throw new Error('sample extraction failed');

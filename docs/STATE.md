@@ -11,7 +11,7 @@ Phase 3 — Plan (Architect): outputs written (docs/PLAN.md, root CLAUDE.md) —
 | 1. Understand | Done — docs/PRD-analysis.md written; open questions resolved via assumptions |
 | 2. Critique | Done — docs/PRD-critique.md written; all recommendations ACCEPTED by user (2026-11-11) |
 | 3. Plan | Done pending [GATE] — docs/PLAN.md + CLAUDE.md written (2026-11-12) |
-| 4. Build | In progress — S3-M0 merged, S3-M1 in PR (see changelog); next S3-M2 |
+| 4. Build | In progress — S3-M0, S3-M1 merged; S3-M2 in PR (see changelog); next S3-M3 |
 | 5. Review | Not started |
 
 ## Decisions Made

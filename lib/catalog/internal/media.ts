@@ -13,11 +13,22 @@ export type Probe = { format: 'wav' | 'mp3'; durationMs: number; sampleRate: num
 export class MediaRejectedError extends Error {}
 
 /**
+ * Input arguments for a seller-supplied file. ffmpeg otherwise auto-detects the container from the CONTENT, and
+ * playlist-style formats (HLS, concat) can make it read local files or fetch URLs. So the demuxer is forced from
+ * the extension we assigned (wav or mp3, validated at upload) and only the plain file protocol is allowed.
+ */
+export function untrustedInput(file: string): string[] {
+  const ext = /\.([^./\\]+)$/.exec(file)?.[1]?.toLowerCase();
+  if (ext !== 'wav' && ext !== 'mp3') throw new MediaRejectedError('File is not a valid WAV or MP3 audio file');
+  return ['-protocol_whitelist', 'file', '-f', ext, '-i', file];
+}
+
+/**
  * ffmpeg-static ships no ffprobe, so the file is probed with `ffmpeg -i` (exit code 1 is expected:
  * there is no output file) and the stream summary parsed from stderr. Also acts as the decode sanity check.
  */
 export async function probeAudio(file: string): Promise<Probe> {
-  const { stderr } = await runFfmpeg(['-i', file], { timeoutMs: 60_000 });
+  const { stderr } = await runFfmpeg([...untrustedInput(file)], { timeoutMs: 60_000 });
   return parseProbe(stderr);
 }
 
@@ -64,7 +75,7 @@ export function renderPreview(src: string, dest: string) {
   const filter =
     '[1:a]volume=0.35[tag];[0:a][tag]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[out]';
   return mustSucceed(
-    ['-y', '-i', src, '-f', 'lavfi', '-i', 'sine=frequency=880:beep_factor=4', '-filter_complex', filter, '-map', '[out]',
+    ['-y', ...untrustedInput(src), '-f', 'lavfi', '-i', 'sine=frequency=880:beep_factor=4', '-filter_complex', filter, '-map', '[out]',
       '-map_metadata', '-1', '-c:a', 'libmp3lame', '-b:a', '128k', '-ar', '44100', dest],
     'preview',
   );
@@ -72,7 +83,7 @@ export function renderPreview(src: string, dest: string) {
 
 /** Clean 320 kbps MP3 derivative handed to buyers after purchase. */
 export function renderMp3(src: string, dest: string) {
-  return mustSucceed(['-y', '-i', src, '-vn', '-map_metadata', '-1', '-c:a', 'libmp3lame', '-b:a', '320k', dest], 'mp3');
+  return mustSucceed(['-y', ...untrustedInput(src), '-vn', '-map_metadata', '-1', '-c:a', 'libmp3lame', '-b:a', '320k', dest], 'mp3');
 }
 
 /** Peak amplitude (0..1, three decimals) for each of `buckets` equal slices of the track. */
@@ -83,7 +94,7 @@ export async function waveformPeaks(src: string, durationMs: number, buckets = W
   const peaks = new Array<number>(buckets).fill(0);
   let index = 0;
   let carry: Buffer = Buffer.alloc(0);
-  const { code, stderr } = await streamFfmpeg(['-i', src, '-vn', '-ac', '1', '-ar', String(RATE), '-f', 's16le', '-'], (chunk) => {
+  const { code, stderr } = await streamFfmpeg([...untrustedInput(src), '-vn', '-ac', '1', '-ar', String(RATE), '-f', 's16le', '-'], (chunk) => {
     const buf = carry.length ? Buffer.concat([carry, chunk]) : chunk;
     const usable = buf.length - (buf.length % 2);
     for (let o = 0; o < usable; o += 2) {

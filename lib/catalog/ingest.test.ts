@@ -145,6 +145,16 @@ describe('ingestVersion', () => {
     expect((await row(id)).ingestError).toMatch(/not a valid WAV or MP3/);
   });
 
+  it('does not let ffmpeg follow a playlist disguised as .wav (no local-file or URL reads)', async () => {
+    const key = keyFor(`hls${Date.now()}`);
+    const playlist = path.join(dir, 'hls.wav');
+    await writeFile(playlist, '#EXTM3U\n#EXT-X-TARGETDURATION:10\n#EXTINF:10,\nhttp://127.0.0.1:9/should-never-be-fetched\n#EXT-X-ENDLIST\n');
+    await putMaster(key, playlist);
+    const id = await newVersion(key);
+    expect(await ingestVersion(id, store)).toBe('failed');
+    expect((await row(id)).ingestError).toMatch(/not a valid WAV or MP3/);
+  });
+
   it('fails cleanly when the uploaded object is missing', async () => {
     const id = await newVersion(keyFor(`missing${Date.now()}`));
     expect(await ingestVersion(id, store)).toBe('failed');

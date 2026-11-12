@@ -60,3 +60,15 @@ export async function acceptPending(
     return checkAcceptance(tx, input.userId, input.kinds);
   });
 }
+
+/** Has this organisation (acting through any member) accepted the CURRENT version of a document kind? */
+export async function hasOrgAccepted(db: DbOrTx, orgId: string, kind: LegalKind, at = new Date()): Promise<boolean> {
+  const doc = await getCurrentDocument(db, kind, at);
+  if (!doc) return false;
+  const [hit] = await db
+    .select({ id: acceptances.id })
+    .from(acceptances)
+    .where(and(eq(acceptances.orgId, orgId), eq(acceptances.legalDocumentId, doc.id)))
+    .limit(1);
+  return Boolean(hit);
+}

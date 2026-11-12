@@ -431,14 +431,16 @@ export const licenseTermsVersions = pgTable(
 /**
  * One license per order. Only status, revoked_reason, revoked_at and updated_at may change (DB trigger), so the
  * record-hash inputs (PLAN §7) stored here can always be recomputed from this row alone.
- * order_id gets its FK when the orders table arrives (S3-M4).
  */
 export const licenses = pgTable(
   'licenses',
   {
     id: id(),
     publicId: text('public_id').notNull().unique(),
-    orderId: uuid('order_id').notNull().unique(),
+    orderId: uuid('order_id')
+      .notNull()
+      .unique()
+      .references((): AnyPgColumn => orders.id, { onDelete: 'restrict' }),
     trackId: uuid('track_id').notNull().references(() => tracks.id, { onDelete: 'restrict' }),
     trackVersionId: uuid('track_version_id').notNull().references(() => trackVersions.id, { onDelete: 'restrict' }),
     masterSha256: text('master_sha256').notNull(),
@@ -535,4 +537,228 @@ export const licensedVideos = pgTable(
     check('licensed_videos_urls_check', sql`cardinality(${t.urls}) between 1 and 10`),
     index('licensed_videos_license_idx').on(t.licenseId),
   ],
+).enableRLS();
+
+/** Append-only log of clean-file download URLs issued; capped per license (PLAN §13.13). */
+export const licenseDownloads = pgTable(
+  'license_downloads',
+  {
+    id: id(),
+    licenseId: uuid('license_id').notNull().references(() => licenses.id, { onDelete: 'restrict' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    file: text('file').notNull(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check('license_downloads_file_check', sql`${t.file} in ('master','mp3')`), index('license_downloads_license_idx').on(t.licenseId)],
+).enableRLS();
+
+// ---- orders (S3-M4) ----
+
+export const ORDER_STATUS_SQL = sql`'created','awaiting_payment','paid','failed','expired','fulfilled','refund_pending','refunded','charged_back_pending','charged_back'`;
+
+/**
+ * Money and the purchase facts are a snapshot taken at creation and never change (DB trigger); later code
+ * reads them, never the current price book, terms or track. `snapshot` holds the descriptive facts.
+ */
+export const orders = pgTable(
+  'orders',
+  {
+    id: id(),
+    buyerOrgId: uuid('buyer_org_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
+    buyerUserId: uuid('buyer_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    idempotencyKey: text('idempotency_key').notNull(),
+    trackId: uuid('track_id').notNull().references(() => tracks.id, { onDelete: 'restrict' }),
+    trackVersionId: uuid('track_version_id').notNull().references(() => trackVersions.id, { onDelete: 'restrict' }),
+    sellerOrgId: uuid('seller_org_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
+    tier: text('tier').notNull(),
+    termsVersionId: uuid('terms_version_id').notNull().references(() => licenseTermsVersions.id, { onDelete: 'restrict' }),
+    licenseTextDocumentId: uuid('license_text_document_id').notNull().references(() => legalDocuments.id, { onDelete: 'restrict' }),
+    priceBookId: uuid('price_book_id').notNull().references(() => priceBooks.id, { onDelete: 'restrict' }),
+    priceLevel: text('price_level').notNull(),
+    taxablePaise: bigint('taxable_paise', { mode: 'number' }).notNull(),
+    cgstPaise: bigint('cgst_paise', { mode: 'number' }).notNull(),
+    sgstPaise: bigint('sgst_paise', { mode: 'number' }).notNull(),
+    igstPaise: bigint('igst_paise', { mode: 'number' }).notNull(),
+    totalPaise: bigint('total_paise', { mode: 'number' }).notNull(),
+    currency: text('currency').notNull().default('INR'),
+    gstRateBps: integer('gst_rate_bps').notNull(),
+    royaltyRateBps: integer('royalty_rate_bps').notNull(),
+    snapshot: jsonb('snapshot').notNull(),
+    gatewayOrderId: text('gateway_order_id').unique(),
+    gatewayPaymentId: text('gateway_payment_id').unique(),
+    status: text('status').notNull().default('created'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
+    fulfilClaimedAt: timestamp('fulfil_claimed_at', { withTimezone: true }),
+    fulfilAttempts: integer('fulfil_attempts').notNull().default(0),
+    lastError: text('last_error'),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('orders_buyer_idempotency_key').on(t.buyerUserId, t.idempotencyKey),
+    check('orders_status_check', sql`${t.status} in (${ORDER_STATUS_SQL})`),
+    check('orders_tier_check', sql`${t.tier} in ('creator','brand_organic','paid_ad')`),
+    check('orders_currency_check', sql`${t.currency} = 'INR'`),
+    check('orders_taxable_check', sql`${t.taxablePaise} > 0`),
+    check('orders_total_check', sql`${t.totalPaise} = ${t.taxablePaise} + ${t.cgstPaise} + ${t.sgstPaise} + ${t.igstPaise}`),
+    check(
+      'orders_gst_split_check',
+      sql`(${t.igstPaise} = 0 and ${t.cgstPaise} = ${t.sgstPaise} and ${t.cgstPaise} >= 0) or (${t.cgstPaise} = 0 and ${t.sgstPaise} = 0 and ${t.igstPaise} >= 0)`,
+    ),
+    check('orders_royalty_rate_check', sql`${t.royaltyRateBps} between 0 and 10000`),
+    index('orders_status_idx').on(t.status, t.updatedAt),
+    index('orders_buyer_org_idx').on(t.buyerOrgId),
+  ],
+).enableRLS();
+
+/** Append-only history of order status changes. */
+export const orderEvents = pgTable(
+  'order_events',
+  {
+    id: id(),
+    orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'restrict' }),
+    fromStatus: text('from_status').notNull(),
+    toStatus: text('to_status').notNull(),
+    event: text('event').notNull(),
+    actorUserId: uuid('actor_user_id'), // null = system
+    reason: text('reason'),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('order_events_order_idx').on(t.orderId, t.at)],
+).enableRLS();
+
+// ---- payments (S3-M4) ----
+
+/** Webhook dedupe on Razorpay's event id. Rows only ever gain processed_at (DB trigger). */
+export const paymentEvents = pgTable(
+  'payment_events',
+  {
+    id: id(),
+    gatewayEventId: text('gateway_event_id').notNull().unique(),
+    eventType: text('event_type').notNull(),
+    payload: jsonb('payload').notNull(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp('processed_at', { withTimezone: true }),
+  },
+  (t) => [index('payment_events_unprocessed_idx').on(t.receivedAt).where(sql`${t.processedAt} is null`)],
+).enableRLS();
+
+/** Daily reconciliation mismatches for the finance queue; one row per (kind, gateway reference). */
+export const reconciliationItems = pgTable(
+  'reconciliation_items',
+  {
+    id: id(),
+    kind: text('kind').notNull(),
+    gatewayRef: text('gateway_ref').notNull(),
+    orderId: uuid('order_id').references(() => orders.id, { onDelete: 'restrict' }),
+    details: jsonb('details').notNull().default(sql`'{}'::jsonb`),
+    status: text('status').notNull().default('open'),
+    resolvedBy: uuid('resolved_by').references(() => users.id, { onDelete: 'restrict' }),
+    resolutionNote: text('resolution_note'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('reconciliation_items_kind_ref_key').on(t.kind, t.gatewayRef),
+    check('reconciliation_items_kind_check', sql`${t.kind} in ('unknown_payment','captured_not_paid','amount_mismatch','paid_without_capture','duplicate_payment')`),
+    check('reconciliation_items_status_check', sql`${t.status} in ('open','resolved')`),
+  ],
+).enableRLS();
+
+// ---- invoicing (S3-M4) ----
+
+/** Gap-free counters per financial year and kind; row-locked (SELECT … FOR UPDATE) inside the issuing transaction. */
+export const invoiceSeries = pgTable(
+  'invoice_series',
+  {
+    fy: text('fy').notNull(),
+    kind: text('kind').notNull(),
+    nextNumber: integer('next_number').notNull().default(1),
+  },
+  (t) => [
+    primaryKey({ columns: [t.fy, t.kind] }),
+    check('invoice_series_kind_check', sql`${t.kind} in ('invoice','credit_note')`),
+    check('invoice_series_fy_check', sql`${t.fy} ~ '^[0-9]{4}-[0-9]{2}$'`),
+  ],
+).enableRLS();
+
+/** Tax invoice issued by the platform. Fiscal columns immutable; pdf_key and e-invoice fields write-once (DB trigger). */
+export const invoices = pgTable(
+  'invoices',
+  {
+    id: id(),
+    orderId: uuid('order_id').notNull().unique().references(() => orders.id, { onDelete: 'restrict' }),
+    number: text('number').notNull().unique(),
+    fy: text('fy').notNull(),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull(),
+    supplierName: text('supplier_name').notNull(),
+    supplierAddress: text('supplier_address').notNull(),
+    supplierGstin: text('supplier_gstin').notNull(),
+    supplierStateCode: text('supplier_state_code').notNull(),
+    recipientName: text('recipient_name').notNull(),
+    recipientGstin: text('recipient_gstin'),
+    recipientStateCode: text('recipient_state_code').notNull(),
+    recipientAddress: text('recipient_address'),
+    placeOfSupplyState: text('place_of_supply_state').notNull(),
+    sacCode: text('sac_code').notNull(),
+    gstRateBps: integer('gst_rate_bps').notNull(),
+    taxablePaise: bigint('taxable_paise', { mode: 'number' }).notNull(),
+    cgstPaise: bigint('cgst_paise', { mode: 'number' }).notNull(),
+    sgstPaise: bigint('sgst_paise', { mode: 'number' }).notNull(),
+    igstPaise: bigint('igst_paise', { mode: 'number' }).notNull(),
+    totalPaise: bigint('total_paise', { mode: 'number' }).notNull(),
+    lineDescription: text('line_description').notNull(),
+    pdfKey: text('pdf_key'),
+    irn: text('irn'),
+    irnAckNo: text('irn_ack_no'),
+    signedQr: text('signed_qr'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('invoices_number_length_check', sql`char_length(${t.number}) <= 16`),
+    check('invoices_total_check', sql`${t.totalPaise} = ${t.taxablePaise} + ${t.cgstPaise} + ${t.sgstPaise} + ${t.igstPaise}`),
+  ],
+).enableRLS();
+
+// ---- ledger (S3-M4 writes sale royalties; S3-M5 adds the rest) ----
+
+/** Append-only, signed. One entry per (order, kind). payout_id gets its FK with the payouts table (S3-M5). */
+export const ledgerEntries = pgTable(
+  'ledger_entries',
+  {
+    id: id(),
+    sellerOrgId: uuid('seller_org_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
+    kind: text('kind').notNull(),
+    amountPaise: bigint('amount_paise', { mode: 'number' }).notNull(),
+    orderId: uuid('order_id').references(() => orders.id, { onDelete: 'restrict' }),
+    payoutId: uuid('payout_id'),
+    availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'restrict' }),
+  },
+  (t) => [
+    check(
+      'ledger_entries_kind_check',
+      sql`${t.kind} in ('sale_royalty','refund_reversal','chargeback_reversal','clawback','payout','adjustment')`,
+    ),
+    uniqueIndex('ledger_entries_order_kind_key').on(t.orderId, t.kind).where(sql`${t.orderId} is not null`),
+    index('ledger_entries_seller_idx').on(t.sellerOrgId, t.availableAt),
+  ],
+).enableRLS();
+
+// ---- certificates (S3-M4) ----
+
+/** Append-only revisions; a channel change adds a revision. record_hash lives on the license and never changes. */
+export const certificates = pgTable(
+  'certificates',
+  {
+    id: id(),
+    licenseId: uuid('license_id').notNull().references(() => licenses.id, { onDelete: 'restrict' }),
+    revision: integer('revision').notNull(),
+    pdfKey: text('pdf_key').notNull(),
+    pdfSha256: text('pdf_sha256').notNull(),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique('certificates_license_revision_key').on(t.licenseId, t.revision)],
 ).enableRLS();

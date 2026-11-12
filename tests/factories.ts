@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { memberships, organizations, sellerProfiles, trackVersions, tracks, users } from '@/db/schema';
+import { memberships, orders, organizations, sellerProfiles, trackVersions, tracks, users } from '@/db/schema';
 import type { Db } from '@/lib/platform/db';
 import { uuidv7 } from '@/lib/platform/ids';
 import type { AdminPermission, Session } from '@/lib/identity';
@@ -41,11 +41,11 @@ export async function makeSeller(db: Db, opts: { kyc?: 'pending' | 'verified' | 
 }
 
 /** A buyer org with an owner user; `owner` is a session for that user. */
-export async function makeBuyer(db: Db, legalName = 'Buyer Media LLP') {
+export async function makeBuyer(db: Db, legalName = 'Buyer Media LLP', buyerType: 'individual' | 'business' | 'agency' = 'business') {
   const owner = await makeUser(db);
   const [org] = await db
     .insert(organizations)
-    .values({ kind: 'buyer', buyerType: 'business', legalName, displayName: legalName })
+    .values({ kind: 'buyer', buyerType, legalName, displayName: legalName })
     .returning({ id: organizations.id });
   await db.insert(memberships).values({ userId: owner.userId, orgId: org!.id, role: 'owner' });
   return { owner, orgId: org!.id };
@@ -74,6 +74,43 @@ export async function makeSellableTrack(
     })
     .where(eq(tracks.id, trackId));
   return { trackId, trackVersionId: v!.id, sellerOrgId };
+}
+
+/**
+ * A bare order row for licensing tests that issue licenses directly (licenses.order_id has an FK).
+ * Checkout tests go through createOrder instead.
+ */
+export async function makeOrderRow(
+  db: Db,
+  q: { trackId: string; trackVersionId: string; sellerOrgId: string; tier: string; termsVersionId: string; licenseTextDocumentId: string; priceBookId: string; amountPaise: number },
+  buyer: { orgId: string; owner: { userId: string } },
+) {
+  const [o] = await db
+    .insert(orders)
+    .values({
+      buyerOrgId: buyer.orgId,
+      buyerUserId: buyer.owner.userId,
+      idempotencyKey: randomBytes(12).toString('hex'),
+      trackId: q.trackId,
+      trackVersionId: q.trackVersionId,
+      sellerOrgId: q.sellerOrgId,
+      tier: q.tier,
+      termsVersionId: q.termsVersionId,
+      licenseTextDocumentId: q.licenseTextDocumentId,
+      priceBookId: q.priceBookId,
+      priceLevel: 'L2',
+      taxablePaise: q.amountPaise,
+      cgstPaise: 0,
+      sgstPaise: 0,
+      igstPaise: 0,
+      totalPaise: q.amountPaise,
+      gstRateBps: 0,
+      royaltyRateBps: 7000,
+      snapshot: {},
+      expiresAt: new Date(Date.now() + 1_800_000),
+    })
+    .returning({ id: orders.id });
+  return o!.id;
 }
 
 let counter = 0;

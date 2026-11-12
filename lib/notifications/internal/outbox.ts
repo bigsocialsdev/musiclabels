@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { outbox } from '@/db/schema';
 import { getDb, type DbOrTx } from '@/lib/platform/db';
-import { errorMessage } from '@/lib/platform/log';
+import { getEnv } from '@/lib/platform/env';
+import { errorMessage, log } from '@/lib/platform/log';
 import { render } from './templates';
 import { ResendSender, type EmailSender } from './sender';
 
@@ -25,7 +26,13 @@ export async function enqueueEmail(tx: DbOrTx, m: EmailMessage): Promise<string>
   return row!.id;
 }
 
-type Claimed = { id: string; to: string; template: string; payload: Record<string, unknown>; attempts: number };
+/** Ops alert (PLAN §10 monitoring): logged now, emailed to OPS_ALERT_EMAIL via the outbox with the caller's transaction. */
+export async function enqueueOpsAlert(tx: DbOrTx, kind: string, title: string, details: Record<string, unknown>): Promise<void> {
+  log.error(`ops alert: ${title}`, { kind, ...details });
+  await enqueueEmail(tx, { kind: `alert.${kind}`, to: getEnv().OPS_ALERT_EMAIL, template: 'system_alert', payload: { title, message: JSON.stringify(details) } });
+}
+
+type Claimed ={ id: string; to: string; template: string; payload: Record<string, unknown>; attempts: number };
 
 /**
  * Claim = compare-and-set pending -> sending under FOR UPDATE SKIP LOCKED, so the after() run and

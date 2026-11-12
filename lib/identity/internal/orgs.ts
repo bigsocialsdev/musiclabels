@@ -26,6 +26,20 @@ export async function createOrganization(db: DbOrTx, userId: string, input: NewO
   });
 }
 
+/** The buyer orgs a user can purchase for (any membership role). */
+export async function listBuyerOrgs(db: DbOrTx, userId: string) {
+  return db
+    .select({ id: organizations.id, legalName: organizations.legalName, buyerType: organizations.buyerType })
+    .from(memberships)
+    .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+    .where(and(eq(memberships.userId, userId), eq(organizations.kind, 'buyer')));
+}
+
+export async function getOrganization(db: DbOrTx, orgId: string) {
+  const [row] = await db.select().from(organizations).where(eq(organizations.id, orgId));
+  return row ?? null;
+}
+
 /** Tenant check: org ids from the client are inputs to verify, never trusted. */
 export async function getMembershipRole(db: DbOrTx, userId: string, orgId: string): Promise<'owner' | 'member' | null> {
   const [row] = await db

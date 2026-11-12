@@ -30,6 +30,17 @@ const schema = z.object({
   SEND_SMS_HOOK_SECRET: z.string().optional(), // "v1,whsec_<base64>" from the Supabase dashboard
   MSG91_AUTH_KEY: z.string().optional(),
   MSG91_OTP_TEMPLATE_ID: z.string().optional(),
+  // Razorpay (test mode outside production). Checked at use by the payments slice.
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  // [CA] billing config (PLAN §8.2/§8.3). Checked at use by invoicing/orders; never code constants.
+  SUPPLIER_GSTIN: z.string().optional(),
+  SUPPLIER_LEGAL_NAME: z.string().optional(),
+  SUPPLIER_ADDRESS: z.string().optional(),
+  SAC_CODE: z.string().optional(),
+  GST_RATE_BPS: z.coerce.number().int().min(0).max(10_000).optional(),
+  DEFAULT_ROYALTY_RATE_BPS: z.coerce.number().int().min(0).max(10_000).optional(),
 });
 
 export type Env = z.infer<typeof schema>;

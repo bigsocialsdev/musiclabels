@@ -1,7 +1,7 @@
 import 'server-only';
 export * from './index';
 export { publishTermsVersion, getTermsVersion, getCurrentTerms, type TermsInput, type TermsVersion } from './internal/terms';
-export { quoteLicense, type LicenseQuote } from './internal/availability';
+export { quoteLicense, sellabilityIssues, type LicenseQuote } from './internal/availability';
 export { issueLicense, addMonthsUtc, LicensingError, type IssueInput, type License } from './internal/issue';
 export {
   HASH_SCHEMA,
@@ -20,4 +20,13 @@ export {
   type LicenseTransitionResult,
 } from './internal/transitions';
 export { addChannel, replaceChannel, registerVideo, addVideoUrl, type BuyerActor } from './internal/usage';
-export { getLicenseByPublicId, type ResolvedLicense } from './internal/read';
+export {
+  getLicenseByPublicId,
+  getLicenseByOrder,
+  getLicenseForBuyer,
+  resolveBuyerActor,
+  listActiveChannels,
+  issueDownloadUrl,
+  MAX_DOWNLOADS,
+  type ResolvedLicense,
+} from './internal/read';

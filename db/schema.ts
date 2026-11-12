@@ -1,5 +1,21 @@
 import { sql } from 'drizzle-orm';
-import { bigint, boolean, check, doublePrecision, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  check,
+  doublePrecision,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+  type AnyPgColumn,
+} from 'drizzle-orm/pg-core';
 import { uuidv7 } from '../lib/platform/ids';
 
 // Conventions (CLAUDE.md): UUIDv7 ids, money in bigint paise, timestamptz, status columns with CHECKs.
@@ -339,4 +355,184 @@ export const claimProbes = pgTable(
     notes: text('notes'),
   },
   (t) => [check('claim_probes_platform_check', sql`${t.platform} in ('youtube','meta')`)],
+).enableRLS();
+
+// ---- pricing (S3-M3) ----
+
+/** Platform-owned price grid, versioned. At most one `active` book (partial unique index). */
+export const priceBooks = pgTable(
+  'price_books',
+  {
+    id: id(),
+    version: integer('version').notNull().unique(),
+    status: text('status').notNull().default('draft'),
+    effectiveAt: timestamp('effective_at', { withTimezone: true }), // set on activation
+    createdBy: uuid('created_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('price_books_status_check', sql`${t.status} in ('draft','active','retired')`),
+    uniqueIndex('price_books_one_active_idx').on(t.status).where(sql`${t.status} = 'active'`),
+  ],
+).enableRLS();
+
+/** Append-only: a book's grid is written once, with the book. amount_paise is the taxable value (GST-exclusive). */
+export const priceBookEntries = pgTable(
+  'price_book_entries',
+  {
+    priceBookId: uuid('price_book_id').notNull().references(() => priceBooks.id, { onDelete: 'restrict' }),
+    priceLevel: text('price_level').notNull(),
+    tier: text('tier').notNull(),
+    amountPaise: bigint('amount_paise', { mode: 'number' }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.priceBookId, t.priceLevel, t.tier] }),
+    check('price_book_entries_level_check', sql`${t.priceLevel} in ('L1','L2','L3','L4','L5')`),
+    check('price_book_entries_tier_check', sql`${t.tier} in ('creator','brand_organic','paid_ad')`),
+    check('price_book_entries_amount_check', sql`${t.amountPaise} > 0`),
+  ],
+).enableRLS();
+
+// ---- licensing (S3-M3) ----
+
+/** Tier rules, versioned and immutable (append-only). A license pins the version it was sold under. */
+export const licenseTermsVersions = pgTable(
+  'license_terms_versions',
+  {
+    id: id(),
+    tier: text('tier').notNull(),
+    version: integer('version').notNull(),
+    termKind: text('term_kind').notNull(),
+    termMonths: integer('term_months'),
+    videoCap: integer('video_cap'), // null = no cap
+    maxChannels: integer('max_channels').notNull(),
+    allowedPlatforms: text('allowed_platforms').array().notNull(),
+    organicOnly: boolean('organic_only').notNull(),
+    licenseTextDocumentId: uuid('license_text_document_id').notNull().references(() => legalDocuments.id, { onDelete: 'restrict' }),
+    effectiveAt: timestamp('effective_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('license_terms_versions_tier_version_key').on(t.tier, t.version),
+    check('license_terms_versions_tier_check', sql`${t.tier} in ('creator','brand_organic','paid_ad')`),
+    check(
+      'license_terms_versions_term_check',
+      sql`(${t.termKind} = 'perpetual' and ${t.termMonths} is null) or (${t.termKind} = 'fixed_months' and ${t.termMonths} > 0)`,
+    ),
+    check('license_terms_versions_video_cap_check', sql`${t.videoCap} is null or ${t.videoCap} > 0`),
+    check('license_terms_versions_max_channels_check', sql`${t.maxChannels} > 0`),
+    check(
+      'license_terms_versions_platforms_check',
+      sql`cardinality(${t.allowedPlatforms}) > 0 and ${t.allowedPlatforms} <@ array['youtube','instagram','facebook']::text[]`,
+    ),
+  ],
+).enableRLS();
+
+/**
+ * One license per order. Only status, revoked_reason, revoked_at and updated_at may change (DB trigger), so the
+ * record-hash inputs (PLAN §7) stored here can always be recomputed from this row alone.
+ * order_id gets its FK when the orders table arrives (S3-M4).
+ */
+export const licenses = pgTable(
+  'licenses',
+  {
+    id: id(),
+    publicId: text('public_id').notNull().unique(),
+    orderId: uuid('order_id').notNull().unique(),
+    trackId: uuid('track_id').notNull().references(() => tracks.id, { onDelete: 'restrict' }),
+    trackVersionId: uuid('track_version_id').notNull().references(() => trackVersions.id, { onDelete: 'restrict' }),
+    masterSha256: text('master_sha256').notNull(),
+    trackTitle: text('track_title').notNull(),
+    primaryArtist: text('primary_artist').notNull(),
+    tier: text('tier').notNull(),
+    termsVersionId: uuid('terms_version_id').notNull().references(() => licenseTermsVersions.id, { onDelete: 'restrict' }),
+    licenseTextDocumentId: uuid('license_text_document_id').notNull().references(() => legalDocuments.id, { onDelete: 'restrict' }),
+    licenseTextSha256: text('license_text_sha256').notNull(),
+    licenseeName: text('licensee_name').notNull(),
+    clientName: text('client_name'),
+    purchaserOrgId: uuid('purchaser_org_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
+    territory: text('territory').notNull().default('worldwide'),
+    editsAllowed: boolean('edits_allowed').notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }), // null = perpetual
+    invoiceNumber: text('invoice_number').notNull(),
+    hashSchema: text('hash_schema').notNull(),
+    recordHash: text('record_hash').notNull(),
+    status: text('status').notNull().default('active'),
+    revokedReason: text('revoked_reason'),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    renewsLicenseId: uuid('renews_license_id').references((): AnyPgColumn => licenses.id, { onDelete: 'restrict' }),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('licenses_status_check', sql`${t.status} in ('active','expired','revoked')`),
+    check('licenses_tier_check', sql`${t.tier} in ('creator','brand_organic','paid_ad')`),
+    check('licenses_territory_check', sql`${t.territory} = 'worldwide'`),
+    check('licenses_term_check', sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`),
+    check('licenses_record_hash_check', sql`${t.recordHash} ~ '^[0-9a-f]{64}$'`),
+    check('licenses_revoked_check', sql`(${t.status} = 'revoked') = (${t.revokedReason} is not null and ${t.revokedAt} is not null)`),
+    check(
+      'licenses_revoked_reason_check',
+      sql`${t.revokedReason} is null or ${t.revokedReason} in ('refund','chargeback_lost','fraud','breach')`,
+    ),
+    index('licenses_purchaser_idx').on(t.purchaserOrgId),
+    index('licenses_track_idx').on(t.trackId),
+    index('licenses_expiry_idx').on(t.endsAt).where(sql`${t.status} = 'active' and ${t.endsAt} is not null`),
+  ],
+).enableRLS();
+
+/** Append-only history of license status changes. */
+export const licenseEvents = pgTable(
+  'license_events',
+  {
+    id: id(),
+    licenseId: uuid('license_id').notNull().references(() => licenses.id, { onDelete: 'restrict' }),
+    fromStatus: text('from_status').notNull(),
+    toStatus: text('to_status').notNull(),
+    event: text('event').notNull(),
+    actorUserId: uuid('actor_user_id'), // null = system
+    reason: text('reason'),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('license_events_license_idx').on(t.licenseId, t.at)],
+).enableRLS();
+
+/** Active channels have removed_at null; their count is capped by the pinned terms' max_channels. */
+export const licensedChannels = pgTable(
+  'licensed_channels',
+  {
+    id: id(),
+    licenseId: uuid('license_id').notNull().references(() => licenses.id, { onDelete: 'restrict' }),
+    platform: text('platform').notNull(),
+    handleOrUrl: text('handle_or_url').notNull(),
+    externalId: text('external_id'),
+    verificationStatus: text('verification_status').notNull().default('unverified'),
+    addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp('removed_at', { withTimezone: true }),
+  },
+  (t) => [
+    check('licensed_channels_platform_check', sql`${t.platform} in ('youtube','instagram','facebook')`),
+    check('licensed_channels_verification_check', sql`${t.verificationStatus} in ('unverified','pending','verified')`),
+    uniqueIndex('licensed_channels_active_key')
+      .on(t.licenseId, t.platform, sql`lower(${t.handleOrUrl})`)
+      .where(sql`${t.removedAt} is null`),
+    index('licensed_channels_license_idx').on(t.licenseId),
+  ],
+).enableRLS();
+
+/** One row = one creative (PLAN §5.3); cross-posts and cut-downs add URLs to the same row. */
+export const licensedVideos = pgTable(
+  'licensed_videos',
+  {
+    id: id(),
+    licenseId: uuid('license_id').notNull().references(() => licenses.id, { onDelete: 'restrict' }),
+    label: text('label').notNull(),
+    urls: text('urls').array().notNull(),
+    registeredAt: timestamp('registered_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('licensed_videos_urls_check', sql`cardinality(${t.urls}) between 1 and 10`),
+    index('licensed_videos_license_idx').on(t.licenseId),
+  ],
 ).enableRLS();

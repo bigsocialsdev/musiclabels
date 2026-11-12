@@ -11,7 +11,7 @@ Phase 3 — Plan (Architect): outputs written (docs/PLAN.md, root CLAUDE.md) —
 | 1. Understand | Done — docs/PRD-analysis.md written; open questions resolved via assumptions |
 | 2. Critique | Done — docs/PRD-critique.md written; all recommendations ACCEPTED by user (2026-11-11) |
 | 3. Plan | Done pending [GATE] — docs/PLAN.md + CLAUDE.md written (2026-11-12) |
-| 4. Build | Not started |
+| 4. Build | In progress — S3-M0 done (see changelog); next S3-M1 |
 | 5. Review | Not started |
 
 ## Decisions Made
@@ -114,6 +114,19 @@ New flags (PLAN §1):
 - Still open: F2, F3, F5–F8. These are mostly external dependencies (CA, lawyer, ACRCloud contract, RazorpayX account) and don't block the build: the plan holds their values as config.
 
 F4 updated: YouTube bio-codes are checked automatically via the YouTube Data API key; Instagram/Facebook are checked by an admin.
+
+## Changelog — Phase 4 (Build)
+
+### S3-M0 Scaffold, 2026-11-12 (Sonnet)
+Built: Next.js 16 + React 19 + TS strict + Tailwind v4 skeleton (`components.json` for shadcn; components added on first use); ESLint 9 flat config with the `lib/<slice>/internal/**` boundary rule (slices discovered from `lib/` directories; verified it blocks cross-slice and allows own-slice imports); Supabase CLI project (`supabase/`) + Drizzle (`db/schema.ts`, migrations via `DIRECT_URL`); `lib/platform/*` (zod env validated lazily, db with `DbOrTx`, service-role Supabase client, storage signed-URL wrappers, AES-256-GCM crypto with key ids, `after()` task `kick` + secret check for `app/api/tasks|cron`, Postgres token-bucket rate limit, UUIDv7, JSON logs); `notifications` slice (outbox enqueue-in-transaction, claim via `FOR UPDATE SKIP LOCKED`, stale-claim reclaim, 5 attempts, Resend sender with idempotency key); `audit` slice (`writeAudit(tx, …)`); migrations: `0000_foundation` (audit_log, outbox, rate_limits, RLS on) and `0001_append_only_triggers` (`mrm_append_only('table')` helper applied to audit_log: UPDATE/DELETE/TRUNCATE rejected); `vercel.json` crons (tasks-sweep, rate-limit-cleanup, daily), `ci.yml`, `vercel-deploy.yml`, `.env.local.example`; Playwright config + smoke spec.
+Tests (real Postgres): audit append-only, RLS-on-every-table (fails if a public table lacks RLS or any policy exists), outbox exactly-once under after()/sweep race, rate limit atomicity/refill, crypto, env, secrets.
+Assumptions / deviations:
+- Per-milestone env: `lib/platform/env.ts` holds only what M0 uses; Razorpay/MSG91/ACRCloud/YouTube/R2 and the **[CA]/[Lawyer]** config values are added by the milestone that uses them.
+- Cookie-based Supabase SSR clients and `proxy.ts` ship with S3-M1 (Auth), not M0. TanStack Query, React Hook Form, next-themes, Chart.js likewise on first use.
+- Only existing crons are in `vercel.json`; the rest (reconcile, payouts, timers, …) are registered with their milestones.
+- `mrm_append_only(tbl)` SQL helper is the mechanism for the append-only list in CLAUDE.md; later migrations call it per table.
+- CI starts only the Supabase Postgres container (`supabase start -x …`); M1 will need `auth` schema, so that exclude list must drop `gotrue` then. CI workflows not yet run on GitHub.
+- Versions follow PLAN (TS 5, ESLint 9, Vitest 4, Node 22) rather than newest majors.
 
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.

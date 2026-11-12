@@ -22,6 +22,10 @@ const schema = z.object({
   RESEND_API_KEY: z.string().min(1),
   EMAIL_FROM: z.string().min(1),
   OPS_ALERT_EMAIL: z.email(),
+  // Fingerprint screening vendor (F3: contract pending). Unset = screening reports "unavailable".
+  ACRCLOUD_HOST: z.string().optional(),
+  ACRCLOUD_ACCESS_KEY: z.string().optional(),
+  ACRCLOUD_ACCESS_SECRET: z.string().optional(),
   // Phone OTP via MSG91, called from Supabase's "Send SMS" auth hook. Checked at use, so dev needs none.
   SEND_SMS_HOOK_SECRET: z.string().optional(), // "v1,whsec_<base64>" from the Supabase dashboard
   MSG91_AUTH_KEY: z.string().optional(),

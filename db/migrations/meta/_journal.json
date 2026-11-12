@@ -29,6 +29,27 @@
       "when": 1794478566075,
       "tag": "0003_legal_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794480327203,
+      "tag": "0004_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794480328998,
+      "tag": "0005_catalog_append_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794480603926,
+      "tag": "0006_screening_unique",
+      "breakpoints": true
     }
   ]
 }

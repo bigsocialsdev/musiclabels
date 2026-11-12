@@ -41,3 +41,22 @@ export async function checkAcceptance(db: DbOrTx, userId: string, kinds: readonl
   }
   return pending.length === 0 && noDocument.length === 0 ? { ok: true } : { ok: false, pending, noDocument };
 }
+
+/**
+ * Accepts every currently pending document of the given kinds in one transaction, re-reading what is
+ * pending at that moment so only current versions are recorded. Returns the gate result afterwards.
+ */
+export async function acceptPending(
+  db: DbOrTx,
+  input: { userId: string; kinds: readonly LegalKind[]; orgId?: string | null; ip?: string | null; userAgent?: string | null },
+): Promise<AcceptanceCheck> {
+  return db.transaction(async (tx) => {
+    const now = await checkAcceptance(tx, input.userId, input.kinds);
+    if (!now.ok) {
+      for (const d of now.pending) {
+        await recordAcceptance(tx, { userId: input.userId, orgId: input.orgId, documentId: d.id, ip: input.ip, userAgent: input.userAgent });
+      }
+    }
+    return checkAcceptance(tx, input.userId, input.kinds);
+  });
+}

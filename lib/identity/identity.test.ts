@@ -72,6 +72,16 @@ describe('ensureUser', () => {
     expect(row!.verifiedAt).toBeInstanceOf(Date);
   });
 
+  it('does not erase a stored email or phone when a sign-in method lacks it', async () => {
+    const email = `${crypto.randomUUID()}@example.com`;
+    const phone = `+919${Math.floor(Math.random() * 1e9).toString().padStart(9, '0')}`;
+    const base = { userId: crypto.randomUUID(), verified: true, aal: 'aal1' as const };
+    await ensureUser(db, { ...base, email, phone });
+    await ensureUser(db, { ...base, email: null, phone: null });
+    const [row] = await db.select().from(users).where(eq(users.id, base.userId));
+    expect(row).toMatchObject({ email, phone });
+  });
+
   it('refuses an unverified session', async () => {
     const s = await makeUser(db, { verified: false });
     await expect(ensureUser(db, s)).rejects.toThrow(/unverified/);

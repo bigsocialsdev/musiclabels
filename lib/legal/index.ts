@@ -9,7 +9,7 @@ export const LEGAL_KINDS = [
 ] as const;
 export type LegalKind = (typeof LEGAL_KINDS)[number];
 
-export type LegalDocument = { id: string; kind: LegalKind; version: number; sha256: string; effectiveAt: Date };
+export type LegalDocument = { id: string; kind: LegalKind; version: number; sha256: string; effectiveAt: Date; bodyMarkdown: string };
 
 /** `no_document` fails closed: nothing published for a required kind means the gate stays shut. */
 export type AcceptanceCheck =

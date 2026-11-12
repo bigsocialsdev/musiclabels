@@ -15,8 +15,9 @@ export async function ensureUser(db: DbOrTx, session: Session): Promise<void> {
     .onConflictDoUpdate({
       target: users.id,
       set: {
-        email: session.email,
-        phone: session.phone,
+        // A sign-in method without an email/phone must not erase the one already stored.
+        email: sql`coalesce(${session.email}, ${users.email})`,
+        phone: sql`coalesce(${session.phone}, ${users.phone})`,
         verifiedAt: sql`coalesce(${users.verifiedAt}, now())`,
       },
     });

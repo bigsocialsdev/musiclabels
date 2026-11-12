@@ -3,7 +3,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { acceptances, auditLog, legalDocuments } from '@/db/schema';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { makeUser } from '@/tests/factories';
-import { LEGAL_KINDS, checkAcceptance, getCurrentDocument, publishLegalDocument, recordAcceptance } from './server';
+import { LEGAL_KINDS, acceptPending, checkAcceptance, getCurrentDocument, publishLegalDocument, recordAcceptance } from './server';
 
 afterAll(closeDb);
 const db = getDb();
@@ -101,6 +101,18 @@ describe('acceptance gate', () => {
     await recordAcceptance(db, { userId: user.userId, documentId: d.id });
     expect(await db.select().from(acceptances).where(eq(acceptances.userId, user.userId))).toHaveLength(1);
     expect(await dbMessage(sql`DELETE FROM acceptances WHERE user_id = ${user.userId}`)).toMatch(/append-only/);
+  });
+
+  it('acceptPending records only the current versions of the requested kinds, atomically', async () => {
+    const admin = await superadmin();
+    const user = await makeUser(db);
+    const tos = await publishLegalDocument(db, admin, { kind: 'tos', bodyMarkdown: 'ap tos' });
+    const privacy = await publishLegalDocument(db, admin, { kind: 'privacy', bodyMarkdown: 'ap privacy' });
+    expect((await checkAcceptance(db, user.userId, ['tos', 'privacy'])).ok).toBe(false);
+    expect(await acceptPending(db, { userId: user.userId, kinds: ['tos', 'privacy'], ip: '198.51.100.1', userAgent: 'ua' })).toEqual({ ok: true });
+    const rows = await db.select().from(acceptances).where(eq(acceptances.userId, user.userId));
+    expect(rows.map((r) => r.legalDocumentId).sort()).toEqual([tos.id, privacy.id].sort());
+    expect(rows.every((r) => r.ip === '198.51.100.1')).toBe(true);
   });
 
   it('fails closed when a required kind has no current document', async () => {

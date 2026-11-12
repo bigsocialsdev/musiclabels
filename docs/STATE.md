@@ -137,6 +137,9 @@ Assumptions / deviations:
 - "Checkout blocked until ToS accepted" is `checkAcceptance(db, userId, ['tos'])`; M4's `createOrder` must call it. Admin pages must call `requireAdmin` (no route gating in `proxy.ts`, by design).
 - Impersonation stays in S4-M10. GSTIN validation is not in M1 (arrives with GST, M4/M7).
 - **Not verified end to end**: the auth UI, Supabase cookie session and TOTP flows, Google OAuth and the MSG91 call need a running Supabase Auth stack plus MSG91/Google credentials and were not exercised here (guards and gate are tested with session objects). MSG91's OTP endpoint parameters are from its docs, untested against a live DLT template. Needs a manual pass with `supabase start` (full stack) before launch; hosted setup: enable the Send SMS hook, Google provider and TOTP in the Supabase dashboard.
+- Code-review fixes (same PR): `safeNext` rejects control characters and backslashes; `/legal/accept` and `/auth/mfa` call `ensureUser` first; the accept page uses `legal.acceptPending` (one transaction) instead of touching tables; sign-in (OTP and OAuth) sends users with a stale ToS/privacy version to `/legal/accept`; `ensureUser` no longer nulls a stored email/phone; client IP prefers `x-vercel-forwarded-for` / `x-real-ip`.
+- `users.totp_enabled` (PLAN §3.1) is **not** stored: factor state lives in Supabase Auth and a copy would go stale. Admin gating uses the session AAL, not this column.
+- **Verify manually**: that Supabase refuses enrolling a second TOTP factor from an AAL1 session once the user already has a verified one (otherwise `/auth/mfa` could weaken the admin AAL2 guard). Open: OTP-request rate limiting on the SMS hook (S4-M11).
 - Dev environment note: Docker was unavailable on the build machine, so local tests ran on a standalone Postgres on port 54322; CI uses the Supabase Postgres container.
 
 ## Notes

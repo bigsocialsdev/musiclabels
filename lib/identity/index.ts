@@ -4,7 +4,9 @@ export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
 
 /** Post-login redirect target: same-origin paths only (blocks open redirects like //evil.com or /\evil.com). */
 export function safeNext(next: string | null | undefined, fallback = '/'): string {
-  if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\') || /[\r\n]/.test(next)) return fallback;
+  // Control characters (tab, CR, LF...) are stripped by browsers/URL parsers, so "/\t/evil.com" would become "//evil.com".
+  // Backslashes are treated as slashes by browsers. Reject both.
+  if (!next || !next.startsWith('/') || next.startsWith('//') || /[\\\u0000-\u001f\u007f]/.test(next)) return fallback;
   return next;
 }
 

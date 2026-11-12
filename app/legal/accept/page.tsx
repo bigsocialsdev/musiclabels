@@ -1,10 +1,9 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { eq } from 'drizzle-orm';
-import { legalDocuments } from '@/db/schema';
-import { loadSession, requireVerified, safeNext } from '@/lib/identity/server';
-import { LEGAL_KINDS, checkAcceptance, recordAcceptance, type LegalKind } from '@/lib/legal/server';
+import { ensureUser, loadSession, requireVerified, safeNext } from '@/lib/identity/server';
+import { LEGAL_KINDS, acceptPending, checkAcceptance, type LegalKind } from '@/lib/legal/server';
 import { getDb } from '@/lib/platform/db';
+import { clientIp } from '@/lib/platform/request';
 
 const DEFAULT_KINDS: LegalKind[] = ['tos', 'privacy'];
 
@@ -19,31 +18,22 @@ export default async function AcceptPage({ searchParams }: { searchParams: Promi
   const target = safeNext(next);
   const guard = requireVerified(await loadSession());
   if (!guard.ok) {
-    redirect(`/auth/sign-in?next=${encodeURIComponent(`/legal/accept?kinds=${kinds.join(',')}&next=${target}`)}`);
+    const back = `/legal/accept?${new URLSearchParams({ kinds: kinds.join(','), next: target })}`;
+    redirect(`/auth/sign-in?${new URLSearchParams({ next: back })}`);
   }
+  const session = guard.value;
   const db = getDb();
-  const check = await checkAcceptance(db, guard.value.userId, kinds);
+  await ensureUser(db, session); // acceptances reference users(id)
+  const check = await checkAcceptance(db, session.userId, kinds);
   if (check.ok) redirect(target);
-
-  const docs = await Promise.all(
-    check.pending.map(async (d) => {
-      const [row] = await db.select({ body: legalDocuments.bodyMarkdown }).from(legalDocuments).where(eq(legalDocuments.id, d.id));
-      return { ...d, body: row?.body ?? '' };
-    }),
-  );
 
   async function accept() {
     'use server';
     const g = requireVerified(await loadSession());
     if (!g.ok) redirect('/auth/sign-in');
     const h = await headers();
-    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
-    const userAgent = h.get('user-agent');
-    // Re-read what is pending now so only current versions are ever recorded.
-    const now = await checkAcceptance(getDb(), g.value.userId, kinds);
-    if (!now.ok) {
-      for (const d of now.pending) await recordAcceptance(getDb(), { userId: g.value.userId, documentId: d.id, ip, userAgent });
-    }
+    await ensureUser(getDb(), g.value);
+    await acceptPending(getDb(), { userId: g.value.userId, kinds, ip: clientIp(h), userAgent: h.get('user-agent') });
     redirect(target);
   }
 
@@ -55,12 +45,12 @@ export default async function AcceptPage({ searchParams }: { searchParams: Promi
           These documents are not available yet: {check.noDocument.join(', ')}.
         </p>
       )}
-      {docs.map((d) => (
+      {check.pending.map((d) => (
         <section key={d.id} className="mt-4">
           <h2 className="font-medium">
             {d.kind} (version {d.version})
           </h2>
-          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded border p-3 text-sm">{d.body}</pre>
+          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded border p-3 text-sm">{d.bodyMarkdown}</pre>
         </section>
       ))}
       {check.noDocument.length === 0 && (

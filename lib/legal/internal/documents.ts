@@ -14,6 +14,7 @@ const toDoc = (r: typeof legalDocuments.$inferSelect): LegalDocument => ({
   version: r.version,
   sha256: r.sha256,
   effectiveAt: r.effectiveAt,
+  bodyMarkdown: r.bodyMarkdown,
 });
 
 /**

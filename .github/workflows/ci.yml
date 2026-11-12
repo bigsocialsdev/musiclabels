@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      # Dummy values: tests and `next build` need valid-shaped env, never real secrets.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
+      APP_URL: http://localhost:3000
+      CRON_SECRET: ci-cron-secret-0123456789abcdef
+      TASKS_SECRET: ci-tasks-secret-0123456789abcdef
+      ENCRYPTION_KEYS: k1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+      ENCRYPTION_ACTIVE_KEY_ID: k1
+      RESEND_API_KEY: re_ci
+      EMAIL_FROM: CI <ci@example.com>
+      OPS_ALERT_EMAIL: ops@example.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.1
+      - run: npm ci
+
+      - name: Env-file guard (only .env*.example may be tracked)
+        run: |
+          if git ls-files | grep -E '(^|/)\.env' | grep -vE '\.example$'; then
+            echo "Tracked env file found"; exit 1
+          fi
+
+      - run: npm run typecheck
+      - run: npm run lint
+
+      # Integration tests run against the local Supabase Postgres (database only).
+      - name: Start local Supabase Postgres
+        run: supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      - run: npm test
+
+      - run: npm audit --omit=dev --audit-level=critical
+      - run: npm run build

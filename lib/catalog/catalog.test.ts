@@ -3,7 +3,7 @@ import { copyFile, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { and, eq } from 'drizzle-orm';
-import { acceptances, auditLog, rightsDocuments, screenings, trackEvents, trackVersions, tracks } from '@/db/schema';
+import { acceptances, auditLog, rightsDeclarations, rightsDocuments, screenings, trackEvents, trackVersions, tracks } from '@/db/schema';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { runFfmpeg } from '@/lib/platform/ffmpeg';
 import { ObjectNotFoundError, type ObjectStore } from '@/lib/platform/storage';
@@ -11,6 +11,7 @@ import { publishLegalDocument, getCurrentDocument } from '@/lib/legal/server';
 import { recordClaimProbe, type FingerprintScreener } from '@/lib/screening/server';
 import { makeSeller, makeTrack, makeUser } from '@/tests/factories';
 import {
+  applyTransition,
   approveTrack,
   confirmMasterUpload,
   confirmRightsDocument,
@@ -319,6 +320,67 @@ describe('reject, availability and resubmit', () => {
     const stranger = await makeSeller(db);
     await expect(delistOwnTrack(db, { userId: stranger.owner.userId, orgId: stranger.orgId }, d.trackId)).rejects.toThrow(/Track not found/);
     expect(await delistOwnTrack(db, d.actor, d.trackId)).toMatchObject({ ok: true, to: 'delisted' });
+  });
+});
+
+describe('review fixes', () => {
+  it('a transition, its event row and its audit row commit together or not at all', async () => {
+    const { orgId } = await makeSeller(db);
+    const trackId = await makeTrack(db, orgId, 'draft');
+    const broken = await applyTransition(db, trackId, 'submit', null, { audit: { action: null as never } }).catch((e: unknown) => e);
+    expect(broken).toBeInstanceOf(Error);
+    expect((await trackRow(trackId)).status).toBe('draft');
+    expect(await db.select().from(trackEvents).where(eq(trackEvents.trackId, trackId))).toHaveLength(0);
+
+    const ok = await applyTransition(db, trackId, 'submit', null, { audit: { action: 'track.submit_test' } });
+    expect(ok).toMatchObject({ ok: true, to: 'submitted' });
+    expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, trackId), eq(auditLog.action, 'track.submit_test')))).toHaveLength(1);
+  });
+
+  it('the system move into review leaves an audit row with no actor', async () => {
+    const d = await inReview('clean');
+    const [row] = await db.select().from(auditLog).where(and(eq(auditLog.entityId, d.trackId), eq(auditLog.action, 'track.ingest_screen_done')));
+    expect(row).toBeDefined();
+    expect(row!.actorUserId).toBeNull();
+  });
+
+  it('the sweep retries an errored screening only after the backoff', async () => {
+    const d = await readyDraft();
+    const erroring: FingerprintScreener = { id: 'fake', screen: async () => ({ status: 'error', matches: [] }) };
+    await processVersion(d.versionId, { store, screener: erroring });
+    const status = async () => (await db.select().from(screenings).where(eq(screenings.trackVersionId, d.versionId)))[0]!.status;
+    expect(await status()).toBe('error');
+
+    await sweepCatalog(50, { store, screener: screener('clean') });
+    expect(await status()).toBe('error'); // attempted moments ago: left alone
+
+    await db.update(screenings).set({ createdAt: new Date(Date.now() - 31 * 60_000) }).where(eq(screenings.trackVersionId, d.versionId));
+    await sweepCatalog(50, { store, screener: screener('clean') });
+    expect(await status()).toBe('clean');
+  });
+
+  it('a track classified as not clearable (class C) cannot be edited back into a draft', async () => {
+    const d = await inReview('clean');
+    const admin = await makeUser(db, { admin: ['verification'], aal: 'aal2' });
+    await probe(admin, d.versionId);
+    await rejectTrack(db, adminCtx(admin), { trackId: d.trackId, reason: 'Cannot be cleared', classC: true });
+    await expect(editTrack(db, d.actor, d.trackId)).rejects.toThrow(/cannot be resubmitted/);
+    expect((await trackRow(d.trackId)).status).toBe('rejected');
+    // the decision cites the screening and the probe it rested on
+    const [audit] = await db.select().from(auditLog).where(and(eq(auditLog.entityId, d.trackId), eq(auditLog.action, 'track.classify_c')));
+    const [scr] = await db.select().from(screenings).where(eq(screenings.trackVersionId, d.versionId));
+    expect(audit!.after).toMatchObject({ versionId: d.versionId, screeningId: scr!.id, probeIds: [expect.any(String)] });
+  });
+
+  it('the rights declaration records the seller agreement version and is refused once submitted', async () => {
+    const d = await readyDraft();
+    const [decl] = await db.select().from(rightsDeclarations).where(eq(rightsDeclarations.trackId, d.trackId));
+    const current = await getCurrentDocument(db, 'seller_agreement');
+    expect(decl!.acceptedDocumentId).toBe(current!.id);
+
+    await processVersion(d.versionId, { store, screener: screener('clean') });
+    expect((await submitTrack(db, d.actor, d.trackId)).ok).toBe(true);
+    await expect(saveRightsDeclaration(db, d.actor, d.trackId, warranties)).rejects.toThrow(/draft/);
   });
 });
 

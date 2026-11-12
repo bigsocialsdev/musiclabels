@@ -25,3 +25,12 @@ export type AdminContext = { userId: string; permissions: readonly AdminPermissi
 
 export type GuardFailure = 'unauthenticated' | 'unverified' | 'mfa_required' | 'forbidden';
 export type Guard<T> = { ok: true; value: T } | { ok: false; reason: GuardFailure };
+
+/** Thrown when an admin lacks the permission for an action. superadmin implies every permission. */
+export class PermissionError extends Error {}
+
+export function requirePermission(admin: AdminContext, permission: AdminPermission): void {
+  if (!admin.permissions.includes('superadmin') && !admin.permissions.includes(permission)) {
+    throw new PermissionError(`This action requires the ${permission} permission`);
+  }
+}

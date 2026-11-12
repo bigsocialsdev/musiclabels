@@ -2,14 +2,16 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { CatalogError, PRICE_LEVELS, approveTrack, rejectTrack } from '@/lib/catalog/server';
+import { CatalogError, PRICE_LEVELS, approveTrack, getReviewDetail, rejectTrack } from '@/lib/catalog/server';
+import { PermissionError } from '@/lib/identity/server';
 import { getDb } from '@/lib/platform/db';
 import { clientIp } from '@/lib/platform/request';
 import { recordClaimProbe } from '@/lib/screening/server';
 import { requireVerificationAdmin } from './guard';
 
 const back = (trackId: string, params: Record<string, string>) => `/admin/verification/${trackId}?${new URLSearchParams(params)}`;
-const fail = (e: unknown) => (e instanceof CatalogError || e instanceof z.ZodError || (e instanceof Error && /permission/.test(e.message)) ? (e instanceof Error ? e.message : 'Invalid input') : 'Something went wrong');
+const fail = (e: unknown) =>
+  e instanceof CatalogError || e instanceof PermissionError || e instanceof z.ZodError ? e.message : 'Something went wrong';
 
 const idSchema = z.uuid();
 
@@ -43,7 +45,8 @@ export async function rejectAction(trackId: string, formData: FormData) {
   redirect('/admin/verification?done=rejected');
 }
 
-export async function probeAction(trackId: string, versionId: string, formData: FormData) {
+/** The probe always attaches to the track’s latest version (what review and approval look at), never to a client-named one. */
+export async function probeAction(trackId: string, formData: FormData) {
   const admin = await requireVerificationAdmin(`/admin/verification/${trackId}`);
   const input = z
     .object({
@@ -55,11 +58,13 @@ export async function probeAction(trackId: string, versionId: string, formData: 
     .safeParse(Object.fromEntries(formData));
   if (!input.success) redirect(back(trackId, { error: 'Invalid probe details' }));
   const { platform, claimant, policy, notes } = input.data;
+  const detail = await getReviewDetail(getDb(), idSchema.parse(trackId));
+  if (!detail?.version) redirect(back(trackId, { error: 'Track has no audio version' }));
   try {
     await recordClaimProbe(
       getDb(),
       admin,
-      { versionId: idSchema.parse(versionId), platform, claims: claimant ? [{ claimant, policy: policy ?? '' }] : [], notes: notes || null },
+      { versionId: detail.version.id, platform, claims: claimant ? [{ claimant, policy: policy ?? '' }] : [], notes: notes || null },
       clientIp(await headers()),
     );
   } catch (e) {

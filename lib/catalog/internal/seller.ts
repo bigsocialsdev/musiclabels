@@ -4,7 +4,7 @@ import path from 'node:path';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { rightsDeclarations, rightsDocuments, trackVersions, tracks } from '@/db/schema';
 import { getMembershipRole } from '@/lib/identity/server';
-import { hasOrgAccepted } from '@/lib/legal/server';
+import { getCurrentDocument, hasOrgAccepted } from '@/lib/legal/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import { uuidv7 } from '@/lib/platform/ids';
 import { BUCKETS, createSignedUploadUrl, supabaseObjectStore, type ObjectStore } from '@/lib/platform/storage';
@@ -59,16 +59,22 @@ export async function updateTrack(db: DbOrTx, actor: SellerActor, trackId: strin
 
 /** A rejected track goes back to draft for changes; resubmits are unlimited. */
 export async function editTrack(db: DbOrTx, actor: SellerActor, trackId: string) {
-  await ownTrack(db, actor, trackId);
+  const track = await ownTrack(db, actor, trackId);
+  if (track.clearanceClass === 'C') throw new CatalogError('This track was classified as not clearable and cannot be resubmitted');
   return applyTransition(db, trackId, 'edit', actor.userId);
 }
 
 export async function saveRightsDeclaration(db: DbOrTx, actor: SellerActor, trackId: string, input: RightsDeclarationInput): Promise<void> {
-  const track = await ownTrack(db, actor, trackId);
-  if (track.status !== 'draft') throw new CatalogError('Rights can only be declared on a draft track');
+  await ownTrack(db, actor, trackId);
   const data = rightsDeclarationSchema.parse(input);
-  const values = { ...data, declaredAt: new Date() };
-  await db.insert(rightsDeclarations).values({ trackId, ...values }).onConflictDoUpdate({ target: rightsDeclarations.trackId, set: values });
+  const agreement = await getCurrentDocument(db, 'seller_agreement');
+  await db.transaction(async (tx) => {
+    // lock the row, then re-check: the track may have been submitted since ownTrack read it
+    const [locked] = await tx.execute<{ status: string }>(sql`SELECT status FROM tracks WHERE id = ${trackId} FOR UPDATE`);
+    if (locked?.status !== 'draft') throw new CatalogError('Rights can only be declared on a draft track');
+    const values = { ...data, acceptedDocumentId: agreement?.id ?? null, declaredAt: new Date() };
+    await tx.insert(rightsDeclarations).values({ trackId, ...values }).onConflictDoUpdate({ target: rightsDeclarations.trackId, set: values });
+  });
 }
 
 // ---- master upload ----

@@ -40,8 +40,8 @@ export function nextStatus(from: TrackStatus, event: TrackEvent): TrackStatus | 
 export const isSellable = (status: TrackStatus) => status === 'published';
 
 export type ClearanceClass = 'unclassified' | 'A' | 'B' | 'C';
-export type PriceLevel = 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
-export const PRICE_LEVELS: readonly PriceLevel[] = ['L1', 'L2', 'L3', 'L4', 'L5'];
+export const PRICE_LEVELS = ['L1', 'L2', 'L3', 'L4', 'L5'] as const;
+export type PriceLevel = (typeof PRICE_LEVELS)[number];
 
 // ---- inputs (zod) ----
 
@@ -63,7 +63,7 @@ export const trackInputSchema = z.object({
   organicSocial: z.boolean().default(true),
   paidAds: z.boolean().default(false),
   editsAllowed: z.boolean().default(false),
-  proposedPriceLevel: z.enum(['L1', 'L2', 'L3', 'L4', 'L5']).nullable().default(null),
+  proposedPriceLevel: z.enum(PRICE_LEVELS).nullable().default(null),
 });
 export type TrackInput = z.input<typeof trackInputSchema>;
 

@@ -1,7 +1,7 @@
 import { asc, desc, eq, sql } from 'drizzle-orm';
 import { rightsDeclarations, rightsDocuments, trackVersions, tracks } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
-import type { AdminContext } from '@/lib/identity';
+import { requirePermission, type AdminContext } from '@/lib/identity';
 import { hasOrgAccepted } from '@/lib/legal/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import { BUCKETS, createSignedDownloadUrl } from '@/lib/platform/storage';
@@ -10,12 +10,6 @@ import { getSellerStanding } from '@/lib/sellers/server';
 import { PRICE_LEVELS, type GuardResult, type PriceLevel, type TrackEvent } from '../index';
 import { CatalogError } from './seller';
 import { applyTransition } from './transition';
-
-function requireVerification(admin: AdminContext) {
-  if (!admin.permissions.includes('verification') && !admin.permissions.includes('superadmin')) {
-    throw new CatalogError('This action requires the verification permission');
-  }
-}
 
 export type ApproveInput = {
   trackId: string;
@@ -32,7 +26,7 @@ export type ApproveInput = {
  * level, and a seller in good standing. Writes the audit row citing the screening and probes in the same transaction.
  */
 export async function approveTrack(db: DbOrTx, admin: AdminContext, input: ApproveInput, ip?: string | null): Promise<GuardResult<{ versionId: string }>> {
-  requireVerification(admin);
+  requirePermission(admin, 'verification');
   return db.transaction(async (tx) => {
     const [track] = await tx.select().from(tracks).where(eq(tracks.id, input.trackId));
     if (!track) throw new CatalogError('Track not found');
@@ -92,7 +86,7 @@ export async function approveTrack(db: DbOrTx, admin: AdminContext, input: Appro
 
 /** Rejects a track in review with a seller-visible reason; `classC` records clearance class C (cannot be cleared). */
 export async function rejectTrack(db: DbOrTx, admin: AdminContext, input: { trackId: string; reason: string; classC?: boolean }, ip?: string | null) {
-  requireVerification(admin);
+  requirePermission(admin, 'verification');
   const reason = input.reason.trim();
   if (!reason) throw new CatalogError('A rejection reason is required');
   return db.transaction(async (tx) => {
@@ -102,7 +96,18 @@ export async function rejectTrack(db: DbOrTx, admin: AdminContext, input: { trac
       set: { rejectionReason: reason, ...(input.classC ? { clearanceClass: 'C' as const } : {}) },
     });
     if (result.ok) {
-      await writeAudit(tx, { actorUserId: admin.userId, action: `track.${event}`, entityType: 'track', entityId: input.trackId, before: { status: result.from }, after: { status: result.to, reason }, ip });
+      // cite what the decision rested on (PLAN 3.4), as approve does
+      const [version] = await tx.select({ id: trackVersions.id }).from(trackVersions).where(eq(trackVersions.trackId, input.trackId)).orderBy(desc(trackVersions.versionNo)).limit(1);
+      const facts = version ? await getReviewFacts(tx, version.id) : null;
+      await writeAudit(tx, {
+        actorUserId: admin.userId,
+        action: `track.${event}`,
+        entityType: 'track',
+        entityId: input.trackId,
+        before: { status: result.from },
+        after: { status: result.to, reason, versionId: version?.id, screeningId: facts?.screening?.id, probeIds: facts?.probes.map((p) => p.id) },
+        ip,
+      });
     }
     return result;
   });
@@ -115,7 +120,7 @@ export async function setTrackAvailability(
   input: { trackId: string; action: 'suspend' | 'reinstate' | 'delist'; reason: string },
   ip?: string | null,
 ) {
-  requireVerification(admin);
+  requirePermission(admin, 'verification');
   const reason = input.reason.trim();
   if (!reason) throw new CatalogError('A reason is required');
   return db.transaction(async (tx) => {
@@ -166,9 +171,9 @@ export async function getReviewDetail(db: DbOrTx, trackId: string) {
 
 /** Admin download of a rights document: short-lived signed URL that forces an attachment download (PLAN F9), audited. */
 export async function rightsDocumentDownloadUrl(db: DbOrTx, admin: AdminContext, documentId: string, ip?: string | null): Promise<string> {
-  requireVerification(admin);
+  requirePermission(admin, 'verification');
   const [doc] = await db.select().from(rightsDocuments).where(eq(rightsDocuments.id, documentId));
   if (!doc || doc.validationStatus !== 'valid') throw new CatalogError('Document not found');
-  await writeAudit(db, { actorUserId: admin.userId, action: 'rights_document.download', entityType: 'rights_document', entityId: doc.id, after: { trackId: doc.trackId }, ip });
+  await writeAudit(db, { actorUserId: admin.userId, action: 'rights_document.download', entityType: 'rights_document', entityId: doc.id, after: { trackId: doc.trackId }, ip }); // single insert: nothing to keep atomic with
   return createSignedDownloadUrl(BUCKETS.documents, doc.fileKey, 900, `rights-document-${doc.id}.${doc.fileKey.split('.').pop()}`);
 }

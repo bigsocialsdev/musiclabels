@@ -116,12 +116,12 @@ port = 54324
 [storage]
 enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
-file_size_limit = "300MiB" # masters: a 15-minute 24-bit/48 kHz stereo WAV is about 260 MB
+file_size_limit = "200MiB" # masters (PLAN 5.1: at most 200 MB)
 
 # Private buckets (PLAN 10). Files leave only through short-lived signed URLs.
 [storage.buckets.masters]
 public = false
-file_size_limit = "300MiB"
+file_size_limit = "200MiB"
 allowed_mime_types = ["audio/wav", "audio/x-wav", "audio/wave", "audio/mpeg", "application/octet-stream"]
 
 [storage.buckets.previews]

@@ -9,6 +9,8 @@ import { BUCKETS, ObjectNotFoundError, supabaseObjectStore, type ObjectStore } f
 import { MediaRejectedError, probeAudio, renderMp3, renderPreview, sha256File, waveformPeaks } from './media';
 
 const STALE_CLAIM_MINUTES = 10;
+/** PLAN 5.1: masters are at most 200 MB (the bucket limit enforces it at upload; re-checked here). */
+export const MAX_MASTER_BYTES = 200 * 1024 * 1024;
 const GENERIC_FAILURE = 'We could not process this file. Please upload it again or contact support.';
 
 export type IngestOutcome = 'ready' | 'failed' | 'skipped';
@@ -50,6 +52,7 @@ export async function ingestVersion(versionId: string, store: ObjectStore = supa
       throw e;
     }
 
+    if ((await stat(master)).size > MAX_MASTER_BYTES) throw new MediaRejectedError('The file is larger than 200 MB');
     const probe = await probeAudio(master);
     const sha256 = await sha256File(master);
     const keys = derivedKeys(row.master_key);

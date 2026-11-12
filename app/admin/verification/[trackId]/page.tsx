@@ -113,7 +113,7 @@ export default async function ReviewTrack({
               </li>
             ))}
           </ul>
-          <form action={probeAction.bind(null, track.id, version.id)} className="mt-2 flex flex-wrap items-end gap-2 text-sm">
+          <form action={probeAction.bind(null, track.id)} className="mt-2 flex flex-wrap items-end gap-2 text-sm">
             <select name="platform" className="rounded border p-1">
               <option value="youtube">YouTube</option>
               <option value="meta">Meta</option>

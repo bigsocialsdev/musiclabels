@@ -1,21 +1,15 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { claimProbes, screenings } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
-import type { AdminContext } from '@/lib/identity';
+import { requirePermission, type AdminContext } from '@/lib/identity';
 import type { DbOrTx } from '@/lib/platform/db';
 import type { ClaimPlatform, ObservedClaim, ScreenMatch, ScreenStatus } from '../index';
 
 export type ProbeInput = { versionId: string; platform: ClaimPlatform; claims: ObservedClaim[]; notes?: string | null };
 
-function requireVerificationPermission(admin: AdminContext) {
-  if (!admin.permissions.includes('verification') && !admin.permissions.includes('superadmin')) {
-    throw new Error('Recording a claim probe requires the verification permission');
-  }
-}
-
 /** Admin records what a private upload of the track on the platform's test channel/page showed. */
 export async function recordClaimProbe(db: DbOrTx, admin: AdminContext, input: ProbeInput, ip?: string | null): Promise<string> {
-  requireVerificationPermission(admin);
+  requirePermission(admin, 'verification');
   return db.transaction(async (tx) => {
     const [row] = await tx
       .insert(claimProbes)

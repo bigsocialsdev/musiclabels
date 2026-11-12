@@ -6,6 +6,8 @@ import { ingestVersion } from './ingest';
 import { applyTransition } from './transition';
 
 const STALE_MINUTES = 10;
+/** A screening that errored is retried by the sweep only this long after its last attempt, so permanent failures neither spin nor starve newer work. */
+const ERROR_RETRY_MINUTES = 30;
 
 export type PipelineDeps = { store?: ObjectStore; screener?: FingerprintScreener };
 
@@ -33,11 +35,13 @@ export async function moveToReviewIfDone(versionId: string): Promise<boolean> {
       AND s.status IN ('clean', 'match', 'unavailable')
       AND v.version_no = (SELECT max(version_no) FROM track_versions WHERE track_id = v.track_id)`);
   if (!row) return false;
-  const result = await applyTransition(db, row.track_id, 'ingest_screen_done', null);
+  const result = await applyTransition(db, row.track_id, 'ingest_screen_done', null, {
+    audit: { action: 'track.ingest_screen_done', before: { status: 'submitted' }, after: { status: 'in_review', versionId } },
+  });
   return result.ok;
 }
 
-/** Cron backstop: versions with unfinished ingest or screening, or a submitted track not yet moved on. Oldest first. */
+/** Cron backstop: versions with unfinished ingest or screening, or a submitted track not yet moved on. Least recently attempted first. */
 export async function sweepCatalog(limit = 5, deps: PipelineDeps = {}) {
   const rows = await getDb().execute<{ id: string }>(sql`
     SELECT v.id
@@ -51,11 +55,11 @@ export async function sweepCatalog(limit = 5, deps: PipelineDeps = {}) {
         OR (v.ingest_status = 'processing' AND v.claimed_at < now() - make_interval(mins => ${STALE_MINUTES}))
         OR (v.ingest_status = 'ready' AND (
               s.id IS NULL
-              OR s.status = 'error'
+              OR (s.status = 'error' AND s.created_at < now() - make_interval(mins => ${ERROR_RETRY_MINUTES}))
               OR (s.status = 'queued' AND s.created_at < now() - make_interval(mins => ${STALE_MINUTES}))
               OR (t.status = 'submitted' AND s.status IN ('clean', 'match', 'unavailable'))))
       )
-    ORDER BY v.created_at
+    ORDER BY coalesce(s.created_at, v.created_at) -- a retried screening gets a fresh created_at and moves to the back
     LIMIT ${limit}`);
   let processed = 0;
   for (const { id } of rows) {

@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.1
       - run: npm ci
 
       - name: Env-file guard (only .env*.example may be tracked)
@@ -41,7 +44,7 @@ jobs:
 
       # Integration tests run against the local Supabase Postgres (database only).
       - name: Start local Supabase Postgres
-        run: npx supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+        run: supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
       - run: npm test
 
       - run: npm audit --omit=dev --audit-level=critical

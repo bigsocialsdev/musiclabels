@@ -16,8 +16,8 @@
     "e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "supabase:start": "supabase start",
-    "supabase:stop": "supabase stop"
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
@@ -44,7 +44,6 @@
     "esbuild": "^0.28.2",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.4.6",
-    "supabase": "^2.0.0",
     "tailwindcss": "^4.3.5",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",

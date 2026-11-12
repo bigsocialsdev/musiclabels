@@ -18,7 +18,9 @@ export const termsInputSchema = z
     licenseTextDocumentId: z.uuid(),
     effectiveAt: z.date().optional(),
   })
-  .refine((t) => (t.termKind === 'perpetual') === (t.termMonths === null), 'termMonths is required for fixed terms and absent for perpetual');
+  .refine((t) => (t.termKind === 'perpetual') === (t.termMonths === null), 'termMonths is required for fixed terms and absent for perpetual')
+  // Locked decision (PLAN §6.1): organic tiers are perpetual, paid ad is a fixed renewable term.
+  .refine((t) => (t.tier === 'paid_ad') === (t.termKind === 'fixed_months'), 'paid_ad terms are fixed-term; creator and brand_organic are perpetual');
 export type TermsInput = z.input<typeof termsInputSchema>;
 
 export type TermsVersion = {

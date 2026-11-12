@@ -61,6 +61,31 @@ CREATE TRIGGER licensed_videos_no_delete BEFORE DELETE ON public.licensed_videos
 CREATE TRIGGER licensed_videos_no_truncate BEFORE TRUNCATE ON public.licensed_videos
   FOR EACH STATEMENT EXECUTE FUNCTION public.mrm_forbid_mutation();
 --> statement-breakpoint
+-- Price books: a book other code has priced from never changes. Only status moves, draft -> active (setting
+-- effective_at once) -> retired. This is an audited config change, not a PLAN 4 state machine.
+CREATE FUNCTION mrm_price_books_guard_update() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF (to_jsonb(NEW) - 'status' - 'effective_at') IS DISTINCT FROM (to_jsonb(OLD) - 'status' - 'effective_at') THEN
+    RAISE EXCEPTION 'price_books: only status and effective_at may change'
+      USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+  IF NOT (
+       (OLD.status = 'draft' AND NEW.status = 'active' AND OLD.effective_at IS NULL AND NEW.effective_at IS NOT NULL)
+    OR (OLD.status = 'active' AND NEW.status = 'retired' AND NEW.effective_at IS NOT DISTINCT FROM OLD.effective_at)
+  ) THEN
+    RAISE EXCEPTION 'price_books: % -> % is not allowed', OLD.status, NEW.status
+      USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER price_books_guard_update BEFORE UPDATE ON public.price_books
+  FOR EACH ROW EXECUTE FUNCTION public.mrm_price_books_guard_update();
+--> statement-breakpoint
 CREATE TRIGGER price_books_no_delete BEFORE DELETE ON public.price_books
   FOR EACH ROW EXECUTE FUNCTION public.mrm_forbid_mutation();
 --> statement-breakpoint

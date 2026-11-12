@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, sql } from 'drizzle-orm';
-import { auditLog, licensedChannels, licenseEvents, licenses, sellerProfiles } from '@/db/schema';
+import { auditLog, licensedChannels, licenseEvents, licenses, sellerProfiles, tracks } from '@/db/schema';
 import { PRICE_LEVELS } from '@/lib/catalog';
 import type { AdminPermission } from '@/lib/identity';
 import { publishLegalDocument } from '@/lib/legal/server';
@@ -68,6 +68,8 @@ async function issue(tier: Tier, opts: { startsAt?: Date; channels?: ChannelInpu
     orderId: opts.orderId ?? uuidv7(),
     trackId: track.trackId,
     trackVersionId: q.value.trackVersionId,
+    trackTitle: q.value.trackTitle,
+    primaryArtist: q.value.primaryArtist,
     tier,
     termsVersionId: q.value.termsVersionId,
     licenseeName: 'Buyer Media LLP',
@@ -109,6 +111,11 @@ describe('availability and quote (PLAN 6.1)', () => {
     const wrong = await publishLegalDocument(db, sa, { kind: 'license_creator', bodyMarkdown: `x ${uuidv7()}` });
     await expect(publishTermsVersion(db, sa, { ...TERMS.paid_ad, licenseTextDocumentId: wrong.id })).rejects.toThrow(/license_paid_ad/);
     await expect(publishTermsVersion(db, await adminCtx(['verification']), { ...TERMS.creator, licenseTextDocumentId: wrong.id })).rejects.toThrow(/superadmin/);
+  });
+
+  it('terms keep the locked term kind per tier (PLAN 6.1)', async () => {
+    await expect(publishTerms('paid_ad', { termKind: 'perpetual', termMonths: null })).rejects.toThrow(/fixed-term/);
+    await expect(publishTerms('creator', { termKind: 'fixed_months', termMonths: 12 })).rejects.toThrow(/perpetual/);
   });
 });
 
@@ -158,6 +165,33 @@ describe('issuance', () => {
     await expect(bad({ trackVersionId: (await makeSellableTrack(db)).trackVersionId })).rejects.toThrow(/ready version/);
     await expect(bad({ channels: [] })).rejects.toThrow();
     await expect(bad({ invoiceNumber: 'X'.repeat(17) })).rejects.toThrow();
+  });
+
+  it('takes track title and artist from the snapshot, not the live track', async () => {
+    const track = await makeSellableTrack(db);
+    const buyer = await makeBuyer(db);
+    const q = await quoteLicense(db, track.trackId, 'creator');
+    if (!q.ok) throw new Error(q.issues.join());
+    await db.update(tracks).set({ title: 'Renamed After Order', primaryArtist: 'Someone Else' }).where(eq(tracks.id, track.trackId));
+    const { license } = await issueLicense(db, {
+      orderId: uuidv7(),
+      ...q.value,
+      licenseeName: 'Buyer Media LLP',
+      purchaserOrgId: buyer.orgId,
+      startsAt: new Date(),
+      invoiceNumber: 'MRM/26-27/000002',
+      channels: [{ platform: 'youtube', handleOrUrl: '@snap' }],
+    });
+    expect(license).toMatchObject({ trackTitle: 'Test Track', primaryArtist: 'Artist' });
+    expect((await getLicenseByPublicId(db, license.publicId))!.recordIntact).toBe(true);
+  });
+
+  it('a named client is the licensee (PLAN 6.3)', async () => {
+    const ok = await issue('creator');
+    const as = (patch: object) => issueLicense(db, { ...ok.input, orderId: uuidv7(), ...patch });
+    await expect(as({ clientName: 'Client Co', licenseeName: 'Agency Ltd' })).rejects.toThrow(/clientName/);
+    const { license } = await as({ clientName: 'Client Co', licenseeName: 'Client Co' });
+    expect(license).toMatchObject({ clientName: 'Client Co', licenseeName: 'Client Co' });
   });
 
   it('hashed columns are immutable, licenses are never deleted, and tampering is detected', async () => {

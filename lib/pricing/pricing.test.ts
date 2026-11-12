@@ -77,6 +77,13 @@ describe('price books', () => {
     expect(await dbMessage(sql`UPDATE price_book_entries SET amount_paise = 1 WHERE price_book_id = ${book.id}`)).toMatch(/append-only/);
     expect(await dbMessage(sql`DELETE FROM price_book_entries WHERE price_book_id = ${book.id}`)).toMatch(/append-only/);
     expect(await dbMessage(sql`DELETE FROM price_books WHERE id = ${book.id}`)).toMatch(/not allowed/);
+    expect(await dbMessage(sql`UPDATE price_books SET status = 'retired' WHERE id = ${book.id}`)).toMatch(/draft -> retired/);
+    expect(await dbMessage(sql`UPDATE price_books SET version = version + 100000 WHERE id = ${book.id}`)).toMatch(/only status/);
+
+    await activatePriceBook(db, a, book.id);
+    await activatePriceBook(db, a, (await createPriceBook(db, a, grid(6_000))).id);
+    expect(await dbMessage(sql`UPDATE price_books SET status = 'active' WHERE id = ${book.id}`)).toMatch(/retired -> active/);
+    expect(await dbMessage(sql`UPDATE price_books SET effective_at = now() WHERE id = ${book.id}`)).toMatch(/retired -> retired/);
     expect(await dbMessage(sql`INSERT INTO price_books (id, version, status, created_by) VALUES (gen_random_uuid(), 999999, 'active', ${a.userId})`)).toMatch(
       /price_books_one_active_idx|duplicate key/,
     );

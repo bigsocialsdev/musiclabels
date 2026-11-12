@@ -11,6 +11,8 @@ import { getCurrentTerms } from './terms';
 export type LicenseQuote = {
   trackId: string;
   trackVersionId: string;
+  trackTitle: string;
+  primaryArtist: string;
   sellerOrgId: string;
   tier: Tier;
   priceLevel: PriceLevel;
@@ -22,7 +24,15 @@ export type LicenseQuote = {
   editsAllowed: boolean;
 };
 
-const tierFlag = { creator: 'organicSocial', brand_organic: 'organicSocial', paid_ad: 'paidAds' } as const;
+/** A version buyers can be licensed: belongs to the track, ingested, with a master hash to pin. */
+export function isReadyVersionOf(
+  v: { trackId: string; ingestStatus: string; masterSha256: string | null } | undefined,
+  trackId: string,
+): v is { trackId: string; ingestStatus: 'ready'; masterSha256: string } {
+  return !!v && v.trackId === trackId && v.ingestStatus === 'ready' && !!v.masterSha256;
+}
+
+const tierFlag ={ creator: 'organicSocial', brand_organic: 'organicSocial', paid_ad: 'paidAds' } as const;
 
 /**
  * Can this tier of this track be sold now, and on what terms (PLAN §6.1)? Returns every blocking issue.
@@ -44,9 +54,7 @@ export async function quoteLicense(db: DbOrTx, trackId: string, tier: Tier, at: 
   const [version] = track.currentVersionId
     ? await db.select().from(trackVersions).where(eq(trackVersions.id, track.currentVersionId))
     : [];
-  if (!version || version.trackId !== track.id || version.ingestStatus !== 'ready' || !version.masterSha256) {
-    issues.push('no_ready_version');
-  }
+  if (!isReadyVersionOf(version, track.id)) issues.push('no_ready_version');
 
   const price = track.priceLevel ? await getActivePrice(db, track.priceLevel as PriceLevel, tier) : null;
   if (!price) issues.push('no_price');
@@ -59,6 +67,8 @@ export async function quoteLicense(db: DbOrTx, trackId: string, tier: Tier, at: 
     value: {
       trackId: track.id,
       trackVersionId: version!.id,
+      trackTitle: track.title,
+      primaryArtist: track.primaryArtist,
       sellerOrgId: track.sellerOrgId,
       tier,
       priceLevel: track.priceLevel as PriceLevel,

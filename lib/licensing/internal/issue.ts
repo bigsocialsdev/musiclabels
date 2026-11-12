@@ -1,8 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { licensedChannels, licenseEvents, licenses, trackVersions, tracks } from '@/db/schema';
+import { licensedChannels, licenseEvents, licenses, trackVersions } from '@/db/schema';
 import type { DbOrTx } from '@/lib/platform/db';
 import { TIERS, channelInputSchema } from '../index';
+import { isReadyVersionOf } from './availability';
 import { HASH_SCHEMA, computeRecordHash, newPublicId, recordHashInput } from './record-hash';
 import { getTermsVersion } from './terms';
 
@@ -11,21 +12,27 @@ export type License = typeof licenses.$inferSelect;
 /** Thrown for inputs fulfilment should never produce (a bug or tampered snapshot), so the transaction rolls back. */
 export class LicensingError extends Error {}
 
-const issueInputSchema = z.object({
-  orderId: z.uuid(),
-  trackId: z.uuid(),
-  trackVersionId: z.uuid(),
-  tier: z.enum(TIERS),
-  termsVersionId: z.uuid(),
-  licenseeName: z.string().trim().min(1).max(300),
-  clientName: z.string().trim().min(1).max(300).nullable().default(null),
-  purchaserOrgId: z.uuid(),
-  editsAllowed: z.boolean(),
-  startsAt: z.date(),
-  invoiceNumber: z.string().trim().min(1).max(16),
-  renewsLicenseId: z.uuid().nullable().default(null),
-  channels: z.array(channelInputSchema).min(1),
-});
+/** Every field comes from the order snapshot (CLAUDE.md: later code reads the snapshot, never current data). */
+const issueInputSchema = z
+  .object({
+    orderId: z.uuid(),
+    trackId: z.uuid(),
+    trackVersionId: z.uuid(),
+    trackTitle: z.string().trim().min(1).max(200),
+    primaryArtist: z.string().trim().min(1).max(200),
+    tier: z.enum(TIERS),
+    termsVersionId: z.uuid(),
+    licenseeName: z.string().trim().min(1).max(300),
+    clientName: z.string().trim().min(1).max(300).nullable().default(null),
+    purchaserOrgId: z.uuid(),
+    editsAllowed: z.boolean(),
+    startsAt: z.date(),
+    invoiceNumber: z.string().trim().min(1).max(16),
+    renewsLicenseId: z.uuid().nullable().default(null),
+    channels: z.array(channelInputSchema).min(1),
+  })
+  // PLAN §6.3: when an agency buys for a client, the client is the licensee.
+  .refine((i) => i.clientName === null || i.licenseeName === i.clientName, 'licenseeName must equal clientName when a client is named');
 export type IssueInput = z.input<typeof issueInputSchema>;
 
 /** Calendar months in UTC; a day past the target month's end clamps to its last day (Jan 31 + 1 → Feb 28/29). */
@@ -56,13 +63,7 @@ export async function issueLicense(db: DbOrTx, raw: IssueInput): Promise<{ licen
       .select({ trackId: trackVersions.trackId, masterSha256: trackVersions.masterSha256, ingestStatus: trackVersions.ingestStatus })
       .from(trackVersions)
       .where(eq(trackVersions.id, input.trackVersionId));
-    if (!version || version.trackId !== input.trackId || version.ingestStatus !== 'ready' || !version.masterSha256) {
-      throw new LicensingError('track version is not a ready version of the track');
-    }
-    const [track] = await tx
-      .select({ title: tracks.title, primaryArtist: tracks.primaryArtist })
-      .from(tracks)
-      .where(eq(tracks.id, input.trackId));
+    if (!isReadyVersionOf(version, input.trackId)) throw new LicensingError('track version is not a ready version of the track');
 
     const channels = input.channels;
     if (channels.length > terms.maxChannels) throw new LicensingError(`at most ${terms.maxChannels} channels`);
@@ -85,8 +86,8 @@ export async function issueLicense(db: DbOrTx, raw: IssueInput): Promise<{ licen
       publicId: newPublicId(),
       trackVersionId: input.trackVersionId,
       masterSha256: version.masterSha256,
-      trackTitle: track!.title,
-      primaryArtist: track!.primaryArtist,
+      trackTitle: input.trackTitle,
+      primaryArtist: input.primaryArtist,
       tier: input.tier,
       termsVersionId: terms.id,
       licenseTextSha256: terms.licenseTextSha256,

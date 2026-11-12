@@ -2,7 +2,9 @@
   "name": "music-rights-marketplace",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -39,6 +41,7 @@
     "@types/react-dom": "^19.2.0",
     "dotenv": "^17.0.0",
     "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.28.2",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.4.6",
     "supabase": "^2.0.0",

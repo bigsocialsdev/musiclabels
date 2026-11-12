@@ -11,7 +11,7 @@ Phase 3 — Plan (Architect): outputs written (docs/PLAN.md, root CLAUDE.md) —
 | 1. Understand | Done — docs/PRD-analysis.md written; open questions resolved via assumptions |
 | 2. Critique | Done — docs/PRD-critique.md written; all recommendations ACCEPTED by user (2026-11-11) |
 | 3. Plan | Done pending [GATE] — docs/PLAN.md + CLAUDE.md written (2026-11-12) |
-| 4. Build | In progress — S3-M0, S3-M1 merged; S3-M2 in PR (see changelog); next S3-M3 |
+| 4. Build | In progress — S3-M0, S3-M1 merged; S3-M2 in PR #3; S3-M3 to S3-M5 handed to a separate Opus session |
 | 5. Review | Not started |
 
 ## Decisions Made
@@ -158,6 +158,9 @@ Assumptions / deviations:
 - ACRCloud env vars (`ACRCLOUD_HOST`, `ACRCLOUD_ACCESS_KEY`, `ACRCLOUD_ACCESS_SECRET`) are optional. The request format follows ACRCloud's documented identify API and was not run against a live account.
 - Code-review fixes (same PR): `applyTransition` now runs the compare-and-set, the `track_events` row and an optional audit row in one transaction (it was only atomic when the caller opened one); the system move into review writes `track.ingest_screen_done` to `audit_log`; the sweep retries an errored screening only 30 minutes after the last attempt and orders by least recent attempt, so permanent failures cannot starve new work; class C tracks cannot be edited back to draft; `reject`/`classify_c` audit rows cite the version, screening and probe ids; the rights declaration stores the seller agreement version and is locked against a concurrent submit; admin probes always attach to the track's latest version; one shared `requirePermission`/`PermissionError` in the identity slice replaces two copies; master size re-checked in ingest (200 MB).
 - **Open after review (deliberately not done):** transient ingest failures (storage hiccup, timeout) are still terminal and need a re-upload (needs an attempt counter; revisit with the seller portal); PDF page count and obfuscated-name active-content detection are not checked (F9 heuristic only, attachment-only delivery contains the risk); `tracks.search_vector` and a `usage_flags` object are not modelled (three booleans instead; search arrives with the buyer catalogue); no `after()` kick after upload or submit until the seller upload action exists (S4-M7), so until then ingest runs from the daily sweep.
+
+### Hand-off after S3-M2, 2026-11-12
+S3-M0 to S3-M2 are built and reviewed (M0 and M1 merged; M2 in PR #3, CI `ci` job green, `deploy` job red only because the `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` repo secrets do not exist yet). S3-M3 onward (pricing and licensing engine, checkout/payments/invoicing, ledger/refunds/payouts) is handed to a separate Opus session, because those milestones are money- and concurrency-critical (record hash, webhook idempotency, `markPaid` races, refund/clawback ledger). Open items carried forward are listed under S3-M2 "Open after review" above.
 
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.

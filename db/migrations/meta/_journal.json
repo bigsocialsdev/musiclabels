@@ -15,6 +15,20 @@
       "when": 1794465235757,
       "tag": "0001_append_only_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794478562498,
+      "tag": "0002_identity_legal",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794478566075,
+      "tag": "0003_legal_append_only",
+      "breakpoints": true
     }
   ]
 }

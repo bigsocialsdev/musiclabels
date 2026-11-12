@@ -125,7 +125,7 @@ Assumptions / deviations:
 - Cookie-based Supabase SSR clients and `proxy.ts` ship with S3-M1 (Auth), not M0. TanStack Query, React Hook Form, next-themes, Chart.js likewise on first use.
 - Only existing crons are in `vercel.json`; the rest (reconcile, payouts, timers, …) are registered with their milestones.
 - `mrm_append_only(tbl)` SQL helper is the mechanism for the append-only list in CLAUDE.md; later migrations call it per table.
-- CI starts only the Supabase Postgres container (`supabase start -x …`); M1 will need `auth` schema, so that exclude list must drop `gotrue` then. CI workflows not yet run on GitHub.
+- CI starts only the Supabase Postgres container (`supabase start -x …`); M1 will need `auth` schema, so that exclude list must drop `gotrue` then. CI is green on GitHub (PR #1); Supabase CLI comes from `supabase/setup-cli`, not an npm dependency. `vercel-deploy.yml` fails until `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` repo secrets exist. Lockfile gotcha: regenerate `package-lock.json` in a clean directory (no `node_modules`) with npm 11, otherwise npm records only the local platform's optional binaries and Linux `npm ci` breaks.
 - Versions follow PLAN (TS 5, ESLint 9, Vitest 4, Node 22) rather than newest majors.
 
 ## Notes

@@ -16,6 +16,7 @@ export {
   type CallbackResult,
   type WebhookOutcome,
 } from './internal/payment';
+export { previewReceipt, type ReceiptTier } from './internal/receipt';
 export { fulfilOrder, type FulfilResult } from './internal/fulfil';
 export { requestRefund, executeRefund, completeRefund, failRefund, type RequestRefundResult, type RefundRun } from './internal/refund';
 export { applyDisputeEvent } from './internal/chargeback';

@@ -60,7 +60,7 @@ export async function makeSellableTrack(
   const trackId = await makeTrack(db, sellerOrgId, opts.status ?? 'published');
   const [v] = await db
     .insert(trackVersions)
-    .values({ trackId, versionNo: 1, masterKey: `${trackId}/master.wav`, masterSha256: randomBytes(32).toString('hex'), ingestStatus: 'ready' })
+    .values({ trackId, versionNo: 1, masterKey: `${trackId}/master.wav`, masterSha256: randomBytes(32).toString('hex'), previewKey: `${trackId}/preview.mp3`, ingestStatus: 'ready' })
     .returning({ id: trackVersions.id });
   await db
     .update(tracks)

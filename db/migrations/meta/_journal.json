@@ -127,6 +127,13 @@
       "when": 1794560192421,
       "tag": "0017_seller_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794578836552,
+      "tag": "0018_search_indexes",
+      "breakpoints": true
     }
   ]
 }

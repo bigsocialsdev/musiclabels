@@ -28,3 +28,5 @@ export {
 export { processVersion, sweepCatalog, moveToReviewIfDone } from './internal/pipeline';
 export { applyTransition, type TransitionResult } from './internal/transition';
 export { getPublishedTrack, getTrackFacts } from './internal/public';
+export { searchTracks, facetCounts, suggestTracks, trackCardBySlug, listSellableSlugs, getSellableTrack } from './internal/search';
+export { previewUrl, trackPeaks } from './internal/playback';

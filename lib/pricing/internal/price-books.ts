@@ -75,3 +75,13 @@ export async function getActivePrice(db: DbOrTx, priceLevel: PriceLevel, tier: T
     .where(and(eq(priceBooks.status, 'active'), eq(priceBookEntries.priceLevel, priceLevel), eq(priceBookEntries.tier, tier)));
   return row ?? null;
 }
+
+/** The active book's whole grid, for listings that show what a price level costs. Empty when nothing is active. */
+export async function getActivePriceGrid(db: DbOrTx): Promise<{ priceLevel: PriceLevel; tier: Tier; amountPaise: number }[]> {
+  const rows = await db
+    .select({ priceLevel: priceBookEntries.priceLevel, tier: priceBookEntries.tier, amountPaise: priceBookEntries.amountPaise })
+    .from(priceBooks)
+    .innerJoin(priceBookEntries, eq(priceBookEntries.priceBookId, priceBooks.id))
+    .where(eq(priceBooks.status, 'active'));
+  return rows as { priceLevel: PriceLevel; tier: Tier; amountPaise: number }[];
+}

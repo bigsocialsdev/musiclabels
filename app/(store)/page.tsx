@@ -4,6 +4,7 @@ import { LANGUAGE_LABELS } from '@/lib/catalog';
 import { facetCounts, searchTracks } from '@/lib/catalog/server';
 import { formatInr } from '@/lib/invoicing';
 import { getActivePriceGrid } from '@/lib/pricing/server';
+import { RateLimited, storefrontLimited } from '@/components/store/rate-limited';
 import { getDb } from '@/lib/platform/db';
 import { Discovery } from './discovery';
 import { Chips, FilterGroups } from './rail';
@@ -30,6 +31,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 export default async function BrowsePage({ searchParams }: Props) {
   const search = parseSearch(await searchParams);
   const db = getDb();
+  if (await storefrontLimited(db)) return <RateLimited />;
   const [result, facets, grid] = await Promise.all([searchTracks(db, search), facetCounts(db, search), getActivePriceGrid(db)]);
   const priceLabels = Object.fromEntries(grid.filter((g) => g.tier === 'creator').map((g) => [g.priceLevel, formatInr(g.amountPaise)]));
 

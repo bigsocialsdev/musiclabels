@@ -83,7 +83,9 @@ export async function reconcilePayments(db: DbOrTx, deps: OrderDeps, from: Date,
     const r = await markPaid(db, p, 'reconcile');
     if (r.ok && !r.alreadyPaid) {
       healed++;
-      await recordReconciliationItem(db, { kind: 'captured_not_paid', gatewayRef: p.id, orderId: r.orderId, details: { amountPaise: p.amountPaise } });
+      if (await recordReconciliationItem(db, { kind: 'captured_not_paid', gatewayRef: p.id, orderId: r.orderId, details: { amountPaise: p.amountPaise } })) {
+        await enqueueOpsAlert(db, 'captured_not_paid', 'A captured payment was found by reconciliation and its order marked paid', { orderId: r.orderId, paymentId: p.id });
+      }
       await fulfilOrder(db, r.orderId, deps.store).catch((e) => log.error('reconcile fulfil failed', { orderId: r.orderId, error: errorMessage(e) }));
     }
   }
@@ -96,7 +98,9 @@ export async function reconcilePayments(db: DbOrTx, deps: OrderDeps, from: Date,
   for (const o of paidInWindow) {
     if (!capturedIds.has(o.paymentId!)) {
       missing++;
-      await recordReconciliationItem(db, { kind: 'paid_without_capture', gatewayRef: o.paymentId!, orderId: o.id });
+      if (await recordReconciliationItem(db, { kind: 'paid_without_capture', gatewayRef: o.paymentId!, orderId: o.id })) {
+        await enqueueOpsAlert(db, 'paid_without_capture', 'An order is paid but the gateway shows no capture', { orderId: o.id, paymentId: o.paymentId });
+      }
     }
   }
   return { payments: payments.length, healed, paidWithoutCapture: missing };

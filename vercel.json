@@ -5,6 +5,7 @@
     { "path": "/api/cron/licenses-expire", "schedule": "45 1 * * *" },
     { "path": "/api/cron/reconcile", "schedule": "0 2 * * *" },
     { "path": "/api/cron/payouts", "schedule": "30 2 * * *" },
-    { "path": "/api/cron/timers", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/timers", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/storage-backup", "schedule": "0 4 * * *" }
   ]
 }

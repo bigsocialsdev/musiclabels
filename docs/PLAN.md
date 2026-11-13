@@ -122,7 +122,7 @@ Each module is a slice in `lib/<slice>/` (BigSocials convention): `index.ts` is 
 | `enquiries` | enquiries | Commercial/Broadcast enquiry form and admin handling. |
 | `notifications` | outbox | Transactional outbox, email templates, Resend sender. |
 | `audit` | audit_log | Append-only admin/system action log. |
-| `platform` | rate_limits | Shared infrastructure, no business logic: db client, Supabase clients, storage, background-handler runner, crypto, env, rate limiting. |
+| `platform` | rate_limits, storage_backups | Shared infrastructure, no business logic: db client, Supabase clients, storage, background-handler runner, crypto, env, rate limiting. |
 
 ### 2.4 Source layout
 

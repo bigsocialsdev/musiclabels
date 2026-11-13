@@ -1,30 +1,23 @@
 import { refreshStaleCertificates } from '@/lib/certificates/server';
 import { sweepCatalog } from '@/lib/catalog/server';
 import { backfillClearance, dispatchClearance } from '@/lib/clearance/server';
+import { processOutbox } from '@/lib/notifications/server';
 import { productionDeps, sweepOrders } from '@/lib/orders/server';
 import { getDb } from '@/lib/platform/db';
-import { errorMessage } from '@/lib/platform/log';
-import { processOutbox } from '@/lib/notifications/server';
-import { rejectUnlessAuthorized } from '@/lib/platform/tasks';
+import { runCron } from '../run';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-/** Backstop: reruns every background handler over rows still waiting. Later milestones add theirs here. */
-export async function GET(req: Request) {
-  const denied = rejectUnlessAuthorized(req, 'cron');
-  if (denied) return denied;
-  // Before the outbox, so license emails go out this run; isolated so a payments problem cannot stop the rest.
-  const orders = await Promise.resolve()
-    .then(() => sweepOrders(getDb(), productionDeps()))
-    .catch((e: unknown) => ({ error: errorMessage(e) }));
-  // Clearance requests go out before the outbox, so their emails are sent this run too.
-  const clearance = await Promise.resolve()
-    .then(async () => ({ backfilled: await backfillClearance(getDb()), sent: await dispatchClearance(getDb()) }))
-    .catch((e: unknown) => ({ error: errorMessage(e) }));
-  // Certificate revisions owed after channel changes.
-  const certificates = await Promise.resolve()
-    .then(() => refreshStaleCertificates(getDb(), productionDeps().store))
-    .catch((e: unknown) => ({ error: errorMessage(e) }));
-  return Response.json({ orders, clearance, certificates, outboxSent: await processOutbox(), catalogProcessed: await sweepCatalog(3) });
-}
+/**
+ * Backstop: reruns every background handler over rows still waiting. Orders first, then clearance, so the outbox
+ * (which comes after them) sends their emails in this run; each part is isolated so one failure cannot stop the rest.
+ */
+export const GET = (req: Request) =>
+  runCron(req, 'tasks-sweep', {
+    orders: () => sweepOrders(getDb(), productionDeps()),
+    clearance: async () => ({ backfilled: await backfillClearance(getDb()), sent: await dispatchClearance(getDb()) }),
+    certificates: () => refreshStaleCertificates(getDb(), productionDeps().store),
+    outboxSent: () => processOutbox(),
+    catalogProcessed: () => sweepCatalog(3),
+  });

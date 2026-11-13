@@ -6,6 +6,7 @@ import type { DbOrTx } from '@/lib/platform/db';
 import type { DocumentMime } from '@/lib/platform/document-validation';
 import { DOC_EXTENSIONS, validateStoredDocument } from '@/lib/platform/stored-document';
 import { uuidv7 } from '@/lib/platform/ids';
+import { allowUpload } from '@/lib/platform/ratelimit';
 import { BUCKETS, createSignedUploadUrl, supabaseObjectStore, type ObjectStore } from '@/lib/platform/storage';
 import { getSellerStanding } from '@/lib/sellers/server';
 import {
@@ -20,6 +21,11 @@ import { applyTransition } from './transition';
 export type SellerActor = { userId: string; orgId: string };
 
 export class CatalogError extends Error {}
+
+/** Signed upload links are throttled per user (PLAN §10), shared with seller onboarding uploads. */
+async function throttleUploads(db: DbOrTx, userId: string) {
+  if (!(await allowUpload(userId, db))) throw new CatalogError('Too many uploads in a short time. Wait a few minutes and try again.');
+}
 
 const AUDIO_EXTENSIONS = ['wav', 'mp3'] as const;
 
@@ -86,6 +92,7 @@ export async function saveRightsDeclaration(db: DbOrTx, actor: SellerActor, trac
  */
 export async function requestMasterUpload(db: DbOrTx, actor: SellerActor, trackId: string, ext: string) {
   const track = await ownTrack(db, actor, trackId);
+  await throttleUploads(db, actor.userId);
   const extension = ext.toLowerCase().replace(/^\./, '');
   if (!(AUDIO_EXTENSIONS as readonly string[]).includes(extension)) throw new CatalogError('Upload a WAV or MP3 file');
   if (track.status !== 'draft') throw new CatalogError('Audio can only be replaced on a draft track');
@@ -132,6 +139,7 @@ export async function requestRightsDocumentUpload(
   input: { docType: DocType; mime: string },
 ) {
   const track = await ownTrack(db, actor, trackId);
+  await throttleUploads(db, actor.userId);
   if (track.status !== 'draft') throw new CatalogError('Documents can only be added to a draft track');
   const ext = DOC_EXTENSIONS[input.mime as DocumentMime];
   if (!ext) throw new CatalogError('Documents must be PDF, JPG or PNG');

@@ -5,6 +5,7 @@ import { TIER_LABELS } from '@/lib/certificates';
 import { suggestTracks, trackCardBySlug } from '@/lib/catalog/server';
 import { previewReceipt } from '@/lib/orders/server';
 import { getEnv } from '@/lib/platform/env';
+import { RateLimited, storefrontLimited } from '@/components/store/rate-limited';
 import { getDb } from '@/lib/platform/db';
 import { Discovery } from '../../discovery';
 
@@ -28,9 +29,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 /** The track page: the same stage, player and receipt as discovery, with alternatives where the list would be. */
 export default async function TrackPage({ params }: Props) {
   const { slug } = await params;
+  const db = getDb();
+  if (await storefrontLimited(db)) return <RateLimited />;
   const track = await load(slug);
   if (!track) notFound();
-  const db = getDb();
   const [similar, receipt] = await Promise.all([suggestTracks(db, track.id, { limit: 8 }), previewReceipt(db, track.id)]);
 
   const offers = receipt

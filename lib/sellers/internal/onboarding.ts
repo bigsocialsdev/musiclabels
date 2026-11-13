@@ -8,6 +8,7 @@ import { decrypt, encrypt, maskTail } from '@/lib/platform/crypto';
 import type { DbOrTx } from '@/lib/platform/db';
 import { DOCUMENT_MIME_TYPES, type DocumentMime } from '@/lib/platform/document-validation';
 import { uuidv7 } from '@/lib/platform/ids';
+import { allowUpload } from '@/lib/platform/ratelimit';
 import { BUCKETS, createSignedDownloadUrl, createSignedUploadUrl, supabaseObjectStore, type ObjectStore } from '@/lib/platform/storage';
 import { DOC_EXTENSIONS, validateStoredDocument } from '@/lib/platform/stored-document';
 import {
@@ -98,6 +99,7 @@ export async function setSellerPan(db: DbOrTx, session: Session, orgId: string, 
 
 export async function requestSellerDocumentUpload(db: DbOrTx, session: Session, orgId: string, input: { kind: KycDocKind; mime: string }) {
   await requireOwner(db, session, orgId);
+  if (!(await allowUpload(session.userId, db))) throw new OnboardingError('Too many uploads in a short time. Wait a few minutes and try again.');
   if (!(DOCUMENT_MIME_TYPES as readonly string[]).includes(input.mime)) throw new OnboardingError('Documents must be PDF, JPG or PNG');
   const [held] = await db.select({ n: sql<number>`count(*)::int` }).from(sellerDocuments).where(eq(sellerDocuments.sellerOrgId, orgId));
   if (held!.n >= MAX_DOCUMENTS) throw new OnboardingError('Too many uploads. Contact support if you need to add more.');

@@ -1,7 +1,8 @@
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { trackVersions } from '@/db/schema';
 import { closeDb, getDb } from '@/lib/platform/db';
+import { setupCommerce } from '@/tests/commerce';
 import { makeSellableTrack } from '@/tests/factories';
 import { GET as preview } from './[id]/preview/route';
 import { GET as waveform } from './[id]/waveform/route';
@@ -15,6 +16,8 @@ vi.mock('@/lib/platform/storage', async (orig) => ({
 afterAll(closeDb);
 afterEach(() => vi.unstubAllGlobals());
 const db = getDb();
+// A track is on sale only with an active price book; do not rely on an earlier test file having made one.
+beforeAll(() => setupCommerce(db, { L1: 100_000, L2: 100_000, L3: 100_000, L4: 100_000, L5: 100_000 }));
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 const req = (path: string, ip: string) => new Request(`http://localhost${path}`, { headers: { 'x-real-ip': ip } });
 const ipOf = () => `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;

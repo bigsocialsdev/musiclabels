@@ -39,7 +39,9 @@ export async function markPaid(db: DbOrTx, payment: GatewayPayment, source: stri
   return db.transaction(async (tx) => {
     const [o] = payment.gatewayOrderId ? await tx.select().from(orders).where(eq(orders.gatewayOrderId, payment.gatewayOrderId)).for('update') : [];
     if (!o) {
-      await recordReconciliationItem(tx, { kind: 'unknown_payment', gatewayRef: payment.id, details: { gatewayOrderId: payment.gatewayOrderId, amountPaise: payment.amountPaise, source } });
+      if (await recordReconciliationItem(tx, { kind: 'unknown_payment', gatewayRef: payment.id, details: { gatewayOrderId: payment.gatewayOrderId, amountPaise: payment.amountPaise, source } })) {
+        await enqueueOpsAlert(tx, 'unknown_payment', 'A captured payment matches no order', { paymentId: payment.id, amountPaise: payment.amountPaise });
+      }
       return { ok: false, reason: 'unknown_order' } as const;
     }
     if (o.gatewayPaymentId === payment.id) return { ok: true, orderId: o.id, alreadyPaid: true } as const;

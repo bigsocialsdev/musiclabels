@@ -188,3 +188,9 @@ export async function listBuyerBilling(db: DbOrTx, userId: string, limit = 200):
     creditNote: r.creditNote ? { number: r.creditNote.number, issuedAt: r.creditNote.issuedAt, reason: r.creditNote.reason, totalPaise: r.creditNote.totalPaise, hasPdf: !!r.creditNote.pdfKey } : null,
   }));
 }
+
+/** The credit note that reversed an order's invoice, if the order was refunded. */
+export async function getCreditNoteByOrder(db: DbOrTx, orderId: string): Promise<CreditNote | null> {
+  const [row] = await db.select({ note: creditNotes }).from(creditNotes).innerJoin(invoices, eq(invoices.id, creditNotes.invoiceId)).where(eq(invoices.orderId, orderId));
+  return row?.note ?? null;
+}

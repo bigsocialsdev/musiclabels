@@ -10,6 +10,7 @@ export {
   storeCreditNotePdf,
   listCreditNotesWithoutPdf,
   listBuyerBilling,
+  getCreditNoteByOrder,
   type BuyerBillingRow,
   type CreditNote,
   type BillingConfig,

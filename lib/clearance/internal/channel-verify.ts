@@ -93,6 +93,14 @@ export async function startBioCodeVerification(db: DbOrTx, actor: BuyerActor, ch
   });
 }
 
+/** The channel and its open code, for the verify page; `code` is null until the buyer asks for one. */
+export async function getBioChallenge(db: DbOrTx, actor: BuyerActor, channelId: string) {
+  const channel = await getChannelForBuyer(db, actor, channelId);
+  if (!channel) return null;
+  const [open] = await db.select({ code: channelVerifications.code }).from(channelVerifications).where(and(eq(channelVerifications.licensedChannelId, channel.id), eq(channelVerifications.status, 'pending')));
+  return { channel, code: open?.code ?? null, autoCheck: channel.platform === 'youtube' && productionBioFetcher() !== null };
+}
+
 export type CheckResult = 'verified' | 'code_not_found' | 'manual_check_required' | 'check_failed' | 'rate_limited' | 'no_challenge';
 
 /**

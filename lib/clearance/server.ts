@@ -7,6 +7,7 @@ export { listClearanceQueue, escalateClearance, resolveClearance, resendClearanc
 export {
   bioCodeVerifier,
   startBioCodeVerification,
+  getBioChallenge,
   checkBioCode,
   type ChannelVerifier,
   adminConfirmChannel,
@@ -16,6 +17,6 @@ export {
   type Challenge,
   type CheckResult,
 } from './internal/channel-verify';
-export { addChannelWithClearance, replaceChannelWithClearance, registerVideoWithClearance } from './internal/usage';
+export { addChannelWithClearance, replaceChannelWithClearance, registerVideoWithClearance, listBuyerClearance } from './internal/usage';
 export { hashToken } from './internal/token';
 export { listSellerClearance, respondAsSeller, ClearanceInboxError, type SellerClearanceRow } from './internal/seller-inbox';

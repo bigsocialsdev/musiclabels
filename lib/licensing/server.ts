@@ -34,6 +34,9 @@ export {
   resolveBuyerActor,
   listActiveChannels,
   issueDownloadUrl,
+  listBuyerLicenses,
+  LICENSE_LIST_PAGE_SIZE,
+  type BuyerLicenseRow,
   MAX_DOWNLOADS,
   type ResolvedLicense,
 } from './internal/read';

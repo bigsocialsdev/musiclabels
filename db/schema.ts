@@ -103,6 +103,8 @@ export const organizations = pgTable(
     gstin: text('gstin'),
     stateCode: text('state_code'),
     billingAddress: text('billing_address'),
+    // Individual buyers only: show the full name (not a masked one) on the public verify page. Off unless the buyer opts in.
+    verifyFullName: boolean('verify_full_name').notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [

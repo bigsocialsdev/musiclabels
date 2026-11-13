@@ -9,6 +9,8 @@ export {
   issueCreditNote,
   storeCreditNotePdf,
   listCreditNotesWithoutPdf,
+  listBuyerBilling,
+  type BuyerBillingRow,
   type CreditNote,
   type BillingConfig,
   type Invoice,

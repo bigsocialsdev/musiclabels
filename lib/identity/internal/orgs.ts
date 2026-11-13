@@ -30,7 +30,7 @@ export async function createOrganization(db: DbOrTx, userId: string, input: NewO
 /** The buyer orgs a user can purchase for (any membership role). */
 export async function listBuyerOrgs(db: DbOrTx, userId: string) {
   return db
-    .select({ id: organizations.id, legalName: organizations.legalName, buyerType: organizations.buyerType })
+    .select({ id: organizations.id, legalName: organizations.legalName, buyerType: organizations.buyerType, verifyFullName: organizations.verifyFullName })
     .from(memberships)
     .innerJoin(organizations, eq(organizations.id, memberships.orgId))
     .where(and(eq(memberships.userId, userId), eq(organizations.kind, 'buyer')));
@@ -75,4 +75,18 @@ export async function listSellerOrgs(db: DbOrTx, userId: string) {
     .innerJoin(organizations, eq(organizations.id, memberships.orgId))
     .where(and(eq(memberships.userId, userId), eq(organizations.kind, 'seller')))
     .orderBy(organizations.id); // uuidv7: oldest first, so callers that take the first org get a stable one
+}
+
+/**
+ * An individual buyer's choice to show their full name, not a masked one, on the public verify page (PLAN §7). Owner only;
+ * businesses and agencies are always shown in full, so the setting does not apply to them.
+ */
+export async function setVerifyFullName(db: DbOrTx, actor: OrgActor, value: boolean): Promise<'ok' | 'not_individual'> {
+  if ((await requireOrgMember(db, actor)) !== 'owner') throw new OrgAccessError();
+  const rows = await db
+    .update(organizations)
+    .set({ verifyFullName: value })
+    .where(and(eq(organizations.id, actor.orgId), eq(organizations.kind, 'buyer'), eq(organizations.buyerType, 'individual')))
+    .returning({ id: organizations.id });
+  return rows.length ? 'ok' : 'not_individual';
 }

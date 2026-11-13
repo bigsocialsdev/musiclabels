@@ -7,9 +7,9 @@ import { consume } from '@/lib/platform/ratelimit';
 
 export const dynamic = 'force-dynamic';
 
-const params = z.object({ id: z.uuid(), doc: z.enum(['certificate', 'invoice', 'dispute-kit']) });
+const params = z.object({ id: z.uuid(), doc: z.enum(['certificate', 'invoice', 'credit-note', 'dispute-kit']) });
 
-/** Buyer documents: certificate/invoice redirect to a 15-minute signed URL; the dispute kit renders on request. */
+/** Buyer documents: certificate, invoice and credit note redirect to a 15-minute signed URL; the dispute kit renders on request. */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string; doc: string }> }) {
   const p = params.safeParse(await ctx.params);
   if (!p.success) return new Response('Not found', { status: 404 });

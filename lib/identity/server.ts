@@ -1,7 +1,7 @@
 import 'server-only';
 export * from './index';
 export { loadSession } from './internal/session';
-export { requireVerified, requireAal2, requireAdmin } from './internal/guards';
+export { requireVerified, requireAal2, requireAdmin, adminPermissionsOf } from './internal/guards';
 export { ensureUser } from './internal/users';
 export { createOrganization, getOrganization, listBuyerOrgs, listSellerOrgs, getMembershipRole, requireOrgMember, listOrgOwnerEmails, setVerifyFullName, type NewOrganization } from './internal/orgs';
 export { handleSendSmsHook } from './internal/sms';

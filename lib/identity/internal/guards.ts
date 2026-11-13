@@ -39,3 +39,10 @@ export async function requireAdmin(
   if (g.value.aal !== 'aal2') return { ok: false, reason: 'mfa_required' };
   return { ok: true, value: { userId: g.value.userId, permissions: perms } };
 }
+
+/** The signed-in admin's permissions, or null when not an admin. Only for choosing which navigation to show: pages and actions still call `requireAdmin`. */
+export async function adminPermissionsOf(session: Session | null, db: DbOrTx = getDb()): Promise<readonly AdminPermission[] | null> {
+  if (!session) return null;
+  const [row] = await db.select({ role: users.platformRole, perms: users.adminPermissions }).from(users).where(eq(users.id, session.userId));
+  return row?.role === 'admin' ? ((row.perms ?? []) as AdminPermission[]) : null;
+}

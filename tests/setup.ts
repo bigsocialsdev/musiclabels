@@ -12,5 +12,14 @@ const defaults: Record<string, string> = {
   RESEND_API_KEY: 're_test',
   EMAIL_FROM: 'Test <test@example.com>',
   OPS_ALERT_EMAIL: 'ops@example.com',
+  RAZORPAY_KEY_ID: 'rzp_test_dummy',
+  RAZORPAY_KEY_SECRET: 'test-razorpay-key-secret',
+  RAZORPAY_WEBHOOK_SECRET: 'test-razorpay-webhook-secret',
+  SUPPLIER_GSTIN: '27AAPFU0939F1ZV', // Maharashtra; a format-valid example, not the platform's
+  SUPPLIER_LEGAL_NAME: 'Test Supplier Pvt Ltd',
+  SUPPLIER_ADDRESS: '1 Test Road, Mumbai 400001',
+  SAC_CODE: 'TEST-SAC',
+  GST_RATE_BPS: '1800',
+  DEFAULT_ROYALTY_RATE_BPS: '7000',
 };
 for (const [k, v] of Object.entries(defaults)) process.env[k] ??= v;

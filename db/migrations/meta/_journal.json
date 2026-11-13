@@ -64,6 +64,27 @@
       "when": 1794498673174,
       "tag": "0008_licensing_immutability",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794501056593,
+      "tag": "0009_orders_payments_invoicing",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794501067206,
+      "tag": "0010_orders_invoicing_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794502561007,
+      "tag": "0011_invoice_supplier_details",
+      "breakpoints": true
     }
   ]
 }

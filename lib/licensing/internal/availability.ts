@@ -39,17 +39,30 @@ const tierFlag ={ creator: 'organicSocial', brand_organic: 'organicSocial', paid
  * Only published tracks of active sellers, classed A or B, with the tier's usage flag, a ready current
  * version, a price in the active book and terms in force are sellable.
  */
+async function standingIssues(db: DbOrTx, track: { status: string; clearanceClass: string; sellerOrgId: string }): Promise<string[]> {
+  const issues: string[] = [];
+  if (!isSellable(track.status as TrackStatus)) issues.push('track_not_published');
+  if (track.clearanceClass !== 'A' && track.clearanceClass !== 'B') issues.push('clearance_class_not_sellable');
+  const standing = await getSellerStanding(db, track.sellerOrgId);
+  if (standing?.status !== 'active') issues.push('seller_not_active');
+  return issues;
+}
+
+/** Re-check at fulfilment (PLAN §5.2 a): is the track still sellable at all? Price and terms come from the order. */
+export async function sellabilityIssues(db: DbOrTx, trackId: string): Promise<string[]> {
+  const [track] = await db
+    .select({ status: tracks.status, clearanceClass: tracks.clearanceClass, sellerOrgId: tracks.sellerOrgId })
+    .from(tracks)
+    .where(eq(tracks.id, trackId));
+  return track ? standingIssues(db, track) : ['track_not_found'];
+}
+
 export async function quoteLicense(db: DbOrTx, trackId: string, tier: Tier, at: Date = new Date()): Promise<Result<LicenseQuote>> {
   const [track] = await db.select().from(tracks).where(eq(tracks.id, trackId));
   if (!track) return { ok: false, issues: ['track_not_found'] };
 
-  const issues: string[] = [];
-  if (!isSellable(track.status as TrackStatus)) issues.push('track_not_published');
-  if (track.clearanceClass !== 'A' && track.clearanceClass !== 'B') issues.push('clearance_class_not_sellable');
+  const issues = await standingIssues(db, track);
   if (!track[tierFlag[tier]]) issues.push('tier_not_offered');
-
-  const standing = await getSellerStanding(db, track.sellerOrgId);
-  if (standing?.status !== 'active') issues.push('seller_not_active');
 
   const [version] = track.currentVersionId
     ? await db.select().from(trackVersions).where(eq(trackVersions.id, track.currentVersionId))

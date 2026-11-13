@@ -56,6 +56,12 @@ export async function publishLegalDocument(db: DbOrTx, admin: AdminContext, inpu
   });
 }
 
+/** A specific version, e.g. the license text a license pinned. */
+export async function getLegalDocument(db: DbOrTx, id: string): Promise<LegalDocument | null> {
+  const [row] = await db.select().from(legalDocuments).where(eq(legalDocuments.id, id));
+  return row ? toDoc(row) : null;
+}
+
 /** The version in force now: highest version of the kind whose effective_at has passed. */
 export async function getCurrentDocument(db: DbOrTx, kind: LegalKind, at = new Date()): Promise<LegalDocument | null> {
   const [row] = await db

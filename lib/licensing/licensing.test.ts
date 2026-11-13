@@ -7,7 +7,7 @@ import { publishLegalDocument } from '@/lib/legal/server';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { uuidv7 } from '@/lib/platform/ids';
 import { activatePriceBook, createPriceBook } from '@/lib/pricing/server';
-import { makeBuyer, makeSellableTrack, makeUser } from '@/tests/factories';
+import { makeBuyer, makeOrderRow, makeSellableTrack, makeUser } from '@/tests/factories';
 import {
   TIERS,
   addChannel,
@@ -65,7 +65,7 @@ async function issue(tier: Tier, opts: { startsAt?: Date; channels?: ChannelInpu
   const q = await quoteLicense(db, track.trackId, tier);
   if (!q.ok) throw new Error(q.issues.join());
   const input = {
-    orderId: opts.orderId ?? uuidv7(),
+    orderId: opts.orderId ?? (await makeOrderRow(db, q.value, buyer)),
     trackId: track.trackId,
     trackVersionId: q.value.trackVersionId,
     trackTitle: q.value.trackTitle,
@@ -139,7 +139,7 @@ describe('issuance', () => {
     const again = await issueLicense(db, first.input);
     expect(again).toMatchObject({ created: false, license: { id: first.license.id, recordHash: first.license.recordHash } });
 
-    const orderId = uuidv7();
+    const orderId = await makeOrderRow(db, first.quote, first.buyer);
     const base = { ...first.input, orderId };
     const results = await Promise.all(Array.from({ length: 6 }, () => issueLicense(db, base)));
     expect(new Set(results.map((r) => r.license.id)).size).toBe(1);
@@ -174,7 +174,7 @@ describe('issuance', () => {
     if (!q.ok) throw new Error(q.issues.join());
     await db.update(tracks).set({ title: 'Renamed After Order', primaryArtist: 'Someone Else' }).where(eq(tracks.id, track.trackId));
     const { license } = await issueLicense(db, {
-      orderId: uuidv7(),
+      orderId: await makeOrderRow(db, q.value, buyer),
       ...q.value,
       licenseeName: 'Buyer Media LLP',
       purchaserOrgId: buyer.orgId,
@@ -188,7 +188,7 @@ describe('issuance', () => {
 
   it('a named client is the licensee (PLAN 6.3)', async () => {
     const ok = await issue('creator');
-    const as = (patch: object) => issueLicense(db, { ...ok.input, orderId: uuidv7(), ...patch });
+    const as = async (patch: object) => issueLicense(db, { ...ok.input, orderId: await makeOrderRow(db, ok.quote, ok.buyer), ...patch });
     await expect(as({ clientName: 'Client Co', licenseeName: 'Agency Ltd' })).rejects.toThrow(/clientName/);
     const { license } = await as({ clientName: 'Client Co', licenseeName: 'Client Co' });
     expect(license).toMatchObject({ clientName: 'Client Co', licenseeName: 'Client Co' });

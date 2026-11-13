@@ -7,6 +7,7 @@ export type SellerStanding = {
   status: 'active' | 'suspended' | 'closed';
   opsContactEmail: string | null;
   worldwideRightsWarranted: boolean;
+  royaltyRateBps: number | null; // contract rate; null = platform default from config
 };
 
 /** The facts about a seller org that gate catalog actions. Null when the org has no seller profile yet. */
@@ -17,6 +18,7 @@ export async function getSellerStanding(db: DbOrTx, orgId: string): Promise<Sell
       status: sellerProfiles.status,
       opsContactEmail: sellerProfiles.opsContactEmail,
       worldwideRightsWarranted: sellerProfiles.worldwideRightsWarranted,
+      royaltyRateBps: sellerProfiles.royaltyRateBps,
     })
     .from(sellerProfiles)
     .where(eq(sellerProfiles.orgId, orgId));

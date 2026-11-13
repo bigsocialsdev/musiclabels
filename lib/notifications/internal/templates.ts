@@ -9,6 +9,13 @@ const templates: Record<string, (p: Record<string, unknown>) => Rendered> = {
     subject: `[Alert] ${esc(p.title)}`,
     html: `<p>${esc(p.message)}</p>`,
   }),
+  license_issued: (p) => ({
+    subject: `Your license for ${esc(p.trackTitle)}`,
+    html:
+      `<p>Your license <strong>${esc(p.publicId)}</strong> for “${esc(p.trackTitle)}” is issued (invoice ${esc(p.invoiceNumber)}).</p>` +
+      `<p>Certificate, invoice, license text and downloads are on your license page. Anyone can check it at <a href="${esc(p.verifyUrl)}">${esc(p.verifyUrl)}</a>.</p>` +
+      `<p>Clearance is a process: register each video on your license page before publishing.</p>`,
+  }),
 };
 
 export function render(template: string, payload: Record<string, unknown>): Rendered {

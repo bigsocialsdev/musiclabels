@@ -91,3 +91,56 @@ export type DocType = (typeof DOC_TYPES)[number];
 
 /** Guard failures are returned as a list so the UI can show everything that blocks the action at once. */
 export type GuardResult<T = void> = { ok: true; value: T } | { ok: false; issues: string[] };
+
+// ---- discovery (S4-M8): the public search contract, safe anywhere ----
+
+export const DISCOVERY_TIERS = ['creator', 'brand_organic', 'paid_ad'] as const;
+export type DiscoveryTier = (typeof DISCOVERY_TIERS)[number];
+export const DISCOVERY_SORTS = ['relevance', 'licensed', 'newest'] as const;
+export const DISCOVERY_PAGE_SIZE = 24;
+
+/** Filters read from the URL. Lists: any of the values within a facet; across facets they all apply (AND). */
+export const discoverySearchSchema = z.object({
+  q: z.string().trim().max(100).optional(),
+  genre: z.array(z.uuid()).max(10).default([]),
+  mood: z.array(z.uuid()).max(10).default([]),
+  lang: z.array(z.enum(LANGUAGES)).max(5).default([]),
+  /** Price levels (the platform's L1 to L5). */
+  price: z.array(z.enum(PRICE_LEVELS)).max(5).default([]),
+  /** Tiers a track must offer, all of them. */
+  tier: z.array(z.enum(DISCOVERY_TIERS)).max(3).default([]),
+  bpmMin: z.number().int().min(30).max(300).optional(),
+  bpmMax: z.number().int().min(30).max(300).optional(),
+  /** Length in seconds. */
+  durMin: z.number().int().min(0).max(3600).optional(),
+  durMax: z.number().int().min(0).max(3600).optional(),
+  sort: z.enum(DISCOVERY_SORTS).default('relevance'),
+  page: z.number().int().min(1).max(500).default(1),
+});
+export type DiscoverySearch = z.output<typeof discoverySearchSchema>;
+
+/** What a result row, the stage and the track page need; storage keys never leave the slice. */
+export type TrackCard = {
+  id: string;
+  slug: string;
+  title: string;
+  primaryArtist: string;
+  language: (typeof LANGUAGES)[number];
+  bpm: number | null;
+  durationMs: number;
+  genre: string | null;
+  moods: string[];
+  priceLevel: PriceLevel;
+  /** Tiers that can be bought right now (usage flag and a price in the active book). */
+  tiers: DiscoveryTier[];
+};
+
+export type FacetOption = { value: string; label: string; count: number };
+export type DiscoveryFacets = {
+  genres: FacetOption[];
+  moods: FacetOption[];
+  languages: FacetOption[];
+  tiers: FacetOption[];
+  priceLevels: FacetOption[];
+  bpm: { min: number; max: number } | null;
+};

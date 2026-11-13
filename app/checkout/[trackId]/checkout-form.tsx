@@ -16,6 +16,7 @@ const MESSAGES: Record<string, string> = {
   platform_not_allowed: 'That platform is not covered by this license.',
   duplicate_channel: 'The same channel is listed twice.',
   payment_gateway_unavailable: 'Payments are unavailable right now. Try again in a minute.',
+  checkout_expired: 'This checkout expired. Reload the page to start again.',
   invalid_signature: 'We could not confirm the payment. If money was taken, it will be matched automatically.',
   payment_failed: 'The payment failed. You were not charged.',
 };

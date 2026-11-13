@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { auditLog, certificates, invoices, ledgerEntries, licenses, orderEvents, orders, outbox, paymentEvents, reconciliationItems, sellerProfiles, tracks } from '@/db/schema';
 import { PRICE_LEVELS } from '@/lib/catalog';
@@ -18,6 +18,7 @@ import {
   fulfilOrder,
   handleRazorpayWebhook,
   reconcilePayments,
+  reconcilePreviousDay,
   sweepOrders,
   verifyCheckoutCallback,
   type BuyerSession,
@@ -320,6 +321,75 @@ describe('payment and fulfilment (exit criteria)', () => {
     expect(await db.select().from(reconciliationItems).where(eq(reconciliationItems.gatewayRef, p.id))).toMatchObject([{ kind: 'captured_not_paid' }]);
     await reconcilePayments(db, deps, new Date(now.getTime() - 60_000), new Date(now.getTime() + 60_000)); // idempotent
     expect(await counts(c.orderId)).toEqual(ONE_EACH);
+  });
+});
+
+describe('review fixes', () => {
+  it('refund and dispute events are stored but left unprocessed for S3-M5, even by the sweep', async () => {
+    const w = gw.webhook('refund.processed', null);
+    expect(await deliver(w)).toEqual({ status: 200 });
+    await sweepOrders(db, deps);
+    const [ev] = await db.select().from(paymentEvents).where(eq(paymentEvents.gatewayEventId, w.eventId));
+    expect(ev).toMatchObject({ eventType: 'refund.processed', processedAt: null });
+  });
+
+  it('a created order whose payment window lapsed during an outage is not opened', async () => {
+    const b = await buyer();
+    const track = await makeSellableTrack(db);
+    const input = { trackId: track.trackId, tier: 'creator' as const, channels: [{ platform: 'youtube' as const, handleOrUrl: '@a' }], billingStateCode: '27', idempotencyKey: 'lapsed-key-1' };
+    gw.failCreate = true;
+    await createOrder(db, b.session, input, gw);
+    gw.failCreate = false;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 31 * 60_000);
+    try {
+      const before = gw.createCalls;
+      expect(await createOrder(db, b.session, input, gw)).toEqual({ ok: false, issues: ['checkout_expired'] });
+      expect(gw.createCalls).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('paid_at is when the buyer paid, so a late-noticed payment does not shift the term or the hold', async () => {
+    const c = await checkout();
+    const paidAt = new Date(Date.now() - 20 * 60_000);
+    await deliver(gw.webhook('payment.captured', gw.pay(c.gatewayOrderId, { at: paidAt })));
+    await fulfilOrder(db, c.orderId, store);
+    expect((await orderRow(c.orderId)).paidAt).toEqual(new Date(Math.floor(paidAt.getTime() / 1000) * 1000));
+    const [lic] = await db.select().from(licenses).where(eq(licenses.orderId, c.orderId));
+    expect(lic!.startsAt).toEqual((await orderRow(c.orderId)).paidAt);
+  });
+
+  it('alerts ops: rejected webhook signatures (capped), sweep failures and orders stuck in paid', async () => {
+    const c = await checkout();
+    const w = gw.webhook('payment.captured', gw.pay(c.gatewayOrderId, { at: new Date(Date.now() - 15 * 60_000) }));
+    const sigAlerts = async () => (await db.select().from(outbox).where(eq(outbox.kind, 'alert.webhook_signature'))).length;
+    const before = await sigAlerts();
+    for (let i = 0; i < 5; i++) await deliver({ ...w, signature: 'bad' });
+    const after = await sigAlerts();
+    expect(after).toBeGreaterThanOrEqual(1); // earlier rejections in this run already raised one
+    expect(after - before).toBeLessThanOrEqual(1); // five more rejections, at most one more email (hourly cap)
+
+    await deliver(w); // paid 15 minutes ago
+    store.failNext = 1_000;
+    try {
+      const r = await sweepOrders(db, deps);
+      expect(r.stuckPaid).toBeGreaterThanOrEqual(1);
+    } finally {
+      store.failNext = 0;
+    }
+    const stuck = await db.select().from(outbox).where(eq(outbox.kind, 'alert.stuck_paid'));
+    expect(stuck.some((o) => JSON.stringify(o.payload).includes(c.orderId))).toBe(true);
+    expect(await db.select().from(outbox).where(eq(outbox.kind, 'alert.handler_failure'))).not.toHaveLength(0);
+    await fulfilOrder(db, c.orderId, store); // leave it fulfilled for later tests
+  });
+
+  it('the daily reconcile covers the previous IST calendar day (±1h at the gateway)', async () => {
+    const calls: [Date, Date][] = [];
+    const spy = Object.assign(Object.create(gw), { listPayments: async (from: Date, to: Date) => (calls.push([from, to]), []) });
+    await reconcilePreviousDay(db, { gateway: spy, store }, new Date('2026-11-13T00:00:00Z')); // 05:30 IST on 13 Nov
+    expect(calls[0]!.map((d) => d.toISOString())).toEqual(['2026-11-11T17:30:00.000Z', '2026-11-12T19:30:00.000Z']);
   });
 });
 

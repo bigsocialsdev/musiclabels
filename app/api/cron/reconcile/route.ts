@@ -1,4 +1,4 @@
-import { productionDeps, reconcilePayments } from '@/lib/orders/server';
+import { productionDeps, reconcilePreviousDay } from '@/lib/orders/server';
 import { getDb } from '@/lib/platform/db';
 import { rejectUnlessAuthorized } from '@/lib/platform/tasks';
 
@@ -9,7 +9,5 @@ export const maxDuration = 300;
 export async function GET(req: Request) {
   const denied = rejectUnlessAuthorized(req, 'cron');
   if (denied) return denied;
-  const IST = 330 * 60_000;
-  const todayIst = Math.floor((Date.now() + IST) / 86_400_000) * 86_400_000 - IST;
-  return Response.json(await reconcilePayments(getDb(), productionDeps(), new Date(todayIst - 86_400_000), new Date(todayIst)));
+  return Response.json(await reconcilePreviousDay(getDb(), productionDeps()));
 }

@@ -1,5 +1,7 @@
-import { and, gte, isNotNull, lt } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, lt, sql } from 'drizzle-orm';
 import { orders } from '@/db/schema';
+import { enqueueOpsAlert } from '@/lib/notifications/server';
+import { consume } from '@/lib/platform/ratelimit';
 import type { PaymentGateway } from '@/lib/payments';
 import { listUnprocessedPaymentEvents, recordReconciliationItem } from '@/lib/payments/server';
 import type { DbOrTx } from '@/lib/platform/db';
@@ -10,7 +12,15 @@ import { expireIfUnpaid, listStaleUnpaidOrders, markPaid, processPaymentEvent } 
 
 export type OrderDeps = { gateway: PaymentGateway; store: ObjectStore };
 
-async function each<T>(ids: string[], what: string, run: (id: string) => Promise<T>): Promise<number> {
+const HOUR = 1 / 3600;
+const DAY = 1 / 86_400;
+
+/** PLAN §10 alerts go to ops at most once per key per window; every failure is still logged. */
+async function alertOnce(db: DbOrTx, key: string, perSecond: number, kind: string, title: string, details: Record<string, unknown>) {
+  if (await consume(`alert:${key}`, { capacity: 1, refillPerSecond: perSecond }, db)) await enqueueOpsAlert(db, kind, title, details);
+}
+
+async function each<T>(db: DbOrTx, ids: string[], what: string, run: (id: string) => Promise<T>): Promise<number> {
   let done = 0;
   for (const id of ids) {
     try {
@@ -18,20 +28,40 @@ async function each<T>(ids: string[], what: string, run: (id: string) => Promise
       done++;
     } catch (e) {
       log.error(`order sweep: ${what} failed`, { id, error: errorMessage(e) });
+      await alertOnce(db, `sweep:${what}`, HOUR, 'handler_failure', `Order sweep: ${what} failed`, { id, error: errorMessage(e).slice(0, 300) });
     }
   }
   return done;
 }
 
+/** Orders paid more than 10 minutes ago and still not fulfilled (PLAN §10), one alert per order per day. */
+const STUCK_PAID_MINUTES = 10;
+
 /**
  * Backstop for after(): replays unprocessed webhook events, expires (or late-captures) stale unpaid orders,
- * and fulfils every paid order. Each handler claims its row, so this can overlap after() runs.
+ * and fulfils every paid order. Each handler claims its row, so this can overlap after() runs. Whatever is
+ * still `paid` afterwards is reported to ops.
  */
 export async function sweepOrders(db: DbOrTx, deps: OrderDeps) {
-  const events = await each(await listUnprocessedPaymentEvents(db), 'payment event', (id) => processPaymentEvent(db, id));
-  const expired = await each(await listStaleUnpaidOrders(db), 'expiry', (id) => expireIfUnpaid(db, id, deps.gateway));
-  const fulfilled = await each(await listPaidOrders(db), 'fulfil', (id) => fulfilOrder(db, id, deps.store));
-  return { events, expired, fulfilled };
+  const events = await each(db, await listUnprocessedPaymentEvents(db), 'payment event', (id) => processPaymentEvent(db, id));
+  const expired = await each(db, await listStaleUnpaidOrders(db), 'expiry', (id) => expireIfUnpaid(db, id, deps.gateway));
+  const fulfilled = await each(db, await listPaidOrders(db), 'fulfil', (id) => fulfilOrder(db, id, deps.store));
+  const stuck = await db
+    .select({ id: orders.id, lastError: orders.lastError })
+    .from(orders)
+    .where(and(eq(orders.status, 'paid'), lt(orders.paidAt, sql`now() - make_interval(mins => ${STUCK_PAID_MINUTES})`)));
+  for (const o of stuck) {
+    await alertOnce(db, `stuck_paid:${o.id}`, DAY, 'stuck_paid', 'Order paid but not fulfilled', { orderId: o.id, lastError: o.lastError });
+  }
+  return { events, expired, fulfilled, stuckPaid: stuck.length };
+}
+
+const IST_OFFSET_MS = 330 * 60_000;
+
+/** The daily cron's window: the previous calendar day in IST. */
+export function reconcilePreviousDay(db: DbOrTx, deps: OrderDeps, now: Date = new Date()) {
+  const todayIst = Math.floor((now.getTime() + IST_OFFSET_MS) / 86_400_000) * 86_400_000 - IST_OFFSET_MS;
+  return reconcilePayments(db, deps, new Date(todayIst - 86_400_000), new Date(todayIst));
 }
 
 /**
@@ -43,9 +73,9 @@ export async function sweepOrders(db: DbOrTx, deps: OrderDeps) {
 export async function reconcilePayments(db: DbOrTx, deps: OrderDeps, from: Date, to: Date) {
   // An hour either side, so a payment created just before `from` but captured inside the window still matches.
   const payments = await deps.gateway.listPayments(new Date(from.getTime() - 3_600_000), new Date(to.getTime() + 3_600_000));
-  const captured = payments.filter((p) => p.status === 'captured' || p.status === 'refunded');
+  const everCaptured = payments.filter((p) => p.status === 'captured' || p.status === 'refunded');
   let healed = 0;
-  for (const p of captured.filter((x) => x.status === 'captured')) {
+  for (const p of everCaptured.filter((x) => x.status === 'captured')) {
     const r = await markPaid(db, p, 'reconcile');
     if (r.ok && !r.alreadyPaid) {
       healed++;
@@ -53,7 +83,7 @@ export async function reconcilePayments(db: DbOrTx, deps: OrderDeps, from: Date,
       await fulfilOrder(db, r.orderId, deps.store).catch((e) => log.error('reconcile fulfil failed', { orderId: r.orderId, error: errorMessage(e) }));
     }
   }
-  const capturedIds = new Set(captured.map((p) => p.id));
+  const capturedIds = new Set(everCaptured.map((p) => p.id));
   const paidInWindow = await db
     .select({ id: orders.id, paymentId: orders.gatewayPaymentId })
     .from(orders)

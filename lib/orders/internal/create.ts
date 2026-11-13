@@ -132,6 +132,8 @@ async function openPayment(db: DbOrTx, order: Order, gateway: PaymentGateway): P
     currency: 'INR',
   });
   if (order.status !== 'created') return { ok: true, value: params(order) };
+  // The payment window runs from order creation; a lapsed one is never opened. A new checkout gets a new key.
+  if (order.expiresAt <= new Date()) return { ok: false, issues: ['checkout_expired'] };
   let gatewayOrderId: string;
   try {
     ({ gatewayOrderId } = await gateway.createOrder({ amountPaise: order.totalPaise, receipt: order.id, notes: { order_id: order.id } }));

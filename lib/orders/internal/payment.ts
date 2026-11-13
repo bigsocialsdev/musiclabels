@@ -4,7 +4,8 @@ import { orders } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
 import { getMembershipRole } from '@/lib/identity/server';
 import { enqueueOpsAlert } from '@/lib/notifications/server';
-import type { GatewayPayment, PaymentGateway } from '@/lib/payments';
+import { HANDLED_EVENT_TYPES, type GatewayPayment, type PaymentGateway } from '@/lib/payments';
+import { consume } from '@/lib/platform/ratelimit';
 import { getPaymentEvent, markPaymentEventProcessed, recordPaymentEvent, recordReconciliationItem, toGatewayPayment } from '@/lib/payments/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import { errorMessage, log } from '@/lib/platform/log';
@@ -45,7 +46,8 @@ export async function markPaid(db: DbOrTx, payment: GatewayPayment, source: stri
       }
       return { ok: false, reason: 'amount_mismatch', orderId: o.id } as const;
     }
-    const r = await applyOrderTransition(tx, o.id, 'capture', { actorUserId: null, reason: source, set: { gatewayPaymentId: payment.id, paidAt: new Date() } });
+    // paid_at is when the buyer paid (Razorpay's time), not when we noticed: it starts the term and the royalty hold.
+    const r = await applyOrderTransition(tx, o.id, 'capture', { actorUserId: null, reason: source, set: { gatewayPaymentId: payment.id, paidAt: payment.createdAt } });
     if (!r.ok) return { ok: false, reason: 'invalid', orderId: o.id, status: r.status } as const;
     return { ok: true, orderId: o.id, alreadyPaid: false } as const;
   });
@@ -63,6 +65,8 @@ const webhookSchema = z.object({
 export async function processPaymentEvent(db: DbOrTx, eventId: string): Promise<{ fulfilOrderId?: string }> {
   const ev = await getPaymentEvent(db, eventId);
   if (!ev || ev.processedAt) return {};
+  // Refund and dispute events stay unprocessed (stored, deduped) until S3-M5 handles them.
+  if (!(HANDLED_EVENT_TYPES as readonly string[]).includes(ev.eventType)) return {};
   const body = webhookSchema.parse(ev.payload);
   const entity = body.payload.payment?.entity;
 
@@ -83,7 +87,7 @@ export async function processPaymentEvent(db: DbOrTx, eventId: string): Promise<
     });
     return {};
   }
-  await markPaymentEventProcessed(db, ev.id); // a handled type without a payment entity: nothing to do
+  await markPaymentEventProcessed(db, ev.id); // a handled type carrying no payment entity: nothing to apply
   return {};
 }
 
@@ -101,6 +105,10 @@ export async function handleRazorpayWebhook(
 ): Promise<WebhookOutcome> {
   if (!req.signature || !gateway.verifyWebhook(req.rawBody, req.signature)) {
     log.error('razorpay webhook signature rejected', { eventId: req.eventId });
+    // Anyone can post here, so the ops email is capped at one an hour; every rejection is still logged.
+    if (await consume('alert:webhook_signature', { capacity: 1, refillPerSecond: 1 / 3600 }, db)) {
+      await enqueueOpsAlert(db, 'webhook_signature', 'Razorpay webhook signature rejected', { eventId: req.eventId });
+    }
     return { status: 401 };
   }
   if (!req.eventId) return { status: 400 };

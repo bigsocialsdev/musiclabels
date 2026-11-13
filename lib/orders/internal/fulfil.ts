@@ -13,6 +13,8 @@ import type { OrderSnapshot } from '../index';
 import { applyOrderTransition } from './transition';
 
 const STALE_CLAIM_MINUTES = 10;
+/** Unclaimed, or claimed by a run that has evidently died. */
+const claimable = () => or(isNull(orders.fulfilClaimedAt), lt(orders.fulfilClaimedAt, sql`now() - make_interval(mins => ${STALE_CLAIM_MINUTES})`));
 
 export type FulfilResult = 'fulfilled' | 'refund_pending' | 'skipped';
 
@@ -34,7 +36,7 @@ export async function fulfilOrder(db: DbOrTx, orderId: string, store: ObjectStor
       and(
         eq(orders.id, orderId),
         eq(orders.status, 'paid'),
-        or(isNull(orders.fulfilClaimedAt), lt(orders.fulfilClaimedAt, sql`now() - make_interval(mins => ${STALE_CLAIM_MINUTES})`)),
+        claimable(),
       ),
     )
     .returning();
@@ -127,7 +129,7 @@ export async function listPaidOrders(db: DbOrTx, limit = 50): Promise<string[]> 
   const rows = await db
     .select({ id: orders.id })
     .from(orders)
-    .where(and(eq(orders.status, 'paid'), or(isNull(orders.fulfilClaimedAt), lt(orders.fulfilClaimedAt, sql`now() - make_interval(mins => ${STALE_CLAIM_MINUTES})`))))
+    .where(and(eq(orders.status, 'paid'), claimable()))
     .orderBy(asc(orders.paidAt))
     .limit(limit);
   return rows.map((r) => r.id);

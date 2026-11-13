@@ -35,14 +35,14 @@ export class FakeGateway extends RazorpayGateway {
   }
 
   /** The buyer pays: a captured (or other status) payment on a gateway order. */
-  pay(gatewayOrderId: string, opts: { amountPaise?: number; status?: GatewayPayment['status'] } = {}): GatewayPayment {
+  pay(gatewayOrderId: string, opts: { amountPaise?: number; status?: GatewayPayment['status']; at?: Date } = {}): GatewayPayment {
     const p: GatewayPayment = {
       id: rid('pay'),
       gatewayOrderId,
       amountPaise: opts.amountPaise ?? this.orders.get(gatewayOrderId)!.amountPaise,
       currency: 'INR',
       status: opts.status ?? 'captured',
-      createdAt: new Date(),
+      createdAt: new Date(Math.floor((opts.at ?? new Date()).getTime() / 1000) * 1000), // Razorpay timestamps are whole seconds
     };
     this.payments.set(p.id, p);
     return p;
@@ -53,7 +53,11 @@ export class FakeGateway extends RazorpayGateway {
   }
 
   /** A webhook delivery as Razorpay sends it: raw JSON body, HMAC signature, event id header. */
-  webhook(event: string, p: GatewayPayment, eventId = rid('evt')) {
+  webhook(event: string, p: GatewayPayment | null, eventId = rid('evt')) {
+    if (!p) {
+      const rawBody = JSON.stringify({ entity: 'event', event, payload: { refund: { entity: { id: rid('rfnd') } } } });
+      return { rawBody, signature: createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET!).update(rawBody).digest('hex'), eventId };
+    }
     const rawBody = JSON.stringify({
       entity: 'event',
       event,

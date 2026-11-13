@@ -17,7 +17,7 @@ export {
   type WebhookOutcome,
 } from './internal/payment';
 export { fulfilOrder, type FulfilResult } from './internal/fulfil';
-export { sweepOrders, reconcilePayments, type OrderDeps } from './internal/sweep';
+export { sweepOrders, reconcilePayments, reconcilePreviousDay, type OrderDeps } from './internal/sweep';
 export { getOrderForBuyer } from './internal/read';
 
 /** Production adapters; tests pass fakes instead. */

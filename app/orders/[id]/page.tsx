@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { z } from 'zod';
 import { formatInr } from '@/lib/invoicing';
-import { expireIfUnpaid, getOrderForBuyer, productionDeps } from '@/lib/orders/server';
+import { expireIfUnpaid, fulfilOrder, getOrderForBuyer, productionDeps } from '@/lib/orders/server';
 import { getDb } from '@/lib/platform/db';
+import { errorMessage, log } from '@/lib/platform/log';
+import { kick } from '@/lib/platform/tasks';
 import { requireBuyerSession } from '../../buyer-session';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +29,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   let order = await getOrderForBuyer(db, session.userId, id);
   if (!order) notFound();
   if (order.status === 'awaiting_payment' && order.expiresAt < new Date()) {
-    await expireIfUnpaid(db, id, productionDeps().gateway).catch(() => null);
+    const deps = productionDeps();
+    const r = await expireIfUnpaid(db, id, deps.gateway).catch((e: unknown) => {
+      log.error('lazy expiry check failed', { orderId: id, error: errorMessage(e) });
+      return null;
+    });
+    if (r?.fulfilOrderId) {
+      const paidId = r.fulfilOrderId;
+      kick('fulfil', () => fulfilOrder(getDb(), paidId, deps.store));
+    }
     order = (await getOrderForBuyer(db, session.userId, id))!;
   }
   if (order.licenseId && order.status === 'fulfilled') redirect(`/licenses/${order.licenseId}`);

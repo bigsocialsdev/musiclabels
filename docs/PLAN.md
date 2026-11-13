@@ -304,7 +304,11 @@ in_progress ──claim released──▶ resolved_released
 in_progress ──claim valid: buyer out of scope──▶ resolved_denied (reason; may lead to license revocation)
 in_progress ──refund window passed without release, claimant is cataloged rightsholder or Class A claim──▶ refund_eligible ──refund processed──▶ resolved_refunded
 in_progress ──third-party claim outside platform's control──▶ resolved_kit_issued (buyer pursues via dispute kit; refund_eligible still applies on its window)
+open | in_progress ──48h resolution deadline missed by ops (Class A/B only)──▶ refund_eligible   [added after the S3-M6 review: protects the buyer from an ops failure; accepted risk of gaming]
+open ──refund window passed, claimant is cataloged rightsholder or Class A claim──▶ refund_eligible   [same decision: an untouched dispute is covered too]
 ```
+
+An `open` dispute reaches `refund_eligible` on the 48h deadline only once its `first_action_due_at` has also passed (a Friday report is due Monday but its 48 hours end on Sunday). Once `refund_eligible`, ops can no longer record a first action or resolve the dispute; finance decides the refund.
 
 Timers set at `open`: `first_action_due_at` = +1 business day (all disputes); `resolution_due_at` = +48h only when the track is Class A or B (F1 for Class A meaning); `refund_eligible_at` = +`CLAIM_RELEASE_REFUND_WINDOW_DAYS` (config, 7 days, **[Lawyer]**). Overdue is a derived flag (`now() > due_at` and not closed) that drives the admin overdue filter and a buyer notification; there is no SLA engine. Dispute types are reported separately (claim, strike, mute, ad rejection).
 

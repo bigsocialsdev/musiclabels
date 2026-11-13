@@ -75,6 +75,13 @@ describe('dispute state machine (PLAN 4.6)', () => {
     expect(nextDisputeStatus('open', 'release')).toBeNull(); // a first action comes first
   });
 
+  it('the database guard allows exactly the moves in the transition table', async () => {
+    const [fn] = await db.execute<{ def: string }>(sql`SELECT pg_get_functiondef('public.mrm_disputes_guard_update'::regproc) AS def`);
+    const inDb = [...fn!.def.matchAll(/'([a-z_]+>[a-z_]+)'/g)].map((m) => m[1]).sort();
+    const inCode = [...new Set(DISPUTE_TRANSITIONS.map((t) => `${t.from}>${t.to}`))].sort();
+    expect(inDb).toEqual(inCode);
+  });
+
   it('the database enforces the same moves; the reported facts and timers never change; history is append-only', async () => {
     const s = await sale(db, gw, store);
     const id = await opened(s);
@@ -262,22 +269,48 @@ describe('refund eligibility (PLAN 4.6, 5.4)', () => {
     expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, missedId), eq(auditLog.action, 'dispute.make_refund_eligible')))).toHaveLength(1);
   });
 
-  it('a dispute ops never touched (still open) becomes refund_eligible once its 48h deadline passes; none before, none for Class C', async () => {
-    const untouched = await sale(db, gw, store, { clearanceClass: 'B' });
-    const untouchedId = await opened(untouched, {}, new Date(Date.now() - 3 * DAY));
-    const fresh = await sale(db, gw, store, { clearanceClass: 'B' });
-    const freshId = await opened(fresh, {}, new Date(Date.now() - DAY));
-    const c = await sale(db, gw, store, { clearanceClass: 'B' });
-    await db.update(tracks).set({ clearanceClass: 'C' }).where(eq(tracks.id, c.trackId));
-    const cId = await opened(c, {}, new Date(Date.now() - 3 * DAY)); // no deadline: nothing to miss
+  // Fixed clock: these disputes are opened in 2030 and swept with an injected `now` (and `only`), so they depend on
+  // neither today's weekday nor the other tests' disputes.
+  const at = (iso: string) => new Date(iso);
+  const sweepOne = (id: string, now: string) => makeRefundEligible(db, 1000, { now: at(now), only: id });
+  const eventNote = async (id: string) => (await db.select().from(disputeEvents).where(and(eq(disputeEvents.disputeId, id), eq(disputeEvents.kind, 'make_refund_eligible'))))[0]?.note;
 
-    await makeRefundEligible(db, 1000);
-    expect((await row(untouchedId)).status).toBe('refund_eligible');
-    expect((await row(freshId)).status).toBe('open');
-    expect((await row(cId)).status).toBe('open');
-    expect((await db.select({ k: disputeEvents.kind }).from(disputeEvents).where(eq(disputeEvents.disputeId, untouchedId))).map((e) => e.k)).toEqual(expect.arrayContaining(['opened', 'make_refund_eligible']));
-    expect((await mailsTo(untouched.buyer.owner.email!, 'dispute.refund_eligible'))).toHaveLength(1);
-    expect(await dbMessage(sql`UPDATE disputes SET status = 'in_progress' WHERE id = ${untouchedId}`)).toMatch(/refund_eligible -> in_progress is not allowed/); // too late for ops to take it back
+  it('a dispute ops never touched (still open) becomes refund_eligible once its 48h deadline passes, not before, and ops cannot take it back', async () => {
+    const s = await sale(db, gw, store, { clearanceClass: 'B' });
+    const id = await opened(s, {}, at('2030-01-02T10:00:00Z')); // Wed: first action due Thu 10:00, resolution due Fri 10:00
+    expect(await sweepOne(id, '2030-01-04T09:00:00Z')).toBe(0);
+    expect((await row(id)).status).toBe('open');
+    expect(await sweepOne(id, '2030-01-04T11:00:00Z')).toBe(1);
+    expect((await row(id)).status).toBe('refund_eligible');
+    expect(await eventNote(id)).toBe('resolution deadline passed without resolution');
+    expect((await mailsTo(s.buyer.owner.email!, 'dispute.refund_eligible'))).toHaveLength(1);
+    expect(await dbMessage(sql`UPDATE disputes SET status = 'in_progress' WHERE id = ${id}`)).toMatch(/refund_eligible -> in_progress is not allowed/);
+
+    // ops arriving late: the sweep won, so first action and resolution are refused; finance can approve the refund
+    expect(await recordFirstAction(db, await dispatcher(), id, { note: 'late' })).toMatchObject({ ok: false });
+    expect(await resolveDispute(db, await dispatcher(), id, { resolution: 'released', note: 'late' })).toMatchObject({ ok: false });
+    expect(await requestDisputeRefund(db, await adminCtx(db, ['finance']), id)).toMatchObject({ ok: true });
+  });
+
+  it('a Friday report is not refund-eligible over the weekend: ops is not expected to act before Monday', async () => {
+    const s = await sale(db, gw, store, { clearanceClass: 'B' });
+    const id = await opened(s, {}, at('2030-01-04T10:00:00Z')); // Fri: resolution due Sun 10:00, first action due Mon 10:00
+    expect(await sweepOne(id, '2030-01-06T12:00:00Z')).toBe(0); // Sunday: 48h are up, first action is not due
+    expect((await row(id)).status).toBe('open');
+    expect(await sweepOne(id, '2030-01-07T12:00:00Z')).toBe(1); // Monday: both passed
+    expect((await row(id)).status).toBe('refund_eligible');
+  });
+
+  it('a Class C dispute has no deadline; once its refund window passes it is eligible only if the claimant is a cataloged rightsholder', async () => {
+    const s = await sale(db, gw, store, { clearanceClass: 'B' });
+    await db.update(tracks).set({ clearanceClass: 'C' }).where(eq(tracks.id, s.trackId));
+    const id = await opened(s, {}, at('2030-01-02T10:00:00Z')); // refund window ends 2030-01-09
+    expect(await sweepOne(id, '2030-01-04T11:00:00Z')).toBe(0); // no 48h deadline to miss
+    expect(await sweepOne(id, '2030-01-10T10:00:00Z')).toBe(0); // window passed, claimant not cataloged
+    expect(await setClaimantCataloged(db, await dispatcher(), id, true)).toEqual({ ok: true });
+    expect(await sweepOne(id, '2030-01-10T10:00:00Z')).toBe(1);
+    expect((await row(id)).status).toBe('refund_eligible'); // straight from open: no first action was ever recorded
+    expect(await eventNote(id)).toBe('refund window passed without release');
   });
 
   it('a kit-issued dispute becomes refund-eligible on its window too; a released one never does', async () => {

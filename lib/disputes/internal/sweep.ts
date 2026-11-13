@@ -25,22 +25,25 @@ const idsOf = async (db: DbOrTx, q: ReturnType<typeof sql>) => (await db.execute
 
 /**
  * → refund_eligible, then finance approves the refund. Two ways in (PLAN §4.6 and the later decision, STATE.md S3-M6):
- * - an open or in-progress dispute whose 48-hour resolution deadline ops missed (protects the buyer from an ops
- *   failure; a Class C dispute has no deadline);
- * - an in-progress or kit-issued dispute whose refund window has passed with the claim unreleased, for a Class A
- *   claim or one by a cataloged rightsholder.
+ * - the 48-hour resolution deadline was missed (protects the buyer from an ops failure; a Class C dispute has none).
+ *   An `open` dispute also needs its first-action date passed: a Friday report is due Monday but its 48 hours end
+ *   on Sunday, and ops must not be penalised before it was ever expected to act;
+ * - the refund window passed with the claim unreleased, for a Class A claim or one by a cataloged rightsholder
+ *   (open, in progress or kit issued).
+ * `now` and `only` (one dispute id) exist so a test can fix the clock without sweeping other tests' disputes.
  */
-export async function makeRefundEligible(db: DbOrTx, limit = BATCH): Promise<number> {
-  const ids = await idsOf(
-    db,
-    sql`SELECT id FROM disputes
-        WHERE (status IN ('open','in_progress') AND resolution_due_at < now())
-           OR (status IN ('in_progress','resolved_kit_issued') AND refund_eligible_at <= now()
-               AND (clearance_class_at_open = 'A' OR claimant_cataloged))
-        ORDER BY refund_eligible_at LIMIT ${limit}`,
+export async function makeRefundEligible(db: DbOrTx, limit = BATCH, opts: { now?: Date; only?: string } = {}): Promise<number> {
+  const at = sql`${(opts.now ?? new Date()).toISOString()}::timestamptz`;
+  const deadlineMissed = sql`(resolution_due_at < ${at} AND (status = 'in_progress' OR (status = 'open' AND first_action_due_at < ${at})))`;
+  const windowPassed = sql`(status IN ('open','in_progress','resolved_kit_issued') AND refund_eligible_at <= ${at} AND (clearance_class_at_open = 'A' OR claimant_cataloged))`;
+  const rows = await db.execute<{ id: string; deadline: boolean }>(
+    sql`SELECT id, ${deadlineMissed} AS deadline FROM disputes
+        WHERE (${deadlineMissed} OR ${windowPassed}) ${opts.only ? sql`AND id = ${opts.only}` : sql``}
+        ORDER BY coalesce(resolution_due_at, refund_eligible_at) LIMIT ${limit}`,
   );
-  return each(db, ids, async (tx, id) => {
-    const moved = await applyDisputeTransition(tx, id, 'make_refund_eligible', { actorUserId: null, note: 'resolution deadline or refund window passed without release' });
+  const why = new Map(rows.map((r) => [r.id, r.deadline ? 'resolution deadline passed without resolution' : 'refund window passed without release']));
+  return each(db, [...why.keys()], async (tx, id) => {
+    const moved = await applyDisputeTransition(tx, id, 'make_refund_eligible', { actorUserId: null, note: why.get(id) });
     if (!moved.ok) return false;
     const [d] = await tx.select().from(disputes).where(eq(disputes.id, id));
     const license = (await getLicenseById(tx, d!.licenseId))!;

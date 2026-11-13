@@ -8,7 +8,7 @@ import { CopyButton } from '@/components/store/copy-button';
 import { PLATFORM_LABELS } from '@/components/store/format';
 import { Button } from '@/components/ui/button';
 import { getBioChallenge } from '@/lib/clearance/server';
-import { resolveBuyerActor } from '@/lib/licensing/server';
+import { getLicenseForBuyer, resolveBuyerActor } from '@/lib/licensing/server';
 import { getDb } from '@/lib/platform/db';
 import { checkVerifyAction, replaceChannelAction, startVerifyAction } from '../../usage-actions';
 
@@ -42,7 +42,8 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
   const db = getDb();
   const actor = await resolveBuyerActor(db, session.userId, id);
   const view = actor ? await getBioChallenge(db, actor, channelId) : null;
-  if (!view || view.channel.licenseId !== id) notFound();
+  if (!actor || !view || view.channel.licenseId !== id) notFound();
+  const allowedPlatforms = (await getLicenseForBuyer(db, actor, id))?.caps.allowedPlatforms ?? [];
   const { channel, code, autoCheck } = view;
   const platform = PLATFORM_LABELS[channel.platform] ?? channel.platform;
   const verified = channel.verificationStatus === 'verified';
@@ -100,9 +101,9 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
             <label className="grid gap-1 text-[13px] font-semibold text-muted-foreground">
               Platform
               <select name="platform" defaultValue={channel.platform} className={`${selectClass} w-40`}>
-                {Object.entries(PLATFORM_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
+                {allowedPlatforms.map((p) => (
+                  <option key={p} value={p}>
+                    {PLATFORM_LABELS[p] ?? p}
                   </option>
                 ))}
               </select>

@@ -8,7 +8,7 @@ import { requireBuyerSession } from '@/app/buyer-session';
 import { PLATFORM_LABELS, istDateTime } from '@/components/store/format';
 import { Button } from '@/components/ui/button';
 import { StatusLabel, type StatusTone } from '@/components/ui/status';
-import { CLOSED_STATUSES, DISPUTE_TYPES, getBuyerDisputeEvents, isDisputeOverdue, listBuyerDisputes, type DisputeStatus } from '@/lib/disputes/server';
+import { DISPUTE_TYPES, getBuyerDisputeEvents, isDisputeOverdue, listBuyerDisputes, type DisputeStatus } from '@/lib/disputes/server';
 import { getLicenseForBuyer, resolveBuyerActor } from '@/lib/licensing/server';
 import { getDb } from '@/lib/platform/db';
 import { openDisputeAction } from '../usage-actions';
@@ -142,7 +142,8 @@ export default async function DisputesPage({ params, searchParams }: { params: P
             <tbody>
               {disputes.map((d, i) => {
                 const s = STATUS[d.status as DisputeStatus] ?? STATUS.open;
-                const closed = (CLOSED_STATUSES as readonly string[]).includes(d.status);
+                // Due dates are targets for a claim still being worked: refund-available and kit-issued claims have moved past them.
+                const live = d.status === 'open' || d.status === 'in_progress';
                 const overdue = isDisputeOverdue(d, now);
                 const log = (events[i] ?? []).filter((e) => EVENT_LABELS[e.kind]);
                 return (
@@ -159,7 +160,7 @@ export default async function DisputesPage({ params, searchParams }: { params: P
                           {log.map((e, n) => (
                             <li key={n} className="flex flex-wrap justify-between gap-x-4 py-1">
                               <span>{EVENT_LABELS[e.kind]}</span>
-                              <span className="font-mono font-normal text-fg-2">{istDateTime(e.at)}</span>
+                              <span className="text-fg-2">{istDateTime(e.at)}</span>
                             </li>
                           ))}
                         </ul>
@@ -169,12 +170,8 @@ export default async function DisputesPage({ params, searchParams }: { params: P
                       <StatusLabel tone={s.tone}>{s.label}</StatusLabel>
                       {overdue && <div className="mt-1 text-[13px] text-muted-foreground">Past its target date</div>}
                     </Td>
-                    <Td mono className="whitespace-nowrap text-fg-2">
-                      {closed || d.status !== 'open' ? '—' : istDateTime(d.firstActionDueAt)}
-                    </Td>
-                    <Td mono className="whitespace-nowrap text-fg-2">
-                      {closed ? '—' : d.resolutionDueAt ? istDateTime(d.resolutionDueAt) : 'No target'}
-                    </Td>
+                    <Td className="whitespace-nowrap text-fg-2">{d.status === 'open' ? istDateTime(d.firstActionDueAt) : '—'}</Td>
+                    <Td className="whitespace-nowrap text-fg-2">{!live ? '—' : d.resolutionDueAt ? istDateTime(d.resolutionDueAt) : 'No target'}</Td>
                   </tr>
                 );
               })}

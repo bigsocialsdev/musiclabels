@@ -24,23 +24,27 @@ async function each(db: DbOrTx, ids: string[], work: (tx: DbOrTx, id: string) =>
 const idsOf = async (db: DbOrTx, q: ReturnType<typeof sql>) => (await db.execute<{ id: string }>(q)).map((r) => r.id);
 
 /**
- * in_progress (or kit-issued) → refund_eligible once the refund window has passed with the claim unreleased, for a
- * Class A claim or one by a cataloged rightsholder (PLAN §4.6). Finance then approves the refund.
+ * → refund_eligible, then finance approves the refund. Two ways in (PLAN §4.6 and the later decision, STATE.md S3-M6):
+ * - an in-progress dispute whose 48-hour resolution deadline ops missed (protects the buyer from an ops failure; a
+ *   Class C dispute has no deadline);
+ * - an in-progress or kit-issued dispute whose refund window has passed with the claim unreleased, for a Class A
+ *   claim or one by a cataloged rightsholder.
  */
 export async function makeRefundEligible(db: DbOrTx, limit = BATCH): Promise<number> {
   const ids = await idsOf(
     db,
     sql`SELECT id FROM disputes
-        WHERE status IN ('in_progress','resolved_kit_issued') AND refund_eligible_at <= now()
-          AND (clearance_class_at_open = 'A' OR claimant_cataloged)
+        WHERE (status = 'in_progress' AND resolution_due_at < now())
+           OR (status IN ('in_progress','resolved_kit_issued') AND refund_eligible_at <= now()
+               AND (clearance_class_at_open = 'A' OR claimant_cataloged))
         ORDER BY refund_eligible_at LIMIT ${limit}`,
   );
   return each(db, ids, async (tx, id) => {
-    const moved = await applyDisputeTransition(tx, id, 'make_refund_eligible', { actorUserId: null, note: 'refund window passed without release' });
+    const moved = await applyDisputeTransition(tx, id, 'make_refund_eligible', { actorUserId: null, note: 'resolution deadline or refund window passed without release' });
     if (!moved.ok) return false;
     const [d] = await tx.select().from(disputes).where(eq(disputes.id, id));
     const license = (await getLicenseById(tx, d!.licenseId))!;
-    await notifyOrg(tx, license.purchaserOrgId, 'dispute.refund_eligible', 'Your report qualifies for a refund', 'The claim was not released within the refund window. Our finance team will review and process the refund.');
+    await notifyOrg(tx, license.purchaserOrgId, 'dispute.refund_eligible', 'Your report qualifies for a refund', 'We could not get the claim released in time. Our finance team will review and process the refund.');
     await enqueueOpsAlert(tx, 'dispute_refund_eligible', 'A dispute is refund-eligible: finance to approve the refund', { disputeId: id, licenseId: d!.licenseId });
     return true;
   });

@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discovery · Night Session</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--background);color:var(--foreground);font:500 15px/1.45 var(--font-sans);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+body{min-height:100vh}
+::selection{background:var(--primary);color:var(--primary-foreground)}
+*{scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent}
+button,input,select{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius-xs)}
+.mono{font-family:var(--font-mono);font-weight:500;letter-spacing:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;height:64px;padding:0 24px;background:color-mix(in srgb,var(--background) 88%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.mark{font-weight:700;font-size:20px;letter-spacing:-.035em;display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit}
+.mark .dot{width:9px;height:9px;border-radius:50%;background:var(--primary)}
+.top .search{flex:1;max-width:560px;margin-left:24px}
+.nav{margin-left:auto;display:flex;align-items:center;gap:6px}
+.nav a{color:var(--muted-foreground);text-decoration:none;font-weight:600;font-size:14px;padding:8px 12px;border-radius:var(--radius-sm)}
+.nav a:hover{color:var(--foreground);background:var(--secondary)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:var(--radius-sm);font-weight:600;font-size:14px;transition:background var(--dur-fast),transform var(--dur-fast) var(--ease-out)}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--primary);color:var(--primary-foreground)}
+.btn-primary:hover{background:#FF7D45}
+.btn-secondary{background:var(--secondary);color:var(--foreground)}
+.btn-secondary:hover{background:var(--accent)}
+.btn-ghost{color:var(--fg-2)}
+.btn-ghost:hover{background:var(--secondary);color:var(--foreground)}
+.icon-btn{width:40px;height:40px;display:grid;place-items:center;border-radius:var(--radius-sm);color:var(--fg-2)}
+.icon-btn:hover{background:var(--secondary);color:var(--foreground)}
+.menu-btn{display:none}
+
+.search{display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;border-radius:var(--radius-sm);background:var(--card);border:1px solid var(--border);color:var(--muted-foreground);transition:border-color var(--dur-fast)}
+.search:focus-within{border-color:var(--ring)}
+.search input{flex:1;background:none;border:0;outline:0;font-size:15px;color:var(--foreground)}
+.search input::placeholder{color:var(--muted-foreground)}
+.search kbd{font:500 11px var(--font-mono);border:1px solid var(--border);border-radius:5px;padding:2px 6px;color:var(--muted-foreground)}
+
+/* layout */
+.layout{display:grid;grid-template-columns:232px minmax(0,1fr) 392px;gap:32px;max-width:1440px;margin:0 auto;padding:24px 24px 64px}
+.side>*{flex:none}
+.rail{position:sticky;top:88px;align-self:start;display:flex;flex-direction:column;gap:28px}
+.side{position:sticky;top:88px;align-self:start;display:flex;flex-direction:column;gap:16px;grid-column:3;grid-row:1;max-height:calc(100vh - 104px);overflow:auto;scrollbar-width:none}
+.results{grid-column:2;grid-row:1;min-width:0}
+.m-search,.m-chips{display:none}
+
+/* rail filters */
+.fgroup h3{font-size:12px;font-weight:600;color:var(--muted-foreground);margin-bottom:8px}
+.opt{display:flex;align-items:center;justify-content:space-between;width:100%;padding:7px 10px;border-radius:var(--radius-xs);font-size:14px;font-weight:500;color:var(--fg-2);text-align:left}
+.opt:hover{background:var(--secondary);color:var(--foreground)}
+.opt[aria-pressed=true]{background:var(--secondary);color:var(--foreground);font-weight:600}
+.opt[aria-pressed=true]::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--primary);margin-right:8px}
+.opt span:first-child{flex:1}
+.opt .n{font:400 12px var(--font-mono);color:var(--muted-foreground)}
+.range{padding:4px 10px 0}
+.range .track{position:relative;height:4px;border-radius:2px;background:var(--surface-3);margin:14px 0 10px}
+.range .fill{position:absolute;left:25%;right:37.5%;top:0;bottom:0;background:var(--foreground);border-radius:2px}
+.range .knob{position:absolute;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--foreground);box-shadow:0 0 0 4px var(--background)}
+.range .vals{display:flex;justify-content:space-between;font:400 12px var(--font-mono);color:var(--muted-foreground)}
+
+/* results */
+.rhead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:12px}
+.rhead h1{font-size:30px;line-height:1.05;letter-spacing:-.035em;font-weight:700}
+.rhead p{color:var(--muted-foreground);font-size:14px;margin-top:6px}
+.sort{display:flex;align-items:center;gap:6px;color:var(--muted-foreground);font-size:13px}
+.sort select{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xs);padding:6px 8px;font-weight:600;font-size:13px;color:var(--foreground)}
+.cols{display:grid;grid-template-columns:44px minmax(150px,1.1fr) minmax(0,2fr) 64px 48px 40px;gap:16px;padding:0 12px 8px;font-size:12px;font-weight:600;color:var(--muted-foreground);border-bottom:1px solid var(--border)}
+.cols span:nth-child(4),.cols span:nth-child(5){text-align:right}
+ol.list{list-style:none}
+.row{display:grid;grid-template-columns:44px minmax(150px,1.1fr) minmax(0,2fr) 64px 48px 40px;gap:16px;align-items:center;padding:10px 12px;border-radius:var(--radius-md);border-bottom:1px solid var(--border);transition:background var(--dur-fast)}
+.row:hover{background:var(--card)}
+.row.sel{background:var(--card);border-bottom-color:transparent}
+.play{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--secondary);color:var(--foreground);transition:background var(--dur-fast),transform var(--dur-fast) var(--ease-out)}
+.play:hover{background:var(--accent)}
+.play:active{transform:scale(.92)}
+.row.playing .play{background:var(--primary);color:var(--primary-foreground)}
+.play svg{width:14px;height:14px;fill:currentColor;stroke:none}
+.ttl{text-align:left;min-width:0}
+.ttl b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttl span{display:block;font-size:13px;color:var(--muted-foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .bpm,.row .dur{font:400 13px var(--font-mono);color:var(--fg-2);text-align:right}
+.more{width:36px;height:36px;display:grid;place-items:center;border-radius:var(--radius-xs);color:var(--muted-foreground)}
+.more:hover{background:var(--secondary);color:var(--foreground)}
+
+/* waveform */
+.wave{display:flex;align-items:center;gap:3px;height:28px;cursor:pointer;min-width:0;overflow:hidden}
+.wave i{flex:1 1 0;min-width:1px;border-radius:1px;background:var(--wave-idle);transition:background var(--dur-base)}
+.row:hover .wave i{background:color-mix(in srgb,var(--wave-idle) 60%,var(--muted-foreground))}
+.wave i.on{background:var(--wave-played)!important}
+.wave i.head{transform-origin:center}
+.is-playing .wave i.head{animation:beat var(--beat,.65s) var(--ease-out) infinite}
+@keyframes beat{0%{transform:scaleY(1.45)}100%{transform:scaleY(1)}}
+
+/* stage */
+.stage{position:relative;border-radius:var(--radius-lg);padding:20px;background:radial-gradient(130% 90% at 50% 110%,var(--stage-glow),transparent 62%),var(--card);border:1px solid var(--border);overflow:hidden}
+.stage .meta{font:400 12px var(--font-mono);color:var(--muted-foreground);display:flex;gap:10px;flex-wrap:wrap}
+.stage h2{font-size:32px;line-height:1.02;letter-spacing:-.04em;font-weight:700;margin:10px 0 4px}
+.stage .by{color:var(--fg-2);font-size:14px}
+.stage .wave{height:76px;gap:2px;margin:18px 0 6px;overflow:hidden}
+.stage .wave i{border-radius:2px}
+.stage .tc{display:flex;justify-content:space-between;font:400 12px var(--font-mono);color:var(--muted-foreground)}
+.stage .ctl{display:flex;align-items:center;gap:10px;margin-top:16px}
+.bigplay{width:52px;height:52px;border-radius:50%;background:var(--primary);color:var(--primary-foreground);display:grid;place-items:center;transition:transform var(--dur-fast) var(--ease-out)}
+.bigplay:active{transform:scale(.93)}
+.bigplay svg{width:18px;height:18px;fill:currentColor;stroke:none}
+.stage .ctl .btn-primary{margin-left:auto}
+.beatdot{width:8px;height:8px;border-radius:50%;background:var(--primary);display:inline-block;margin-right:2px;vertical-align:1px}
+.is-playing .beatdot{animation:dot var(--beat,.65s) var(--ease-out) infinite}
+@keyframes dot{0%{transform:scale(1.6);opacity:1}100%{transform:scale(1);opacity:.7}}
+
+/* receipt */
+.receipt{border-radius:var(--radius-lg);background:var(--card);border:1px solid var(--border);padding:20px}
+.receipt h3{font-size:17px;letter-spacing:-.015em;font-weight:700}
+.receipt .sub{color:var(--muted-foreground);font-size:13px;margin-top:2px}
+.tiers{display:flex;flex-direction:column;gap:6px;margin:14px 0}
+.tier{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:start;padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer;transition:border-color var(--dur-fast),background var(--dur-fast)}
+.tier:hover{background:var(--secondary)}
+.tier input{appearance:none;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--input);margin-top:2px;display:grid;place-items:center}
+.tier input:checked{border-color:var(--primary)}
+.tier input:checked::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.tier:has(input:checked){border-color:color-mix(in srgb,var(--primary) 55%,var(--border));background:var(--secondary)}
+.tier b{font-size:14px;font-weight:600}
+.tier small{display:block;font-size:12px;color:var(--muted-foreground);margin-top:2px}
+.tier .p{font:500 13px var(--font-mono)}
+.enq{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted-foreground);padding:2px 12px}
+.enq a{color:var(--foreground);font-weight:600;text-underline-offset:3px}
+.field{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.field[hidden]{display:none}
+.field label{font-size:12px;font-weight:600;color:var(--muted-foreground)}
+.field input,.field select{height:40px;border-radius:var(--radius-sm);border:1px solid var(--input);background:var(--background);padding:0 12px;font-size:14px;outline:0}
+.field input:focus,.field select:focus{border-color:var(--ring)}
+.field input::placeholder{color:var(--muted-foreground)}
+.lines{margin-top:14px;border-top:1px dashed var(--input);padding-top:12px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.lines div{display:flex;justify-content:space-between;color:var(--fg-2)}
+.lines div span:last-child{font-family:var(--font-mono)}
+.lines .tot{color:var(--foreground);font-weight:700;font-size:15px;border-top:1px solid var(--border);padding-top:8px;margin-top:4px}
+.receipt .btn-primary{width:100%;height:48px;font-size:15px;margin-top:14px}
+.after{margin-top:12px;font-size:12px;color:var(--muted-foreground);line-height:1.5}
+.sample{display:inline-block;font:500 11px var(--font-mono);color:var(--attention);border:1px solid color-mix(in srgb,var(--attention) 40%,transparent);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:2px}
+.sheet-handle,.sheet-close,.scrim,.mini{display:none}
+
+@media (max-width:1180px){.layout{grid-template-columns:minmax(0,1fr) 360px}.rail{display:none}.results{grid-column:1}.side{grid-column:2}}
+@media (max-width:900px){
+  .top{height:56px;padding:0 16px}.top .search,.nav a,.nav .btn-secondary{display:none}.menu-btn{display:grid}
+  .layout{display:flex;flex-direction:column;gap:14px;padding:12px 16px 120px}
+  .m-search{display:flex}
+  .m-chips{display:flex;gap:6px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none}
+  .chip{flex:none;height:34px;padding:0 12px;border-radius:9px;background:var(--card);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--fg-2)}
+  .chip[aria-pressed=true]{background:var(--foreground);color:var(--background);border-color:var(--foreground)}
+  .side{position:static;display:contents}
+  .stage{order:3}.results{order:4}
+  .stage{padding:16px}.stage h2{font-size:28px}.stage .wave{height:64px;gap:2px}
+  .rhead h1{font-size:22px;letter-spacing:-.025em}.rhead p{font-size:13px}.sort{display:none}
+  .cols{display:none}
+  .row{grid-template-columns:40px minmax(0,1fr) auto;gap:4px 12px;padding:10px 4px;border-radius:0}
+  .row .wave{grid-column:2/4;grid-row:2;height:20px}
+  .row .bpm,.row .more{display:none}
+  .row .dur{grid-row:1;grid-column:3;align-self:start;padding-top:2px}
+  .row:hover,.row.sel{background:none}
+  .receipt{position:fixed;left:0;right:0;bottom:0;z-index:40;border-radius:var(--radius-lg) var(--radius-lg) 0 0;max-height:88vh;overflow:auto;transform:translateY(105%);transition:transform var(--dur-slow) var(--ease-out);padding:12px 16px 24px}
+  .receipt.open{transform:none}
+  .sheet-handle{display:block;width:40px;height:4px;border-radius:2px;background:var(--surface-3);margin:0 auto 12px}
+  .sheet-close{display:grid;position:absolute;right:8px;top:8px}
+  .scrim{display:block;position:fixed;inset:0;z-index:39;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--dur-slow)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .mini{display:flex;position:fixed;left:8px;right:8px;bottom:10px;z-index:30;align-items:center;gap:10px;padding:8px;border-radius:var(--radius-md);background:var(--popover);border:1px solid var(--border);box-shadow:0 12px 28px -10px rgba(0,0,0,.6);transform:translateY(140%);transition:transform var(--dur-slow) var(--ease-out)}
+  .mini.show{transform:none}
+  .mini .play{width:40px;height:40px}
+  .mini b{display:block;font-size:14px;font-weight:600}
+  .mini span{font:400 12px var(--font-mono);color:var(--muted-foreground)}
+  .mini .btn{margin-left:auto;height:38px}
+  .mini .bar{position:absolute;left:12px;right:12px;top:0;height:2px;background:var(--surface-3);border-radius:2px;overflow:hidden}
+  .mini .bar i{position:absolute;inset:0 auto 0 0;background:var(--primary)}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="mark" href="#"><span class="dot"></span>MRM</a>
+  <label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="sr">Search</span><input placeholder="Search tracks, moods, artists"><kbd>/</kbd></label>
+  <nav class="nav">
+    <a href="#">Browse</a><a href="#">For business</a><a href="#">How licensing works</a>
+    <button class="btn btn-secondary">Sign in</button>
+    <button class="icon-btn menu-btn" aria-label="Menu"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/></svg></button>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="rail" aria-label="Filters">
+    <div class="fgroup"><h3>Mood</h3><div id="moods"></div></div>
+    <div class="fgroup"><h3>Language</h3><div id="langs"></div></div>
+    <div class="fgroup"><h3>Tempo</h3>
+      <div class="range"><div class="track"><div class="fill"></div><span class="knob" style="left:25%"></span><span class="knob" style="left:62.5%"></span></div><div class="vals"><span>80 BPM</span><span>110 BPM</span></div></div></div>
+    <div class="fgroup"><h3>License available</h3>
+      <button class="opt" aria-pressed="true"><span>Creator</span><span class="n">412</span></button>
+      <button class="opt" aria-pressed="false"><span>Brand organic</span><span class="n">388</span></button>
+      <button class="opt" aria-pressed="false"><span>Paid ads</span><span class="n">241</span></button></div>
+  </aside>
+
+  <label class="search m-search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="sr">Search</span><input placeholder="Search tracks, moods, artists"></label>
+  <div class="m-chips" id="chips"></div>
+
+  <main class="results" id="results">
+    <div class="rhead">
+      <div><h1>Romantic, in Hindi</h1><p>128 tracks · every track screened before listing <span class="sample">SAMPLE DATA</span></p></div>
+      <label class="sort">Sort <select><option>Most relevant</option><option>Most licensed</option><option>Newest</option></select></label>
+    </div>
+    <div class="cols"><span></span><span>Track</span><span>Preview</span><span>Tempo</span><span>Time</span><span></span></div>
+    <ol class="list" id="list"></ol>
+  </main>
+
+  <div class="side">
+    <section class="stage" id="stage" aria-label="Now playing">
+      <div class="meta"><span><span class="beatdot"></span> <span id="s-state">NOW PLAYING</span></span><span id="s-meta"></span></div>
+      <h2 id="s-title"></h2>
+      <div class="by" id="s-by"></div>
+      <div class="wave" id="s-wave" role="slider" aria-label="Seek" tabindex="0"></div>
+      <div class="tc"><span id="s-t">0:00</span><span id="s-d"></span></div>
+      <div class="ctl">
+        <button class="bigplay" id="s-play" aria-label="Play"></button>
+        <button class="btn btn-ghost" id="s-sim"><svg class="i" viewBox="0 0 24 24"><path d="M2 12h3l3-8 4 16 3-8h7"/></svg>Similar</button>
+        <button class="btn btn-primary" id="s-lic">License</button>
+      </div>
+    </section>
+
+    <div class="scrim" id="scrim"></div>
+    <section class="receipt" id="receipt" aria-label="License this track">
+      <div class="sheet-handle"></div>
+      <button class="icon-btn sheet-close" id="r-close" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <h3>License <span id="r-title"></span></h3>
+      <p class="sub">Pick how the video will be used. Prices exclude GST. <span class="sample">SAMPLE PRICES</span></p>
+      <div class="tiers" id="tiers" role="radiogroup" aria-label="License type"></div>
+      <div class="enq"><span>TV, OTT or cinema?</span><a href="#">Send an enquiry</a></div>
+      <div class="field" id="f-client" hidden><label for="client">Licensing for a client? (optional)</label><input id="client" placeholder="Client name, printed on the certificate"></div>
+      <div class="field"><label for="state">Billing state</label><select id="state"><option value="27">Maharashtra</option><option value="07" selected>Delhi</option><option value="29">Karnataka</option><option value="33">Tamil Nadu</option><option value="03">Punjab</option></select></div>
+      <div class="lines" id="lines"></div>
+      <button class="btn btn-primary" id="r-pay"></button>
+      <p class="after">You get a license certificate with a public verify link and a GST invoice. If a claim appears on a registered channel, our clearance desk handles it with the rightsholder.</p>
+    </section>
+  </div>
+</div>
+
+<div class="mini" id="mini"><div class="bar"><i id="m-bar"></i></div><button class="play" id="m-play" aria-label="Play"></button><div><b id="m-title"></b><span id="m-t"></span></div><button class="btn btn-primary" id="m-lic">License</button></div>
+
+<script>
+const TRACKS=[
+ {id:1,t:"Barsaat Ki Dhun",a:"Meera Kapoor",lang:"Hindi",mood:"Romantic",bpm:92,d:168},
+ {id:2,t:"Dil Ki Gali",a:"Rohan Sethi",lang:"Hindi",mood:"Romantic",bpm:84,d:185},
+ {id:3,t:"Pehli Baarish",a:"Ananya Iyer",lang:"Hindi",mood:"Romantic",bpm:78,d:151},
+ {id:4,t:"Chand Raat",a:"The Lucknow Strings",lang:"Instrumental",mood:"Romantic",bpm:70,d:192},
+ {id:5,t:"Saawan",a:"Kabir Malhotra",lang:"Hindi",mood:"Romantic",bpm:96,d:174},
+ {id:6,t:"Rang De",a:"Ira & Dev",lang:"Hindi",mood:"Romantic",bpm:102,d:160},
+ {id:7,t:"Tere Bina Shaam",a:"Nisha Rao",lang:"Hindi",mood:"Romantic",bpm:88,d:203},
+ {id:8,t:"Mehfil",a:"Saif Qureshi",lang:"Hindi",mood:"Romantic",bpm:94,d:146}];
+const TIERS=[
+ {k:"creator",n:"Creator",s:"1 video · organic posts · up to 3 of your channels · perpetual",p:99900},
+ {k:"brand",n:"Brand organic",s:"Up to 3 videos · official brand handles · no paid spend · perpetual",p:499900},
+ {k:"paid",n:"Paid ads",s:"Meta, Google and OTT pre-roll ads · 12 months · register each creative",p:1499900}];
+const SUPPLIER_STATE="27";
+const S={sel:TRACKS[0],playing:false,t:42,tier:"creator"};
+const $=id=>document.getElementById(id);
+const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+const inr=p=>"₹"+(p/100).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+const ICON={play:'<svg viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></svg>',pause:'<svg viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>'};
+function peaks(id,n){let s=id*7919;const r=()=>(s=(s*16807)%2147483647)/2147483647;const out=[];for(let k=0;k<n;k++){const x=k/n;const env=.35+.65*Math.sin(Math.PI*Math.min(1,x*1.15));const sec=x>.3&&x<.55?1:.78;out.push(Math.max(.12,Math.min(1,env*sec*(.55+.45*Math.abs(Math.sin(k*.9+id)))*(.8+r()*.35))))}return out}
+function waveHTML(id,n){return peaks(id,n).map(h=>`<i style="height:${(h*100).toFixed(0)}%"></i>`).join("")}
+function paint(el,frac){const bars=el.children,n=bars.length,on=Math.floor(frac*n);for(let k=0;k<n;k++){bars[k].classList.toggle("on",k<on);bars[k].classList.toggle("head",k===on-1)}}
+const mobile=()=>matchMedia("(max-width:900px)").matches;
+
+function renderFilters(){
+  const moods=[["Romantic",128],["Upbeat",214],["Devotional",96],["Chill",187],["Epic",73],["Festive",110]];
+  $("moods").innerHTML=moods.map(([m,n],i)=>`<button class="opt" aria-pressed="${i===0}"><span>${m}</span><span class="n">${n}</span></button>`).join("");
+  const langs=[["Hindi",312],["Punjabi",141],["Tamil",118],["English",205],["Instrumental",264]];
+  $("langs").innerHTML=langs.map(([m,n],i)=>`<button class="opt" aria-pressed="${i===0}"><span>${m}</span><span class="n">${n}</span></button>`).join("");
+  $("chips").innerHTML=["Romantic","Hindi","80–110 BPM","Upbeat","Devotional","Chill","Punjabi","Tamil"].map((c,i)=>`<button class="chip" aria-pressed="${i<3}">${c}</button>`).join("");
+  document.querySelectorAll(".opt,.chip").forEach(b=>b.onclick=()=>b.setAttribute("aria-pressed",b.getAttribute("aria-pressed")!=="true"));
+}
+function renderList(){
+  const n=mobile()?44:52;
+  $("list").innerHTML=TRACKS.map(tr=>`<li class="row" data-id="${tr.id}" style="--beat:${(60/tr.bpm).toFixed(3)}s">
+    <button class="play" aria-label="Play ${tr.t}"></button>
+    <button class="ttl"><b>${tr.t}</b><span>${tr.a} · ${tr.lang}</span></button>
+    <div class="wave" aria-hidden="true">${waveHTML(tr.id,n)}</div>
+    <span class="bpm">${tr.bpm}</span><span class="dur">${fmt(tr.d)}</span>
+    <button class="more" aria-label="More options"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></li>`).join("");
+  $("list").querySelectorAll(".row").forEach(li=>{
+    const tr=TRACKS.find(x=>x.id==li.dataset.id);
+    li.querySelector(".play").onclick=()=>{if(S.sel===tr)toggle();else select(tr,true)};
+    li.querySelector(".ttl").onclick=()=>select(tr,false);
+    li.querySelector(".wave").onclick=e=>{const r=e.currentTarget.getBoundingClientRect();select(tr,true,(e.clientX-r.left)/r.width*tr.d)};
+  });
+}
+function select(tr,play,at){if(S.sel!==tr){S.sel=tr;S.t=0;renderStage()}if(at!=null)S.t=at;if(play)S.playing=true;sync()}
+function toggle(){S.playing=!S.playing;sync()}
+function renderStage(){
+  const tr=S.sel;
+  $("s-title").textContent=tr.t;$("r-title").textContent="“"+tr.t+"”";
+  $("s-by").textContent=`${tr.a} · ${tr.lang}`;
+  $("s-meta").textContent=`${tr.bpm} BPM · ${tr.mood.toUpperCase()}`;
+  $("s-d").textContent=fmt(tr.d);
+  $("s-wave").innerHTML=waveHTML(tr.id,mobile()?60:76);
+  $("m-title").textContent=tr.t;
+  document.documentElement.style.setProperty("--beat",(60/tr.bpm).toFixed(3)+"s");
+}
+function sync(){
+  const tr=S.sel,frac=S.t/tr.d;
+  document.querySelectorAll(".row").forEach(li=>{const me=li.dataset.id==tr.id;li.classList.toggle("sel",me);li.classList.toggle("playing",me&&S.playing);li.classList.toggle("is-playing",me&&S.playing);li.querySelector(".play").innerHTML=me&&S.playing?ICON.pause:ICON.play;paint(li.querySelector(".wave"),me?frac:0)});
+  paint($("s-wave"),frac);
+  $("stage").classList.toggle("is-playing",S.playing);$("mini").classList.toggle("is-playing",S.playing);
+  $("s-play").innerHTML=S.playing?ICON.pause:ICON.play;$("s-play").setAttribute("aria-label",S.playing?"Pause":"Play");
+  $("m-play").innerHTML=$("s-play").innerHTML;
+  $("s-state").textContent=S.playing?"NOW PLAYING":"PAUSED";
+  $("s-t").textContent=fmt(S.t);$("m-t").textContent=`${fmt(S.t)} / ${fmt(tr.d)}`;$("m-bar").style.width=(frac*100)+"%";
+  $("s-wave").setAttribute("aria-valuenow",Math.floor(S.t));
+}
+let last=performance.now();
+function tick(now){const dt=(now-last)/1000;last=now;if(S.playing){S.t+=dt;if(S.t>=S.sel.d){S.t=0;S.playing=false}sync()}requestAnimationFrame(tick)}
+function renderTiers(){
+  $("tiers").innerHTML=TIERS.map(t=>`<label class="tier"><input type="radio" name="tier" value="${t.k}" ${t.k===S.tier?"checked":""}><span><b>${t.n}</b><small>${t.s}</small></span><span class="p">${inr(t.p)}</span></label>`).join("");
+  $("tiers").querySelectorAll("input").forEach(i=>i.onchange=()=>{S.tier=i.value;quote()});
+}
+function quote(){
+  const t=TIERS.find(x=>x.k===S.tier),st=$("state").value,taxable=t.p;
+  $("f-client").hidden=S.tier==="creator";
+  const half=v=>Math.floor((v*900+5000)/10000);
+  let rows=[["License fee",taxable]];
+  if(st===SUPPLIER_STATE){rows.push(["CGST 9%",half(taxable)],["SGST 9%",half(taxable)])}else{rows.push(["IGST 18%",Math.floor((taxable*1800+5000)/10000)])}
+  const total=rows.reduce((a,r)=>a+r[1],0);
+  $("lines").innerHTML=rows.map(r=>`<div><span>${r[0]}</span><span>${inr(r[1])}</span></div>`).join("")+`<div class="tot"><span>Total</span><span>${inr(total)}</span></div>`;
+  $("r-pay").textContent=`License for ${inr(total)}`;
+}
+function openSheet(o){$("receipt").classList.toggle("open",o);$("scrim").classList.toggle("open",o)}
+$("s-play").onclick=toggle;$("m-play").onclick=toggle;
+$("s-wave").onclick=e=>{const r=e.currentTarget.getBoundingClientRect();S.t=(e.clientX-r.left)/r.width*S.sel.d;sync()};
+$("s-wave").onkeydown=e=>{if(e.key==="ArrowRight"){S.t=Math.min(S.sel.d,S.t+5);sync()}if(e.key==="ArrowLeft"){S.t=Math.max(0,S.t-5);sync()}};
+[$("s-lic"),$("m-lic")].forEach(b=>b.onclick=()=>{if(mobile())openSheet(true);else $("receipt").scrollIntoView({behavior:"smooth",block:"nearest"})});
+$("scrim").onclick=()=>openSheet(false);$("r-close").onclick=()=>openSheet(false);
+$("state").onchange=quote;
+document.addEventListener("keydown",e=>{if(e.target.matches("input,select,textarea"))return;if(e.key===" "){e.preventDefault();toggle()}if(e.key==="/"){e.preventDefault();document.querySelector(".top .search input").focus()}if(e.key==="Escape")openSheet(false)});
+new IntersectionObserver(([en])=>$("mini").classList.toggle("show",!en.isIntersecting&&mobile())).observe($("stage"));
+renderFilters();renderList();renderStage();renderTiers();quote();sync();requestAnimationFrame(tick);
+addEventListener("resize",()=>{renderList();renderStage();sync()});
+if(new URLSearchParams(location.search).has("playing")){S.playing=true;sync()}
+</script>
+</body>
+</html>

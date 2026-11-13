@@ -1,0 +1,83 @@
+/* Night Session design tokens. Variable names follow shadcn/ui so this maps onto app/globals.css.
+   Storefront (discovery, track, checkout, buyer dashboard) defaults to dark; seller portal and admin default to light.
+   Both themes ship everywhere; next-themes switches the class. */
+
+:root,
+.light {
+  --background: #F5F5F3;
+  --foreground: #16161A;
+  --card: #FFFFFF;
+  --card-foreground: #16161A;
+  --popover: #FFFFFF;
+  --popover-foreground: #16161A;
+  --secondary: #EDECE9;
+  --secondary-foreground: #16161A;
+  --muted: #EDECE9;
+  --muted-foreground: #66666F;
+  --accent: #E7E6E2;
+  --accent-foreground: #16161A;
+  --border: #E2E1DD;
+  --input: #D6D5D1;
+  --primary: #FF6A2B;
+  --primary-foreground: #160A03;
+  --ring: #F05A1C;
+  --destructive: #C8322E;
+
+  --fg-2: #3D3D45;
+  --surface-3: #E2E1DD;
+  --wave-idle: #CFCEC9;
+  --wave-played: #F05A1C;
+  --stage-glow: rgba(255, 106, 43, 0.14);
+
+  --ok: #12804F;
+  --attention: #9A5B00;
+  --blocked: #C8322E;
+  --info: #2459C9;
+}
+
+.dark {
+  --background: #101014;
+  --foreground: #F2F1EE;
+  --card: #18181E;
+  --card-foreground: #F2F1EE;
+  --popover: #1D1D24;
+  --popover-foreground: #F2F1EE;
+  --secondary: #22222A;
+  --secondary-foreground: #F2F1EE;
+  --muted: #22222A;
+  --muted-foreground: #8F8F99;
+  --accent: #2B2B34;
+  --accent-foreground: #F2F1EE;
+  --border: #26262E;
+  --input: #32323C;
+  --primary: #FF6A2B;
+  --primary-foreground: #160A03;
+  --ring: #FF6A2B;
+  --destructive: #FF5A5A;
+
+  --fg-2: #C6C5C1;
+  --surface-3: #2E2E38;
+  --wave-idle: #3A3A44;
+  --wave-played: #FF6A2B;
+  --stage-glow: rgba(255, 106, 43, 0.22);
+
+  --ok: #3DD68C;
+  --attention: #F5B83D;
+  --blocked: #FF6B6B;
+  --info: #7AB0FF;
+}
+
+:root {
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Red Hat Mono", ui-monospace, monospace;
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+}

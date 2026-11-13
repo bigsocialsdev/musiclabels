@@ -908,3 +908,172 @@ export const payouts = pgTable(
     check('payouts_net_check', sql`${t.netPaise} = ${t.royaltyBasePaise} - ${t.tdsPaise} + ${t.sellerGstPaise}`),
   ],
 ).enableRLS();
+
+// ---- clearance, disputes, complaints, enquiries (S3-M6) ----
+
+export const CLEARANCE_STATUS_SQL = sql`'not_required','pending','sent','completed','failed','overdue','escalated'`;
+
+/** Bio-code proof that the buyer controls a licensed channel (PLAN §11 ChannelVerifier). One pending challenge per channel. */
+export const channelVerifications = pgTable(
+  'channel_verifications',
+  {
+    id: id(),
+    licensedChannelId: uuid('licensed_channel_id').notNull().references(() => licensedChannels.id, { onDelete: 'restrict' }),
+    method: text('method').notNull(),
+    code: text('code').notNull(),
+    status: text('status').notNull().default('pending'),
+    checkedBy: uuid('checked_by').references(() => users.id, { onDelete: 'restrict' }), // admin who confirmed it by hand; null = automatic
+    checkedAt: timestamp('checked_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('channel_verifications_method_check', sql`${t.method} in ('bio_code','oauth_google','oauth_meta')`),
+    check('channel_verifications_status_check', sql`${t.status} in ('pending','verified','failed')`),
+    uniqueIndex('channel_verifications_pending_key').on(t.licensedChannelId).where(sql`${t.status} = 'pending'`),
+  ],
+).enableRLS();
+
+/**
+ * One request per licensed channel and per registered video (PLAN §4.5). The response token is stored as a
+ * SHA-256 hash and cleared when used; `clearance_class` is the track's class when the request was made.
+ */
+export const clearanceRequests = pgTable(
+  'clearance_requests',
+  {
+    id: id(),
+    licenseId: uuid('license_id').notNull().references(() => licenses.id, { onDelete: 'restrict' }),
+    licensedChannelId: uuid('licensed_channel_id').references(() => licensedChannels.id, { onDelete: 'restrict' }),
+    licensedVideoId: uuid('licensed_video_id').references(() => licensedVideos.id, { onDelete: 'restrict' }),
+    sellerOrgId: uuid('seller_org_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
+    provider: text('provider').notNull().default('manual_seller'),
+    scope: text('scope').notNull(),
+    clearanceClass: text('clearance_class').notNull(),
+    status: text('status').notNull(),
+    respondTokenHash: text('respond_token_hash'),
+    tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
+    dueAt: timestamp('due_at', { withTimezone: true }),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    sellerNote: text('seller_note'),
+    evidenceKey: text('evidence_key'), // reserved: evidence upload arrives with the seller portal (S4-M7)
+    externalRef: text('external_ref'),
+    lastError: text('last_error'),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('clearance_requests_status_check', sql`${t.status} in (${CLEARANCE_STATUS_SQL})`),
+    check('clearance_requests_provider_check', sql`${t.provider} in ('manual_seller')`),
+    check(
+      'clearance_requests_scope_check',
+      sql`(${t.scope} = 'channel' and ${t.licensedChannelId} is not null and ${t.licensedVideoId} is null) or (${t.scope} = 'video' and ${t.licensedVideoId} is not null and ${t.licensedChannelId} is null)`,
+    ),
+    check('clearance_requests_class_check', sql`${t.clearanceClass} in ('A','B')`),
+    uniqueIndex('clearance_requests_channel_key').on(t.licensedChannelId).where(sql`${t.licensedChannelId} is not null`),
+    uniqueIndex('clearance_requests_video_key').on(t.licensedVideoId).where(sql`${t.licensedVideoId} is not null`),
+    uniqueIndex('clearance_requests_token_key').on(t.respondTokenHash).where(sql`${t.respondTokenHash} is not null`),
+    index('clearance_requests_status_idx').on(t.status, t.dueAt),
+    index('clearance_requests_license_idx').on(t.licenseId),
+    index('clearance_requests_seller_idx').on(t.sellerOrgId, t.status),
+  ],
+).enableRLS();
+
+export const DISPUTE_STATUS_SQL = sql`'open','in_progress','resolved_released','resolved_denied','refund_eligible','resolved_refunded','resolved_kit_issued'`;
+
+/** A buyer's report of a claim or strike against a registered use (PLAN §4.6). Timers are fixed at open. */
+export const disputes = pgTable(
+  'disputes',
+  {
+    id: id(),
+    licenseId: uuid('license_id').notNull().references(() => licenses.id, { onDelete: 'restrict' }),
+    openedBy: uuid('opened_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    videoUrl: text('video_url').notNull(),
+    platform: text('platform').notNull(),
+    disputeType: text('dispute_type').notNull(),
+    claimantName: text('claimant_name').notNull(),
+    claimantCataloged: boolean('claimant_cataloged').notNull().default(false), // admin: the claimant is a rightsholder in our catalog
+    clearanceClassAtOpen: text('clearance_class_at_open').notNull(),
+    status: text('status').notNull().default('open'),
+    firstActionDueAt: timestamp('first_action_due_at', { withTimezone: true }).notNull(),
+    resolutionDueAt: timestamp('resolution_due_at', { withTimezone: true }), // null outside Class A/B
+    refundEligibleAt: timestamp('refund_eligible_at', { withTimezone: true }).notNull(),
+    overdueNotifiedAt: timestamp('overdue_notified_at', { withTimezone: true }),
+    resolution: text('resolution'),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('disputes_status_check', sql`${t.status} in (${DISPUTE_STATUS_SQL})`),
+    check('disputes_platform_check', sql`${t.platform} in ('youtube','instagram','facebook')`),
+    check('disputes_type_check', sql`${t.disputeType} in ('content_id_claim','copyright_strike','mute','ad_rejection','other')`),
+    check('disputes_class_check', sql`${t.clearanceClassAtOpen} in ('A','B','C','unclassified')`),
+    // The same claim reported twice while the first is still being worked is one dispute.
+    uniqueIndex('disputes_open_claim_key')
+      .on(t.licenseId, t.videoUrl, t.disputeType)
+      .where(sql`${t.status} in ('open','in_progress')`),
+    index('disputes_status_idx').on(t.status, t.firstActionDueAt),
+    index('disputes_license_idx').on(t.licenseId),
+  ],
+).enableRLS();
+
+export const disputeEvents = pgTable(
+  'dispute_events',
+  {
+    id: id(),
+    disputeId: uuid('dispute_id').notNull().references(() => disputes.id, { onDelete: 'restrict' }),
+    kind: text('kind').notNull(),
+    note: text('note'),
+    actorUserId: uuid('actor_user_id'), // null = system
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('dispute_events_dispute_idx').on(t.disputeId, t.at)],
+).enableRLS();
+
+/** Public third-party copyright complaints (PLAN §5.5). */
+export const copyrightComplaints = pgTable(
+  'copyright_complaints',
+  {
+    id: id(),
+    complainantName: text('complainant_name').notNull(),
+    complainantEmail: text('complainant_email').notNull(),
+    trackId: uuid('track_id').references(() => tracks.id, { onDelete: 'restrict' }),
+    workClaimed: text('work_claimed').notNull(),
+    evidenceKey: text('evidence_key'), // reserved: evidence upload arrives with the public form (S4)
+    status: text('status').notNull().default('received'),
+    grievanceOfficerId: uuid('grievance_officer_id').references(() => users.id, { onDelete: 'restrict' }),
+    outcomeNote: text('outcome_note'),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+    acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+  },
+  (t) => [
+    check('copyright_complaints_status_check', sql`${t.status} in ('received','investigating','upheld','rejected')`),
+    index('copyright_complaints_status_idx').on(t.status, t.receivedAt),
+  ],
+).enableRLS();
+
+/** Commercial/Broadcast enquiries (PLAN §6.1): no checkout, no license record. */
+export const enquiries = pgTable(
+  'enquiries',
+  {
+    id: id(),
+    orgId: uuid('org_id').references(() => organizations.id, { onDelete: 'restrict' }),
+    contactName: text('contact_name').notNull(),
+    contactEmail: text('contact_email').notNull(),
+    contactPhone: text('contact_phone'),
+    trackId: uuid('track_id').notNull().references(() => tracks.id, { onDelete: 'restrict' }),
+    intendedUse: text('intended_use').notNull(),
+    media: text('media').notNull(),
+    budgetRange: text('budget_range'),
+    status: text('status').notNull().default('new'),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('enquiries_media_check', sql`${t.media} in ('tv','ott','cinema','other')`),
+    check('enquiries_status_check', sql`${t.status} in ('new','contacted','closed_won','closed_lost')`),
+    index('enquiries_status_idx').on(t.status, t.createdAt),
+  ],
+).enableRLS();

@@ -48,6 +48,11 @@ const schema = z.object({
   RCM_ON_UNREGISTERED_SELLERS: z.enum(['true', 'false']).optional(),
   PAYOUT_MIN_PAISE: z.coerce.number().int().min(0).optional(),
   PAYOUT_DAY_OF_MONTH: z.coerce.number().int().min(1).max(28).optional(),
+  // Clearance and disputes (PLAN §4.5/§4.6). Defaults apply when unset: 1 business day, 7 days. [Lawyer] confirms the refund window.
+  CLEARANCE_TURNAROUND_BUSINESS_DAYS: z.coerce.number().int().min(1).max(10).default(1),
+  CLAIM_RELEASE_REFUND_WINDOW_DAYS: z.coerce.number().int().min(1).max(90).default(7),
+  // YouTube Data API key for bio-code channel checks (PLAN §11). Unset = channels are confirmed by an admin.
+  YOUTUBE_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

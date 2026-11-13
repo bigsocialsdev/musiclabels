@@ -101,3 +101,49 @@ export async function issueDownloadUrl(
   // Clean master and its MP3 derivative both live in the private masters bucket.
   return { ok: true, value: { url: await sign(BUCKETS.masters, target.key, DOWNLOAD_URL_SECONDS, target.name) } };
 }
+
+export async function getLicenseById(db: DbOrTx, licenseId: string): Promise<ResolvedLicense | null> {
+  const [row] = await db.select().from(licenses).where(eq(licenses.id, licenseId));
+  return row ? resolve(row, new Date()) : null;
+}
+
+/** Registered creatives of a license, oldest first. */
+export async function listVideos(db: DbOrTx, licenseId: string) {
+  return db.select().from(licensedVideos).where(eq(licensedVideos.licenseId, licenseId)).orderBy(asc(licensedVideos.registeredAt));
+}
+
+export type ChannelRef = { id: string; licenseId: string; platform: string; handleOrUrl: string; verificationStatus: string };
+
+/** An active channel of a license, as its purchasing org sees it; another org's channel (or a non-member) gets null. */
+export async function getChannelForBuyer(db: DbOrTx, actor: BuyerActor, channelId: string): Promise<ChannelRef | null> {
+  if (!(await getMembershipRole(db, actor.userId, actor.orgId))) return null;
+  const [row] = await db
+    .select({ id: licensedChannels.id, licenseId: licensedChannels.licenseId, platform: licensedChannels.platform, handleOrUrl: licensedChannels.handleOrUrl, verificationStatus: licensedChannels.verificationStatus })
+    .from(licensedChannels)
+    .innerJoin(licenses, eq(licenses.id, licensedChannels.licenseId))
+    .where(and(eq(licensedChannels.id, channelId), isNull(licensedChannels.removedAt), eq(licenses.purchaserOrgId, actor.orgId)));
+  return row ?? null;
+}
+
+/** Admin read for hand verification (Instagram/Facebook). */
+export async function getChannelById(db: DbOrTx, channelId: string): Promise<ChannelRef | null> {
+  const [row] = await db
+    .select({ id: licensedChannels.id, licenseId: licensedChannels.licenseId, platform: licensedChannels.platform, handleOrUrl: licensedChannels.handleOrUrl, verificationStatus: licensedChannels.verificationStatus })
+    .from(licensedChannels)
+    .where(and(eq(licensedChannels.id, channelId), isNull(licensedChannels.removedAt)));
+  return row ?? null;
+}
+
+/** Channel verification status is owned here; the clearance slice's verifier calls this. */
+export async function setChannelVerification(db: DbOrTx, channelId: string, status: 'unverified' | 'pending' | 'verified'): Promise<void> {
+  await db.update(licensedChannels).set({ verificationStatus: status }).where(eq(licensedChannels.id, channelId));
+}
+
+/** Active licenses of a track: what an upheld copyright complaint puts under review (PLAN §5.5). */
+export async function listActiveLicensesForTrack(db: DbOrTx, trackId: string) {
+  return db
+    .select({ id: licenses.id, publicId: licenses.publicId, orderId: licenses.orderId })
+    .from(licenses)
+    .where(and(eq(licenses.trackId, trackId), eq(licenses.status, 'active')))
+    .orderBy(asc(licenses.createdAt));
+}

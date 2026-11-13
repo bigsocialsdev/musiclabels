@@ -1,4 +1,5 @@
 import { sweepCatalog } from '@/lib/catalog/server';
+import { backfillClearance, dispatchClearance } from '@/lib/clearance/server';
 import { productionDeps, sweepOrders } from '@/lib/orders/server';
 import { getDb } from '@/lib/platform/db';
 import { errorMessage } from '@/lib/platform/log';
@@ -16,5 +17,9 @@ export async function GET(req: Request) {
   const orders = await Promise.resolve()
     .then(() => sweepOrders(getDb(), productionDeps()))
     .catch((e: unknown) => ({ error: errorMessage(e) }));
-  return Response.json({ orders, outboxSent: await processOutbox(), catalogProcessed: await sweepCatalog(3) });
+  // Clearance requests go out before the outbox, so their emails are sent this run too.
+  const clearance = await Promise.resolve()
+    .then(async () => ({ backfilled: await backfillClearance(getDb()), sent: await dispatchClearance(getDb()) }))
+    .catch((e: unknown) => ({ error: errorMessage(e) }));
+  return Response.json({ orders, clearance, outboxSent: await processOutbox(), catalogProcessed: await sweepCatalog(3) });
 }

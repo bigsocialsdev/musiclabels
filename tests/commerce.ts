@@ -4,12 +4,13 @@ import type { PriceLevel } from '@/lib/catalog';
 import { acceptPending, publishLegalDocument } from '@/lib/legal/server';
 import { TIERS, publishTermsVersion, type Tier } from '@/lib/licensing/server';
 import { createOrder, fulfilOrder, handleRazorpayWebhook, type BuyerSession } from '@/lib/orders/server';
+import type { AdminPermission } from '@/lib/identity';
 import type { Db } from '@/lib/platform/db';
 import { activatePriceBook, createPriceBook } from '@/lib/pricing/server';
 import { makeBuyer, makeSellableTrack, makeUser } from './factories';
 import type { FakeGateway, MemoryStore } from './fakes';
 
-export const adminCtx = async (db: Db, permissions: ('superadmin' | 'verification' | 'finance' | 'disputes')[]) => ({
+export const adminCtx = async (db: Db, permissions: AdminPermission[]) => ({
   userId: (await makeUser(db, { admin: permissions, aal: 'aal2' })).userId,
   permissions,
 });
@@ -52,9 +53,9 @@ export async function sale(
   db: Db,
   gw: FakeGateway,
   store: MemoryStore,
-  opts: { sellerOrgId?: string; priceLevel?: PriceLevel; paidAt?: Date; tier?: Tier; fulfil?: boolean } = {},
+  opts: { sellerOrgId?: string; priceLevel?: PriceLevel; paidAt?: Date; tier?: Tier; fulfil?: boolean; clearanceClass?: 'A' | 'B' } = {},
 ) {
-  const track = await makeSellableTrack(db, { sellerOrgId: opts.sellerOrgId, priceLevel: opts.priceLevel ?? 'L1' });
+  const track = await makeSellableTrack(db, { sellerOrgId: opts.sellerOrgId, priceLevel: opts.priceLevel ?? 'L1', clearanceClass: opts.clearanceClass });
   const buyer = await readyBuyer(db);
   const r = await createOrder(
     db,

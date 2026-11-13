@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import { orders } from '@/db/schema';
 import { ensureFirstCertificate, verifyUrl } from '@/lib/certificates/server';
+import { dispatchClearance, ensureClearanceRequests } from '@/lib/clearance/server';
 import { getInvoiceByOrder, issueInvoice, storeInvoicePdf } from '@/lib/invoicing/server';
 import { creditSaleRoyalty } from '@/lib/ledger/server';
 import { TIER_LABELS } from '@/lib/certificates';
@@ -8,7 +9,7 @@ import { getLicenseByOrder, issueLicense, sellabilityIssues, type Tier } from '@
 import { enqueueEmail, enqueueOpsAlert } from '@/lib/notifications/server';
 import { createRefundRequest } from '@/lib/payments/server';
 import type { DbOrTx } from '@/lib/platform/db';
-import { errorMessage } from '@/lib/platform/log';
+import { errorMessage, log } from '@/lib/platform/log';
 import type { ObjectStore } from '@/lib/platform/storage';
 import type { OrderSnapshot } from '../index';
 import { applyOrderTransition } from './transition';
@@ -105,6 +106,7 @@ export async function fulfilOrder(db: DbOrTx, orderId: string, store: ObjectStor
           channels: snap.channels,
         });
         await creditSaleRoyalty(tx, { orderId: o.id, sellerOrgId: o.sellerOrgId, taxablePaise: o.taxablePaise, royaltyRateBps: o.royaltyRateBps, paidAt: o.paidAt! });
+        await ensureClearanceRequests(tx, issued.license.id); // Class B: one pending request per channel; Class A: not_required
         if (issued.created && snap.buyerEmail) {
           await enqueueEmail(tx, {
             kind: 'license.issued',
@@ -122,6 +124,8 @@ export async function fulfilOrder(db: DbOrTx, orderId: string, store: ObjectStor
     await ensureFirstCertificate(db, license, store);
 
     const done = await applyOrderTransition(db, o.id, 'fulfil', { actorUserId: null, set: { fulfilledAt: new Date(), fulfilClaimedAt: null, lastError: null } });
+    // Send the clearance requests now; a failure here is not the order's problem, the sweep sends them later.
+    await dispatchClearance(db, { licenseId: license.id }).catch((e: unknown) => log.error('clearance dispatch after fulfilment failed', { orderId: o.id, error: errorMessage(e) }));
     return done.ok || done.status === 'fulfilled' ? 'fulfilled' : 'skipped';
   } catch (e) {
     await db.update(orders).set({ lastError: errorMessage(e).slice(0, 500), fulfilClaimedAt: null }).where(and(eq(orders.id, o.id), eq(orders.status, 'paid')));

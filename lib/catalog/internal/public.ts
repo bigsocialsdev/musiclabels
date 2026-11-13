@@ -10,3 +10,12 @@ export async function getPublishedTrack(db: DbOrTx, by: { slug: string } | { id:
     .where(and('slug' in by ? eq(tracks.slug, by.slug) : eq(tracks.id, by.id), eq(tracks.status, 'published')));
   return row ?? null;
 }
+
+/** What clearance, disputes and complaints need to know about a track, whatever its status. */
+export async function getTrackFacts(db: DbOrTx, trackId: string) {
+  const [row] = await db
+    .select({ id: tracks.id, title: tracks.title, status: tracks.status, sellerOrgId: tracks.sellerOrgId, clearanceClass: tracks.clearanceClass })
+    .from(tracks)
+    .where(eq(tracks.id, trackId));
+  return row ?? null;
+}

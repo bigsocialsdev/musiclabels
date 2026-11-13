@@ -37,7 +37,7 @@ export function TrackForm({
 }) {
   const d = defaults;
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-5">
       {trackId && <input type="hidden" name="trackId" value={trackId} />}
       <Field id="title" label="Title" required maxLength={200} defaultValue={d.title ?? ''} />
       <Field id="primaryArtist" label="Primary artist" required maxLength={200} defaultValue={d.primaryArtist ?? ''} />
@@ -67,11 +67,11 @@ export function TrackForm({
       </div>
       {taxonomy.moods.length > 0 && (
         <fieldset className="grid gap-1.5">
-          <legend className="text-sm font-medium">Moods (choose up to 5)</legend>
+          <legend className="mb-1 text-xs font-semibold text-muted-foreground">Moods (choose up to 5)</legend>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {taxonomy.moods.map((m) => (
-              <label key={m.id} className="flex items-center gap-1.5 text-sm">
-                <input type="checkbox" name="moodIds" value={m.id} defaultChecked={d.moodIds?.includes(m.id)} />
+              <label key={m.id} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="moodIds" value={m.id} defaultChecked={d.moodIds?.includes(m.id)} className="size-4" />
                 {m.name}
               </label>
             ))}
@@ -91,7 +91,7 @@ export function TrackForm({
         </select>
       </div>
       <fieldset className="grid gap-2">
-        <legend className="text-sm font-medium">About the track</legend>
+        <legend className="mb-1 text-xs font-semibold text-muted-foreground">About the track</legend>
         <Check name="explicit" label="Contains explicit lyrics" defaultChecked={d.explicit ?? false} />
         <Check name="aiGeneratedDeclared" label="Made with AI tools" defaultChecked={d.aiGeneratedDeclared ?? false} />
         <Check name="organicSocial" label="Buyers may use it in organic social posts" defaultChecked={d.organicSocial ?? true} />

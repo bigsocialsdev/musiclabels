@@ -1,18 +1,175 @@
 @import "tailwindcss";
 
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+/* Night Session (DESIGN.md). Values mirror docs/design/tokens.css. The theme follows the surface, not the OS:
+   no class = daylight (seller portal, admin); a `.dark` ancestor = night (storefront route group). */
+@custom-variant dark (&:is(.dark *));
+
+:root,
+.light {
+  --background: #F6F5F2;
+  --foreground: #1A1815;
+  --card: #FFFFFF;
+  --card-foreground: #1A1815;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1815;
+  --primary: #1A1815;
+  --primary-foreground: #F6F5F2;
+  --secondary: #EDEBE7;
+  --secondary-foreground: #1A1815;
+  --muted: #EDEBE7;
+  --muted-foreground: #66615A;
+  --accent: #E6E3DE;
+  --accent-foreground: #1A1815;
+  --destructive: #B82B27;
+  --border: #E3E0DB;
+  --input: #D4D0CA;
+  --ring: #1A1815;
+
+  --fg-2: #403C36;
+  --fg-4: #A6A199;
+  --surface-3: #E3E0DB;
+
+  --signal: #FF6A2B;
+  --signal-foreground: #160A03;
+  --wave-idle: #D2CEC7;
+  --wave-played: #F05A1C;
+  --stage-glow: rgba(255, 106, 43, 0.14);
+
+  --ok: #12804F;
+  --attention: #9A5B00;
+  --blocked: #B82B27;
+  --info: #2459C9;
+
+  --radius: 10px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
+.dark {
+  --background: #141311;
+  --foreground: #F2F0EB;
+  --card: #1C1A17;
+  --card-foreground: #F2F0EB;
+  --popover: #221F1C;
+  --popover-foreground: #F2F0EB;
+  --primary: #F2F0EB;
+  --primary-foreground: #141311;
+  --secondary: #262421;
+  --secondary-foreground: #F2F0EB;
+  --muted: #262421;
+  --muted-foreground: #9C968D;
+  --accent: #302D29;
+  --accent-foreground: #F2F0EB;
+  --destructive: #FF6B6B;
+  --border: #2B2825;
+  --input: #3A3631;
+  --ring: #F2F0EB;
+
+  --fg-2: #CDC8BF;
+  --fg-4: #6F6A62;
+  --surface-3: #3A3631;
+
+  --signal: #FF6A2B;
+  --signal-foreground: #160A03;
+  --wave-idle: #47423C;
+  --wave-played: #FF6A2B;
+  --stage-glow: rgba(255, 106, 43, 0.26);
+
+  --ok: #3DD68C;
+  --attention: #F5B83D;
+  --blocked: #FF6B6B;
+  --info: #7AB0FF;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-fg-2: var(--fg-2);
+  --color-fg-4: var(--fg-4);
+  --color-surface-3: var(--surface-3);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-wave-idle: var(--wave-idle);
+  --color-wave-played: var(--wave-played);
+  --color-stage-glow: var(--stage-glow);
+  --color-ok: var(--ok);
+  --color-attention: var(--attention);
+  --color-blocked: var(--blocked);
+  --color-info: var(--info);
+
+  /* Tailwind's scale lands on the design radii: rounded-sm 6 (xs), rounded-md 10 (sm: buttons, inputs),
+     rounded-lg 14 (md: cards, rows), rounded-xl 18 (lg: stage, receipt). */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-redhat-mono), var(--font-hanken), ui-monospace, monospace;
+
+  /* Type roles (DESIGN.md typography). */
+  --text-display: 44px;
+  --text-display--line-height: 0.98;
+  --text-display--letter-spacing: -0.045em;
+  --text-display--font-weight: 700;
+  --text-headline: 22px;
+  --text-headline--line-height: 1.1;
+  --text-headline--letter-spacing: -0.025em;
+  --text-headline--font-weight: 700;
+  --text-title: 17px;
+  --text-title--line-height: 1.25;
+  --text-title--letter-spacing: -0.015em;
+  --text-title--font-weight: 700;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  * {
+    @apply border-border;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
+  html {
+    @apply bg-background text-foreground font-sans;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    scrollbar-color: var(--surface-3) transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  ::selection {
+    background: var(--foreground);
+    color: var(--background);
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--foreground);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
 }

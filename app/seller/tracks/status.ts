@@ -1,3 +1,4 @@
+import type { StatusTone } from '@/components/ui/status';
 import type { TrackStatus } from '@/lib/catalog';
 
 export const STATUS_LABELS: Record<TrackStatus, string> = {
@@ -10,4 +11,8 @@ export const STATUS_LABELS: Record<TrackStatus, string> = {
   delisted: 'Delisted',
 };
 
-export const statusVariant = (s: TrackStatus) => (s === 'published' ? 'default' : s === 'rejected' || s === 'suspended' ? 'destructive' : 'outline');
+export const statusTone = (s: TrackStatus): StatusTone =>
+  s === 'published' ? 'ok' : s === 'rejected' || s === 'suspended' ? 'blocked' : s === 'submitted' || s === 'in_review' ? 'info' : 'muted';
+
+/** Upload checks (KYC and rights documents): valid, rejected, or still checking. */
+export const checkTone = (s: string): StatusTone => (s === 'valid' ? 'ok' : s === 'rejected' ? 'blocked' : 'attention');

@@ -1,15 +1,15 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { StatusLabel } from '@/components/ui/status';
 import { getCurrentDocument } from '@/lib/legal/server';
 import { getDb } from '@/lib/platform/db';
 import { ENTITY_TYPES, getOnboardingStatus, getPayoutAccount, getSellerProfile, listSellerDocuments, type OnboardingStatus } from '@/lib/sellers/server';
 import { requireSellerSession } from '../session';
 import { FlashBanner } from '../flash';
-import { Field, selectClass } from '../ui';
+import { Field, Notice, Page, PageHeader, selectClass } from '../ui';
 import { UploadForm } from '../upload-form';
 import { acceptTermsAction, confirmKycDocumentAction, createSellerAction, requestKycUploadAction, setBankAction, setPanAction, updateProfileAction } from './actions';
 
@@ -23,8 +23,9 @@ function Step({ title, done, description, children }: { title: string; done: boo
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {title} <Badge variant={done ? 'default' : 'outline'}>{done ? 'Done' : 'To do'}</Badge>
+        <CardTitle className="flex flex-wrap items-center justify-between gap-2">
+          {title}
+          <StatusLabel tone={done ? 'ok' : 'muted'}>{done ? 'Done' : 'To do'}</StatusLabel>
         </CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
@@ -49,9 +50,9 @@ function EntitySelect({ value }: { value?: string }) {
 }
 
 function kycBadge(s: OnboardingStatus) {
-  if (s.kycStatus === 'verified') return <Badge>KYC verified</Badge>;
-  if (s.kycStatus === 'rejected') return <Badge variant="destructive">KYC rejected</Badge>;
-  return <Badge variant="outline">KYC in review</Badge>;
+  if (s.kycStatus === 'verified') return <StatusLabel tone="ok">KYC verified</StatusLabel>;
+  if (s.kycStatus === 'rejected') return <StatusLabel tone="blocked">KYC rejected</StatusLabel>;
+  return <StatusLabel tone="info">KYC in review</StatusLabel>;
 }
 
 export default async function SellerOnboardingPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
@@ -62,24 +63,23 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
 
   if (!orgId) {
     return (
-      <main className="mx-auto max-w-xl space-y-4 p-6">
-        <h1 className="text-2xl font-semibold">Become a seller</h1>
-        <p className="text-sm text-muted-foreground">Tell us who sells the music. You can add tax and bank details next.</p>
+      <Page>
+        <PageHeader title="Become a seller">Tell us who sells the music. You can add tax and bank details next.</PageHeader>
         {banner}
-        <form action={createSellerAction} className="space-y-4">
+        <form action={createSellerAction} className="space-y-4 rounded-lg border bg-card p-5">
           <Field id="legalName" label="Legal name (yours, or your company's)" required minLength={2} />
           <Field id="displayName" label="Name shown to buyers" required minLength={2} />
           <EntitySelect />
           <Field id="opsContactEmail" label="Contact email for clearance requests" type="email" required />
           <Field id="opsContactPhone" label="Contact phone (optional)" type="tel" />
           <Field id="gstin" label="GSTIN (only if you are GST registered)" placeholder="27AAPFU0939F1ZV" />
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" name="worldwideRightsWarranted" required className="mt-1" />
+          <label className="flex items-start gap-2.5 text-sm">
+            <input type="checkbox" name="worldwideRightsWarranted" required className="mt-[3px] size-4" />
             <span>I confirm I hold the rights to license my music worldwide for online use.</span>
           </label>
           <Button type="submit">Create seller account</Button>
         </form>
-      </main>
+      </Page>
     );
   }
 
@@ -91,23 +91,36 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
     getCurrentDocument(db, 'seller_agreement'),
     getCurrentDocument(db, 'release_commitment'),
   ]);
-  if (!status || !profile) return <main className="p-6">Seller profile not found.</main>;
+  if (!status || !profile)
+    return (
+      <Page>
+        <p className="text-sm text-muted-foreground">Seller profile not found.</p>
+      </Page>
+    );
   const mfaHref = `/auth/mfa?${new URLSearchParams({ next: '/seller/onboarding' })}`;
   const needsTotp = session.aal !== 'aal2';
   const totpNote = needsTotp && (
-    <p className="text-sm text-muted-foreground">
-      Changing this needs your authenticator app. <Link className="underline" href={mfaHref}>Verify with your authenticator</Link> first.
-    </p>
+    <Notice tone="attention">
+      Changing this needs your authenticator app.{' '}
+      <Link className="font-semibold underline underline-offset-4" href={mfaHref}>
+        Verify with your authenticator
+      </Link>{' '}
+      first.
+    </Notice>
   );
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">Seller onboarding</h1>
-        {kycBadge(status)}
-      </div>
+    <Page>
+      <PageHeader
+        title={
+          <>
+            Seller onboarding
+            {kycBadge(status)}
+          </>
+        }
+      />
       {banner}
-      {status.kycStatus === 'rejected' && <p className="text-sm text-red-800">We could not verify your details. Update your documents and contact support.</p>}
+      {status.kycStatus === 'rejected' && <Notice tone="blocked">We could not verify your details. Update your documents and contact support.</Notice>}
 
       <Step title="Profile" done={status.profile} description="Clearance requests for your tracks go to the contact email.">
         <form action={updateProfileAction} className="space-y-3">
@@ -132,11 +145,11 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
 
       <Step title="KYC documents" done={status.documents.panCardValid} description="Upload your PAN card (required) and an ID. Only our verification team can open them.">
         {documents.length > 0 && (
-          <ul className="space-y-1 text-sm">
+          <ul className="divide-y rounded-md border text-sm">
             {documents.map((d) => (
-              <li key={d.id} className="flex flex-wrap items-center gap-2">
+              <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                 {KIND_LABELS[d.kind] ?? d.kind}
-                <Badge variant={d.status === 'valid' ? 'default' : d.status === 'rejected' ? 'destructive' : 'outline'}>{d.status === 'valid' ? 'accepted' : d.status}</Badge>
+                <StatusLabel tone={d.status === 'valid' ? 'ok' : d.status === 'rejected' ? 'blocked' : 'attention'}>{d.status === 'valid' ? 'accepted' : d.status}</StatusLabel>
                 {d.error && <span className="text-muted-foreground">{d.error}</span>}
               </li>
             ))}
@@ -156,7 +169,7 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
         {bank && (
           <p className="text-sm">
             <span className="font-mono">{bank.maskedAccount}</span> · {bank.ifsc} · {bank.accountHolderName}{' '}
-            <Badge variant={bank.verified ? 'default' : 'outline'}>{bank.verified ? 'verified' : 'awaiting verification'}</Badge>
+            <StatusLabel tone={bank.verified ? 'ok' : 'attention'}>{bank.verified ? 'verified' : 'awaiting verification'}</StatusLabel>
           </p>
         )}
         {totpNote}
@@ -175,8 +188,8 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
         {agreement ? (
           <form action={acceptTermsAction} className="space-y-3">
             <details>
-              <summary className="cursor-pointer text-sm underline">Read the agreement (version {agreement.version})</summary>
-              <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap text-xs">{agreement.bodyMarkdown}</pre>
+              <summary className="cursor-pointer text-sm font-semibold underline underline-offset-4">Read the agreement (version {agreement.version})</summary>
+              <pre className="mt-2 max-h-72 overflow-auto rounded-md border bg-background p-3 font-sans text-[13px] leading-relaxed whitespace-pre-wrap text-fg-2">{agreement.bodyMarkdown}</pre>
             </details>
             {status.sellerAgreement ? (
               <p className="text-sm">You accepted this version.</p>
@@ -196,8 +209,8 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
         {commitment ? (
           <form action={acceptTermsAction} className="space-y-3">
             <details>
-              <summary className="cursor-pointer text-sm underline">Read the commitment (version {commitment.version})</summary>
-              <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap text-xs">{commitment.bodyMarkdown}</pre>
+              <summary className="cursor-pointer text-sm font-semibold underline underline-offset-4">Read the commitment (version {commitment.version})</summary>
+              <pre className="mt-2 max-h-72 overflow-auto rounded-md border bg-background p-3 font-sans text-[13px] leading-relaxed whitespace-pre-wrap text-fg-2">{commitment.bodyMarkdown}</pre>
             </details>
             {status.releaseCommitment ? (
               <p className="text-sm">You accepted this version.</p>
@@ -216,6 +229,6 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
       <p className="text-sm text-muted-foreground">
         {status.readyToSubmit ? 'You can submit tracks for review.' : 'Accept the seller agreement to submit tracks. Payouts also need verified KYC and a verified bank account.'}
       </p>
-    </main>
+    </Page>
   );
 }

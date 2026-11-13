@@ -1,12 +1,16 @@
 name: Vercel deploy
 
 # Production on push to main (PR-only repo, so effectively on merge); previews on pull requests.
+# Needs the repo secrets VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID. Without VERCEL_TOKEN a pull request
+# skips the preview with a warning (it is not a code failure); a push to main fails, so production never silently
+# stops deploying.
 on:
   push:
     branches: [main]
   pull_request:
 
 env:
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
@@ -14,15 +18,33 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check Vercel credentials
+        id: gate
+        run: |
+          if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "::error::VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID must all be set as repository secrets to deploy production."
+            exit 1
+          else
+            echo "::warning::Vercel secrets are not set for this run; skipping the preview deploy."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.gate.outputs.go == 'true'
+        uses: actions/checkout@v4
+      - if: steps.gate.outputs.go == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm i -g vercel@latest
+      - if: steps.gate.outputs.go == 'true'
+        run: npm i -g vercel@latest
       - name: Pull Vercel env
-        run: vercel pull --yes --environment=${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }} --token=${{ secrets.VERCEL_TOKEN }}
+        if: steps.gate.outputs.go == 'true'
+        run: vercel pull --yes --environment=${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }} --token="$VERCEL_TOKEN"
       - name: Build
-        run: vercel build ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token=${{ secrets.VERCEL_TOKEN }}
+        if: steps.gate.outputs.go == 'true'
+        run: vercel build ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token="$VERCEL_TOKEN"
       - name: Deploy
-        run: vercel deploy --prebuilt ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token=${{ secrets.VERCEL_TOKEN }}
+        if: steps.gate.outputs.go == 'true'
+        run: vercel deploy --prebuilt ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token="$VERCEL_TOKEN"

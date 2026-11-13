@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull } from 'drizzle-orm';
-import { licenseDownloads, licensedChannels, licensedVideos, licenses, memberships, trackVersions } from '@/db/schema';
+import { licenseDownloads, licensedChannels, licensedVideos, licenses, memberships, organizations, trackVersions } from '@/db/schema';
 import { getMembershipRole } from '@/lib/identity/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import { BUCKETS, createSignedDownloadUrl } from '@/lib/platform/storage';
@@ -173,7 +173,12 @@ export type BuyerLicenseRow = {
  * license can never appear whatever the caller passes.
  */
 export async function listBuyerLicenses(db: DbOrTx, userId: string, opts: { client?: string; page?: number; pageSize?: number } = {}, now: Date = new Date()) {
-  const mine = db.select({ orgId: memberships.orgId }).from(memberships).where(eq(memberships.userId, userId));
+  // A suspended organisation's members lose access to it everywhere (S4-M10c): leave it out of "my orgs" too.
+  const mine = db
+    .select({ orgId: memberships.orgId })
+    .from(memberships)
+    .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+    .where(and(eq(memberships.userId, userId), isNull(organizations.suspendedAt)));
   const scope = inArray(licenses.purchaserOrgId, mine);
   const client = opts.client?.trim().slice(0, 100);
   // Escape LIKE wildcards: the filter is a substring match on what the buyer typed, not a pattern.

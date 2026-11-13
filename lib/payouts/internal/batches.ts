@@ -81,6 +81,7 @@ export async function computePayoutBatch(db: DbOrTx, admin: AdminContext | null,
       if (unsettled.has(sellerOrgId)) { skip('previous_payout_unsettled'); continue; }
       const standing = await getSellerStanding(tx, sellerOrgId);
       if (standing?.kycStatus !== 'verified') { skip('kyc_not_verified'); continue; }
+      if (standing.status === 'suspended') { skip('seller_suspended'); continue; } // an admin suspension holds the balance; reinstating releases it at the next run
       if (!(await getVerifiedBankDetails(tx, sellerOrgId))) { skip('bank_not_verified'); continue; }
 
       // Earlier payouts to this seller for periods in the same financial year (failed ones paid nothing).

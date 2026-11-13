@@ -20,7 +20,13 @@ export default async function AccountPage() {
       <PageHeader title="Account">Your organisations and what the public verify page shows about them.</PageHeader>
       {orgs.length === 0 && <p className="text-sm text-muted-foreground">You are not part of a buyer organisation yet. One is created when you buy your first license.</p>}
       <ul className="grid gap-3">
-        {orgs.map((o) => (
+        {orgs.map((o) => o.suspendedAt ? (
+          <li key={o.id} className="space-y-2 rounded-lg border bg-card p-5">
+            <p className="text-title">{o.legalName}</p>
+            <StatusLabel tone="attention">Suspended</StatusLabel>
+            <p className="text-sm text-muted-foreground">This organisation is suspended, so purchases and its licenses are closed to it for now. If you think this is a mistake, contact the platform team.</p>
+          </li>
+        ) : (
           <li key={o.id} className="space-y-3 rounded-lg border bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-title">{o.legalName}</p>

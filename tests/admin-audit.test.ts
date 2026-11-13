@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { TransactionRollbackError, eq, sql } from 'drizzle-orm';
 import { acceptances, auditLog, clearanceRequests, licensedChannels, payoutBatches, payouts, reconciliationItems, rightsDocuments, screenings, sellerDocuments } from '@/db/schema';
+import { reinstateOrg, suspendOrg, viewOrgSummary } from '@/lib/accounts/server';
 import { createPriceBook, activatePriceBook } from '@/lib/pricing/server';
 import { adminRevokeLicense, publishTermsVersion } from '@/lib/licensing/server';
 import { getCurrentDocument, publishLegalDocument } from '@/lib/legal/server';
@@ -279,6 +280,22 @@ const SCENARIOS: Record<string, Scenario> = {
     const admin = await as('verification');
     return { admin, act: () => sellerDocumentDownloadUrl(tx, admin, doc!.id) };
   },
+  'accounts.summary': async (tx, as) => {
+    const seller = await makeSeller(tx);
+    const admin = await as('superadmin');
+    return { admin, act: () => viewOrgSummary(tx, admin, seller.orgId) };
+  },
+  'accounts.suspend': async (tx, as) => {
+    const t = await makeSellableTrack(tx);
+    const admin = await as('superadmin');
+    return { admin, act: () => suspendOrg(tx, admin, { orgId: t.sellerOrgId, reason: 'chargeback ring' }) };
+  },
+  'accounts.reinstate': async (tx, as) => {
+    const t = await makeSellableTrack(tx);
+    const admin = await as('superadmin');
+    await suspendOrg(tx, admin, { orgId: t.sellerOrgId, reason: 'chargeback ring' });
+    return { admin, act: () => reinstateOrg(tx, admin, { orgId: t.sellerOrgId, reason: 'cleared' }) };
+  },
   'legal.publish': async (tx, as) => {
     const admin = await as('superadmin');
     return { admin, act: () => publishLegalDocument(tx, admin, { kind: 'seller_agreement', bodyMarkdown: 'Seller agreement, test version.' }) };
@@ -340,6 +357,9 @@ const EXPECTED_ACTION: Record<string, string> = {
   'pricing.activate': 'price_book.activate',
   'kyc.set_status': 'seller.kyc_rejected',
   'kyc.document': 'seller_document.download',
+  'accounts.summary': 'org.view_summary',
+  'accounts.suspend': 'org.suspend',
+  'accounts.reinstate': 'org.reinstate',
   'legal.publish': 'legal_document.publish',
   'terms.publish': 'license_terms.publish',
 };

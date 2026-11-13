@@ -13,6 +13,8 @@ export const AREAS: readonly { href: string; label: string; permission: AreaPerm
   { href: '/admin/reconciliation', label: 'Reconciliation', permission: 'finance' },
   { href: '/admin/enquiries', label: 'Enquiries', permission: 'any' },
   { href: '/admin/catalog', label: 'Catalog', permission: 'verification' },
+  { href: '/admin/kyc', label: 'KYC', permission: 'verification' },
+  { href: '/admin/accounts', label: 'Users and orgs', permission: 'superadmin' },
   { href: '/admin/legal', label: 'Legal', permission: 'superadmin' },
   { href: '/admin/audit', label: 'Audit log', permission: 'superadmin' },
 ];

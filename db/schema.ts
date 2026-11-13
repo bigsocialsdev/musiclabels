@@ -105,9 +105,13 @@ export const organizations = pgTable(
     billingAddress: text('billing_address'),
     // Individual buyers only: show the full name (not a masked one) on the public verify page. Off unless the buyer opts in.
     verifyFullName: boolean('verify_full_name').notNull().default(false),
+    // Set by an admin suspension (S4-M10c): members lose access to this org everywhere; null = in good standing.
+    suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+    suspensionReason: text('suspension_reason'),
     createdAt: createdAt(),
   },
   (t) => [
+    check('organizations_suspension_check', sql`(${t.suspendedAt} is null) = (${t.suspensionReason} is null)`),
     check('organizations_kind_check', sql`${t.kind} in ('seller','buyer')`),
     check('organizations_buyer_type_check', sql`${t.buyerType} is null or ${t.buyerType} in ('individual','business','agency')`),
   ],

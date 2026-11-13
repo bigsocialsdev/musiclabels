@@ -1,6 +1,6 @@
 import 'server-only';
 export * from './index';
-export { getSellerStanding, type SellerStanding } from './internal/standing';
+export { getSellerStanding, setSellerStatus, type SellerStanding } from './internal/standing';
 export {
   setPayoutAccount,
   verifyPayoutAccount,

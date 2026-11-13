@@ -91,7 +91,7 @@ describe('what discovery lists', () => {
     expect(sorted(await ids({ genre: g, durMin: 60, durMax: 120 }))).toEqual([b]); // length
     expect(sorted(await ids({ genre: g, tier: ['paid_ad'] }))).toEqual(sorted([a, c])); // b has no paid use
     expect(sorted(await ids({ genre: g, tier: ['creator'] }))).toEqual(sorted([a, b])); // c has no organic use
-    expect(sorted(await ids({ genre: g, tier: ['creator', 'paid_ad'] }))).toEqual([a]); // every picked tier must be on offer
+    expect(sorted(await ids({ genre: g, tier: ['creator', 'paid_ad'] }))).toEqual(sorted([a, b, c])); // any picked tier on offer
     expect(await ids({ genre: g, lang: ['tamil'] })).toEqual([]);
     expect(await ids({ genre: g, mood: [calm.id] })).not.toContain(other); // facets are ANDed
   });

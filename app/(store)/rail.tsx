@@ -1,12 +1,11 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { TIER_LABELS } from '@/lib/certificates';
-import type { DiscoveryFacets, DiscoverySearch, DiscoveryTier, FacetOption } from '@/lib/catalog';
+import { LANGUAGE_LABELS, type DiscoveryFacets, type DiscoverySearch, type DiscoveryTier, type FacetOption, type Language } from '@/lib/catalog';
 import { cn } from '@/lib/utils';
 import { BpmRange } from './bpm-range';
 import { searchHref, toggled, withParams } from './search-params';
 
-export const LANGUAGE_LABELS: Record<string, string> = { hindi: 'Hindi', punjabi: 'Punjabi', tamil: 'Tamil', english: 'English', instrumental: 'Instrumental' };
 
 const LENGTHS = [
   { label: 'Under 1:00', min: undefined, max: 60 },
@@ -62,7 +61,7 @@ export function FilterGroups({ search, facets, priceLabels }: { search: Discover
       <Group title="Language">
         {shown(facets.languages, search.lang).map((o) => (
           <Opt key={o.value} href={toggled(search, 'lang', o.value)} selected={(search.lang as string[]).includes(o.value)} count={o.count}>
-            {LANGUAGE_LABELS[o.value]}
+            {LANGUAGE_LABELS[o.value as Language]}
           </Opt>
         ))}
       </Group>
@@ -113,7 +112,7 @@ export function FilterGroups({ search, facets, priceLabels }: { search: Discover
 /** The mobile chip row: what is picked first (tap to remove), then the moods and languages that exist. */
 export function Chips({ search, facets }: { search: DiscoverySearch; facets: DiscoveryFacets }) {
   const label = (key: 'mood' | 'lang' | 'genre', value: string) =>
-    key === 'lang' ? LANGUAGE_LABELS[value] : (key === 'mood' ? facets.moods : facets.genres).find((o) => o.value === value)?.label ?? value;
+    key === 'lang' ? LANGUAGE_LABELS[value as Language] : (key === 'mood' ? facets.moods : facets.genres).find((o) => o.value === value)?.label ?? value;
   const picked = (['mood', 'lang', 'genre'] as const).flatMap((k) => search[k].map((v) => ({ k, v })));
   const rest = [
     ...facets.moods.filter((o) => o.count > 0 && !search.mood.includes(o.value)).map((o) => ({ k: 'mood' as const, v: o.value })),

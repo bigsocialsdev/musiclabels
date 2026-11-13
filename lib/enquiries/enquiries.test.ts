@@ -34,6 +34,8 @@ describe('Commercial/Broadcast enquiries (PLAN 6.1)', () => {
 
   it('rejects bad input, an unpublished track and an unknown track', async () => {
     const draft = await makeSellableTrack(db, { status: 'draft' });
+    const classC = await makeSellableTrack(db, { clearanceClass: 'C' }); // published but not on sale
+    expect(await submit(input(classC.trackId))).toEqual({ ok: false, issues: ['trackId'] });
     expect(await submit(input(draft.trackId))).toEqual({ ok: false, issues: ['trackId'] });
     expect(await submit(input('00000000-0000-7000-8000-000000000000'))).toEqual({ ok: false, issues: ['trackId'] });
     const t = await makeSellableTrack(db);

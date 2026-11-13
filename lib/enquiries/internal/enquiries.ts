@@ -1,7 +1,7 @@
 import { asc, eq } from 'drizzle-orm';
 import { enquiries } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
-import { getPublishedTrack } from '@/lib/catalog/server';
+import { getSellableTrack } from '@/lib/catalog/server';
 import type { AdminContext } from '@/lib/identity';
 import { enqueueEmail, enqueueOpsAlert } from '@/lib/notifications/server';
 import { allowPublicSubmission } from '@/lib/platform/ratelimit';
@@ -18,7 +18,7 @@ export async function submitEnquiry(db: DbOrTx, raw: EnquiryInput, opts: { ip: s
   const parsed = enquiryInputSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, issues: parsed.error.issues.map((i) => i.path.join('.') || 'input') };
   if (!(await allowPublicSubmission('enquiry', opts.ip, parsed.data.contactEmail))) return { ok: false, issues: ['rate_limited'] };
-  const track = await getPublishedTrack(db, { id: parsed.data.trackId });
+  const track = await getSellableTrack(db, { id: parsed.data.trackId });
   if (!track) return { ok: false, issues: ['trackId'] };
   const { contactPhone, budgetRange, ...rest } = parsed.data;
   return db.transaction(async (tx) => {

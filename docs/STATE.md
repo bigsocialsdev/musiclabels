@@ -326,6 +326,7 @@ Assumptions / deviations (flag if wrong):
 - **Enquiries are anonymous** (no org link even when signed in); the form promises a reply by email but no turnaround.
 - **Not verified here:** audio playback and signed URLs (the preview bucket needs a live Supabase Storage; helpers and routes are tested with the signer stubbed), and the Playwright exit criteria (they need the Auth stack; keyboard and mobile layout were checked by hand).
 - Open: real catalogue imagery; checkout, verify and admin pages still on the old colours (M9-M10).
+- **After review:** the tier facet matches a track offering any picked tier (it was all of them); previews, waveforms and enquiries use the listing's own on-sale rule (`getSellableTrack`), so a class C, suspended or unpriced track no longer serves a preview or takes an enquiry; `/legal` is crawlable again; the language labels and the m:ss formatter each live in one place; the storefront ground uses a `--night-ground` token. **Known drift risk:** the on-sale rule is written in SQL in `lib/catalog/internal/search.ts` and separately in `quoteLicense`; if one changes, change the other (a listed track must never be a dead end at checkout). Test factories now give every sellable track a preview key. The DB suite is not re-runnable on one long-lived local database (payout runs persist); use a fresh database per run, as CI does.
 
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.

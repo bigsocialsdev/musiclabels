@@ -11,7 +11,7 @@ import { SearchBox } from './search-box';
 export default function StoreLayout({ children }: { children: ReactNode }) {
   return (
     <div className="dark min-h-dvh bg-background text-foreground">
-      <style>{'html{background:#141311;color-scheme:dark}'}</style>
+      <style>{'html{background:var(--night-ground);color-scheme:dark}'}</style>
       <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b bg-background/90 px-6 backdrop-blur-md max-[900px]:h-14 max-[900px]:px-4">
         <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-[-0.035em]">
           <span aria-hidden className="size-[9px] rounded-full bg-signal" />

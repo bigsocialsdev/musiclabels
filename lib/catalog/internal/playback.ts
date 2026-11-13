@@ -3,9 +3,11 @@ import { trackVersions, tracks } from '@/db/schema';
 import type { DbOrTx } from '@/lib/platform/db';
 import { BUCKETS, createSignedDownloadUrl } from '@/lib/platform/storage';
 import { downsamplePeaks } from '../index';
+import { getSellableTrack } from './search';
 
-/** The preview of a published track's current version (the audible-watermarked 128k file), or null if there is none. */
+/** The preview and waveform keys of a track that is on sale (same rule as the listing), or null. The preview is the audible-watermarked 128k file. */
 async function playableKeys(db: DbOrTx, trackId: string) {
+  if (!(await getSellableTrack(db, { id: trackId }))) return null;
   const [row] = await db
     .select({ previewKey: trackVersions.previewKey, waveformKey: trackVersions.waveformKey, durationMs: trackVersions.durationMs })
     .from(tracks)

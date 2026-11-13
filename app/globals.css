@@ -6,6 +6,7 @@
 
 :root,
 .light {
+  --night-ground: #141311; /* the night surface, also painted behind the storefront on <html> */
   --background: #F6F5F2;
   --foreground: #1A1815;
   --card: #FFFFFF;
@@ -44,7 +45,7 @@
 }
 
 .dark {
-  --background: #141311;
+  --background: var(--night-ground);
   --foreground: #F2F0EB;
   --card: #1C1A17;
   --card-foreground: #F2F0EB;

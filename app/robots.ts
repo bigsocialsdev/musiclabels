@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: { userAgent: '*', allow: '/', disallow: ['/api/', '/seller', '/admin', '/auth', '/checkout', '/orders', '/licenses', '/legal'] },
+    rules: { userAgent: '*', allow: '/', disallow: ['/api/', '/seller', '/admin', '/auth', '/checkout', '/orders', '/licenses'] },
     sitemap: `${getEnv().APP_URL}/sitemap.xml`,
   };
 }

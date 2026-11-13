@@ -32,6 +32,7 @@ describe('the preview player', () => {
   it('gives nothing for a track that is not published, has no preview, or does not exist', async () => {
     expect(await previewUrl(db, (await playable({ status: 'draft' })).trackId)).toBeNull();
     expect(await previewUrl(db, (await playable({ status: 'suspended' })).trackId)).toBeNull();
+    expect(await previewUrl(db, (await makeSellableTrack(db, { clearanceClass: 'C' })).trackId)).toBeNull(); // not on sale
     const t = await playable();
     await db.update(trackVersions).set({ previewKey: null }).where(eq(trackVersions.id, t.trackVersionId));
     expect(await previewUrl(db, t.trackId)).toBeNull();

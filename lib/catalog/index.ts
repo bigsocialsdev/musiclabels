@@ -46,6 +46,8 @@ export type PriceLevel = (typeof PRICE_LEVELS)[number];
 // ---- inputs (zod) ----
 
 export const LANGUAGES = ['hindi', 'punjabi', 'tamil', 'english', 'instrumental'] as const;
+export type Language = (typeof LANGUAGES)[number];
+export const LANGUAGE_LABELS: Record<Language, string> = { hindi: 'Hindi', punjabi: 'Punjabi', tamil: 'Tamil', english: 'English', instrumental: 'Instrumental' };
 const names = z.array(z.string().trim().min(1).max(120)).max(20);
 
 export const trackInputSchema = z.object({

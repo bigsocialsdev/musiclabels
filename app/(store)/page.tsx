@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { LANGUAGE_LABELS } from '@/lib/catalog';
 import { facetCounts, searchTracks } from '@/lib/catalog/server';
 import { formatInr } from '@/lib/invoicing';
 import { getActivePriceGrid } from '@/lib/pricing/server';
 import { getDb } from '@/lib/platform/db';
 import { Discovery } from './discovery';
-import { Chips, FilterGroups, LANGUAGE_LABELS } from './rail';
+import { Chips, FilterGroups } from './rail';
 import { parseSearch, searchHref, withParams } from './search-params';
 import { SearchBox } from './search-box';
 import { SortSelect } from './sort-select';

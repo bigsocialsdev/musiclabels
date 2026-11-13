@@ -2,13 +2,12 @@
 import Link from 'next/link';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { PauseIcon, PlayIcon, PulseIcon } from '@/components/store/icons';
-import { Wave } from '@/components/store/wave';
+import { Wave, fmt } from '@/components/store/wave';
 import { buttonVariants } from '@/components/ui/button';
-import { downsamplePeaks, type TrackCard } from '@/lib/catalog';
+import { LANGUAGE_LABELS, downsamplePeaks, type TrackCard } from '@/lib/catalog';
 import { cn } from '@/lib/utils';
 import { Receipt } from './receipt';
 
-const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 function useMobile() {
   return useSyncExternalStore(
@@ -207,7 +206,7 @@ export function Discovery({ tracks, rail, chips, header, footer, stageOnly = fal
                   {sel.title}
                 </Link>
               </h2>
-              <p className="mt-2 text-[15px] text-fg-2 max-[900px]:mt-1.5 max-[900px]:text-sm">{[sel.primaryArtist, LANG[sel.language], sel.bpm ? `${sel.bpm} BPM` : null, ...sel.moods.slice(0, 2)].filter(Boolean).join(' · ')}</p>
+              <p className="mt-2 text-[15px] text-fg-2 max-[900px]:mt-1.5 max-[900px]:text-sm">{[sel.primaryArtist, LANGUAGE_LABELS[sel.language], sel.bpm ? `${sel.bpm} BPM` : null, ...sel.moods.slice(0, 2)].filter(Boolean).join(' · ')}</p>
             </div>
             <div className="flex flex-none items-center gap-2 min-[901px]:ml-auto max-[1366px]:w-full max-[1366px]:[&>a:last-child]:ml-auto">
               <button
@@ -321,7 +320,6 @@ export function Discovery({ tracks, rail, chips, header, footer, stageOnly = fal
   );
 }
 
-const LANG: Record<TrackCard['language'], string> = { hindi: 'Hindi', punjabi: 'Punjabi', tamil: 'Tamil', english: 'English', instrumental: 'Instrumental' };
 
 const Row = memo(function Row({
   track,
@@ -367,7 +365,7 @@ const Row = memo(function Row({
       <button type="button" onClick={() => onSelect(track.id)} aria-current={selected ? 'true' : undefined} className="min-w-0 text-left">
         <b className="block truncate text-[15px] font-semibold tracking-[-0.01em]">{track.title}</b>
         <span className="block truncate text-[13px] font-medium text-muted-foreground">
-          {track.primaryArtist} · {LANG[track.language]}
+          {track.primaryArtist} · {LANGUAGE_LABELS[track.language]}
         </span>
       </button>
       <Wave

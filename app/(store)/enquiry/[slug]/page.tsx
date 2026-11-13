@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getPublishedTrack } from '@/lib/catalog/server';
+import { getSellableTrack } from '@/lib/catalog/server';
 import { getDb } from '@/lib/platform/db';
 import { EnquiryForm } from './enquiry-form';
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: 'Enquire about a license | MRM', robo
 
 /** Television, OTT and cinema are quoted by hand (PLAN §6.1): this form is the whole flow, with no checkout behind it. */
 export default async function EnquiryPage({ params }: { params: Promise<{ slug: string }> }) {
-  const track = await getPublishedTrack(getDb(), { slug: (await params).slug });
+  const track = await getSellableTrack(getDb(), { slug: (await params).slug });
   if (!track) notFound();
   return (
     <main className="mx-auto max-w-[640px] px-4 pt-8 pb-20 min-[901px]:px-6">

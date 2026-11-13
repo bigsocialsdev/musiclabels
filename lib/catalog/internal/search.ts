@@ -62,7 +62,7 @@ function conditions(s: DiscoverySearch, skip?: Facet): SQL[] {
   if (s.mood.length && skip !== 'mood') c.push(sql`t.mood_ids && ${list(s.mood, 'uuid')}`);
   if (s.lang.length && skip !== 'lang') c.push(sql`t.language = ANY(${list(s.lang, 'text')})`);
   if (s.price.length && skip !== 'price') c.push(sql`t.price_level = ANY(${list(s.price, 'text')})`);
-  if (s.tier.length && skip !== 'tier') c.push(sql`${TIERS_ARRAY} @> ${list(s.tier, 'text')}`);
+  if (s.tier.length && skip !== 'tier') c.push(sql`${TIERS_ARRAY} && ${list(s.tier, 'text')}`);
   if (skip !== 'bpm') {
     if (s.bpmMin !== undefined) c.push(sql`t.bpm >= ${s.bpmMin}`);
     if (s.bpmMax !== undefined) c.push(sql`t.bpm <= ${s.bpmMax}`);
@@ -190,4 +190,11 @@ export async function trackCardBySlug(db: DbOrTx, slug: string): Promise<TrackCa
 export async function listSellableSlugs(db: DbOrTx, limit = 50_000): Promise<{ slug: string; publishedAt: Date | null }[]> {
   const rows = await db.execute<{ slug: string; published_at: string | null }>(sql`SELECT t.slug, t.published_at::text AS published_at ${FROM_SELLABLE} ORDER BY t.published_at DESC NULLS LAST, t.id LIMIT ${limit}`);
   return rows.map((r) => ({ slug: r.slug, publishedAt: r.published_at ? new Date(r.published_at) : null }));
+}
+
+/** A track by id or slug if it is on sale under the listing rules (the one check behind the listing, previews and enquiries). */
+export async function getSellableTrack(db: DbOrTx, by: { id: string } | { slug: string }): Promise<{ id: string; slug: string; title: string } | null> {
+  const match = 'id' in by ? sql`t.id = ${by.id}::uuid` : sql`t.slug = ${by.slug}`;
+  const rows = await db.execute<{ id: string; slug: string; title: string }>(sql`SELECT t.id, t.slug, t.title ${FROM_SELLABLE} AND ${match} LIMIT 1`);
+  return rows[0] ?? null;
 }

@@ -2,6 +2,9 @@
 import { memo, type KeyboardEvent, type MouseEvent } from 'react';
 import { cn } from '@/lib/utils';
 
+/** m:ss for a time in seconds. */
+export const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
 /** Idle strip shown until the real peaks arrive: a flat, quiet line the same width as the final waveform. */
 const FLAT = Array.from({ length: 60 }, () => 0.16);
 
@@ -41,7 +44,7 @@ export const Wave = memo(function Wave({
       className={cn('wave flex min-w-0 items-center gap-[3px] overflow-hidden', onSeek && 'cursor-pointer', className)}
       onClick={click}
       {...(slider
-        ? { role: 'slider', tabIndex: 0, 'aria-label': slider.label, 'aria-valuemin': 0, 'aria-valuemax': Math.round(slider.valueMax), 'aria-valuenow': Math.round(slider.valueNow), 'aria-valuetext': `${Math.floor(slider.valueNow / 60)}:${String(Math.floor(slider.valueNow % 60)).padStart(2, '0')}`, onKeyDown: key }
+        ? { role: 'slider', tabIndex: 0, 'aria-label': slider.label, 'aria-valuemin': 0, 'aria-valuemax': Math.round(slider.valueMax), 'aria-valuenow': Math.round(slider.valueNow), 'aria-valuetext': fmt(slider.valueNow), onKeyDown: key }
         : { 'aria-hidden': true })}
     >
       {bars.map((h, i) => (

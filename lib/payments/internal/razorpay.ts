@@ -98,7 +98,7 @@ export class RazorpayGateway implements PaymentGateway {
 
   async findRefund(paymentId: string, receipt: string) {
     const r = z.object({ items: z.array(z.unknown()) }).parse(await this.call('GET', `/payments/${encodeURIComponent(paymentId)}/refunds?count=100`));
-    return r.items.map(toGatewayRefund).find((x) => x.receipt === receipt) ?? null;
+    return r.items.map(toGatewayRefund).find((x) => x.receipt === receipt && x.status !== 'failed') ?? null;
   }
 
   async listPayments(from: Date, to: Date) {

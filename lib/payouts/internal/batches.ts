@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { organizations, payoutBatches, payouts } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
 import { requirePermission, type AdminContext } from '@/lib/identity';
@@ -9,7 +9,7 @@ import type { DbOrTx } from '@/lib/platform/db';
 import { getEnv } from '@/lib/platform/env';
 import { BUCKETS, type ObjectStore } from '@/lib/platform/storage';
 import { getSellerStanding, getVerifiedBankDetails } from '@/lib/sellers/server';
-import { computePayoutLine, istDayOfMonth, periodCutoff, previousPeriod, type PayoutRail, type PayoutTaxConfig } from '../index';
+import { computePayoutLine, istDayOfMonth, periodCutoff, previousPeriod, type PayoutRail, type PayoutTaxConfig, type RailLine } from '../index';
 import { renderPayoutStatement } from './statement-pdf';
 
 export type PayoutBatch = typeof payoutBatches.$inferSelect;
@@ -48,10 +48,15 @@ export async function computePayoutBatch(db: DbOrTx, admin: AdminContext | null,
   const cutoffAt = periodCutoff(period);
   const cfg = getPayoutConfig();
   return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'payout_batch:' + period}))`);
+    // One lock for all periods: the ordering check below must not race another period's compute.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('payout_batch'))`);
     const [existing] = await tx.select().from(payoutBatches).where(eq(payoutBatches.period, period));
     if (existing) return { batch: existing, created: false, lines: 0, skipped: [] };
     if (cutoffAt > new Date()) throw new Error(`period ${period} has not ended`);
+    // Periods run in order. A balance is "everything available by the cutoff", and a payout's debit is dated at its
+    // batch's cutoff, so an earlier period computed after a later one would not see that debit and pay twice.
+    const [latest] = await tx.select({ cutoffAt: payoutBatches.cutoffAt, period: payoutBatches.period }).from(payoutBatches).orderBy(desc(payoutBatches.cutoffAt)).limit(1);
+    if (latest && cutoffAt <= latest.cutoffAt) throw new Error(`period ${period} is not after the latest batch (${latest.period}); payout periods run in order`);
 
     const [batch] = await tx.insert(payoutBatches).values({ period, cutoffAt }).returning();
     const unsettled = new Set(
@@ -121,7 +126,12 @@ export async function approvePayoutBatch(db: DbOrTx, admin: AdminContext, batchI
  * approved → processing, then every pending payout goes to the rail and moves to processing. Safe to re-run on a
  * processing batch: only payouts still pending are sent, and the rail is keyed by payout id.
  */
-export async function submitPayoutBatch(db: DbOrTx, admin: AdminContext, batchId: string, rail: PayoutRail): Promise<{ submitted: number; railRef: string | null }> {
+export async function submitPayoutBatch(
+  db: DbOrTx,
+  admin: AdminContext,
+  batchId: string,
+  rail: PayoutRail,
+): Promise<{ submitted: number; held: string[]; railRef: string | null }> {
   requirePermission(admin, 'finance');
   await db.transaction(async (tx) => {
     const moved = await tx
@@ -134,30 +144,43 @@ export async function submitPayoutBatch(db: DbOrTx, admin: AdminContext, batchId
   const [batch] = await db.select().from(payoutBatches).where(eq(payoutBatches.id, batchId));
   if (batch?.status !== 'processing') throw new Error(`batch is ${batch?.status ?? 'missing'}, not approved`);
   const pending = await db.select().from(payouts).where(and(eq(payouts.batchId, batchId), eq(payouts.status, 'pending')));
-  if (pending.length === 0) return { submitted: 0, railRef: batch.railFileKey };
+  if (pending.length === 0) return { submitted: 0, held: [], railRef: batch.railFileKey };
 
-  const lines = [];
+  // A line whose bank account lost its verification since compute is held back (left pending) rather than
+  // blocking the batch; finance re-verifies and submits again, or fails the line to drop it.
+  const lines: RailLine[] = [];
+  const held: string[] = [];
   for (const p of pending) {
     const bank = await getVerifiedBankDetails(db, p.sellerOrgId);
-    if (!bank) throw new Error(`seller ${p.sellerOrgId} has no verified bank account; re-verify before submitting`);
-    lines.push({ payoutId: p.id, netPaise: p.netPaise, ...bank, reference: p.id });
+    if (bank) lines.push({ payoutId: p.id, netPaise: p.netPaise, ...bank, reference: p.id });
+    else held.push(p.id);
   }
+  if (lines.length === 0) return { submitted: 0, held, railRef: batch.railFileKey };
   const { railRef } = await rail.submit({ batchId, period: batch.period, lines });
   await db.transaction(async (tx) => {
     await tx.update(payoutBatches).set({ railFileKey: railRef, updatedAt: new Date() }).where(eq(payoutBatches.id, batchId));
-    await tx
+    const moved = await tx
       .update(payouts)
       .set({ status: 'processing', railRef, updatedAt: new Date() })
-      .where(and(eq(payouts.batchId, batchId), eq(payouts.status, 'pending'), inArray(payouts.id, pending.map((p) => p.id))));
+      .where(and(eq(payouts.batchId, batchId), eq(payouts.status, 'pending'), inArray(payouts.id, lines.map((l) => l.payoutId))))
+      .returning({ id: payouts.id });
+    for (const m of moved) await auditPayout(tx, admin.userId, m.id, 'pending', 'processing', { railRef });
   });
-  return { submitted: pending.length, railRef };
+  return { submitted: lines.length, held, railRef };
 }
 
-async function completeBatchIfSettled(tx: DbOrTx, batchId: string): Promise<void> {
+const auditPayout = (tx: DbOrTx, actor: string, id: string, from: string, to: string, extra: Record<string, unknown> = {}) =>
+  writeAudit(tx, { actorUserId: actor, action: `payout.${to}`, entityType: 'payout', entityId: id, before: { status: from }, after: { status: to, ...extra } });
+
+async function completeBatchIfSettled(tx: DbOrTx, batchId: string, actor: string): Promise<void> {
   const [open] = await tx.select({ id: payouts.id }).from(payouts).where(and(eq(payouts.batchId, batchId), inArray(payouts.status, ['pending', 'processing']))).limit(1);
-  if (!open) {
-    await tx.update(payoutBatches).set({ status: 'completed', updatedAt: new Date() }).where(and(eq(payoutBatches.id, batchId), eq(payoutBatches.status, 'processing')));
-  }
+  if (open) return;
+  const done = await tx
+    .update(payoutBatches)
+    .set({ status: 'completed', updatedAt: new Date() })
+    .where(and(eq(payoutBatches.id, batchId), eq(payoutBatches.status, 'processing')))
+    .returning({ id: payoutBatches.id });
+  if (done.length) await audit(tx, actor, 'payout_batch.complete', batchId, {});
 }
 
 export type RecordResult = { ok: true } | { ok: false; reason: 'not_found' | 'not_processing' };
@@ -183,30 +206,33 @@ export async function recordPayoutPaid(db: DbOrTx, admin: AdminContext, payoutId
     }
     const [batch] = await tx.select().from(payoutBatches).where(eq(payoutBatches.id, p.batchId));
     await debitPayout(tx, { payoutId: p.id, sellerOrgId: p.sellerOrgId, amountPaise: p.royaltyBasePaise, cutoffAt: batch!.cutoffAt, createdBy: admin.userId });
-    await writeAudit(tx, { actorUserId: admin.userId, action: 'payout.paid', entityType: 'payout', entityId: p.id, after: { utr: cleanUtr, netPaise: p.netPaise } });
+    await auditPayout(tx, admin.userId, p.id, 'processing', 'paid', { utr: cleanUtr, netPaise: p.netPaise });
     const standing = await getSellerStanding(tx, p.sellerOrgId);
     if (standing?.opsContactEmail) {
       await enqueueEmail(tx, { kind: 'payout.paid', to: standing.opsContactEmail, template: 'payout_paid', payload: { period: batch!.period, netPaise: p.netPaise, utr: cleanUtr } });
     }
-    await completeBatchIfSettled(tx, p.batchId);
+    await completeBatchIfSettled(tx, p.batchId, admin.userId);
     return { ok: true } as const;
   });
   if (res.ok && store) await storePayoutStatement(db, payoutId, store);
   return res;
 }
 
-/** processing → failed. Nothing is written to the ledger, so the balance carries into the next run (PLAN §5.6). */
+/** pending | processing → failed. Nothing is written to the ledger, so the balance carries into the next run (PLAN §5.6). */
 export async function recordPayoutFailed(db: DbOrTx, admin: AdminContext, payoutId: string, reason: string): Promise<RecordResult> {
   requirePermission(admin, 'finance');
   return db.transaction(async (tx) => {
+    const [cur] = await tx.select({ status: payouts.status }).from(payouts).where(eq(payouts.id, payoutId)).for('update');
+    if (!cur) return { ok: false, reason: 'not_found' } as const;
+    // A pending line can be failed too, which drops it from a batch it would otherwise hold up.
     const [p] = await tx
       .update(payouts)
       .set({ status: 'failed', failureReason: reason.slice(0, 500), updatedAt: new Date() })
-      .where(and(eq(payouts.id, payoutId), eq(payouts.status, 'processing')))
+      .where(and(eq(payouts.id, payoutId), inArray(payouts.status, ['pending', 'processing'])))
       .returning();
     if (!p) return { ok: false, reason: 'not_processing' } as const;
-    await writeAudit(tx, { actorUserId: admin.userId, action: 'payout.failed', entityType: 'payout', entityId: p.id, after: { reason } });
-    await completeBatchIfSettled(tx, p.batchId);
+    await auditPayout(tx, admin.userId, p.id, cur.status, 'failed', { reason });
+    await completeBatchIfSettled(tx, p.batchId, admin.userId);
     return { ok: true } as const;
   });
 }

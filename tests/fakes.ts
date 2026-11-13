@@ -65,7 +65,7 @@ export class FakeGateway extends RazorpayGateway {
     return r;
   }
   async findRefund(paymentId: string, receipt: string) {
-    return [...this.refunds.values()].find((r) => r.paymentId === paymentId && r.receipt === receipt) ?? null;
+    return [...this.refunds.values()].find((r) => r.paymentId === paymentId && r.receipt === receipt && r.status !== 'failed') ?? null;
   }
 
   /** Any signed event with a raw payload (refund, dispute, …). */

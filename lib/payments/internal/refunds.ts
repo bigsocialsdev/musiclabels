@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { refunds } from '@/db/schema';
+import { writeAudit } from '@/lib/audit/server';
 import type { DbOrTx } from '@/lib/platform/db';
 
 export type Refund = typeof refunds.$inferSelect;
@@ -7,6 +8,13 @@ export const REFUND_REASONS = ['claim_not_released', 'platform_error', 'invalid_
 export type RefundReason = (typeof REFUND_REASONS)[number];
 
 const STALE_CLAIM_MINUTES = 10;
+/** Processing, but unclaimed or claimed by a run that has evidently died. */
+const staleProcessing = () =>
+  and(eq(refunds.status, 'processing'), or(isNull(refunds.claimedAt), lt(refunds.claimedAt, sql`now() - make_interval(mins => ${STALE_CLAIM_MINUTES})`)));
+
+/** Refund status changes are system actions: each writes an audit row with the change (CLAUDE.md). */
+const auditRefund = (db: DbOrTx, id: string, from: string, to: string, extra: Record<string, unknown> = {}) =>
+  writeAudit(db, { actorUserId: null, action: `refund.${to}`, entityType: 'refund', entityId: id, before: { status: from }, after: { status: to, ...extra } });
 
 /** One refund per order (unique). The amount is the order total; the DB rejects anything else. */
 export async function createRefundRequest(
@@ -38,24 +46,21 @@ export async function findRefundByGateway(db: DbOrTx, gatewayRefundId: string, r
 
 /** Compare-and-set claim: requested or failed (retry), or processing left by a run that died. */
 export async function claimRefund(db: DbOrTx, id: string): Promise<Refund | null> {
-  const [row] = await db
-    .update(refunds)
-    .set({ status: 'processing', claimedAt: new Date(), updatedAt: new Date() })
-    .where(
-      and(
-        eq(refunds.id, id),
-        or(
-          inArray(refunds.status, ['requested', 'failed']),
-          and(eq(refunds.status, 'processing'), or(isNull(refunds.claimedAt), lt(refunds.claimedAt, sql`now() - make_interval(mins => ${STALE_CLAIM_MINUTES})`))),
-        ),
-      ),
-    )
-    .returning();
-  return row ?? null;
+  return db.transaction(async (tx) => {
+    const [prev] = await tx.select({ status: refunds.status }).from(refunds).where(eq(refunds.id, id)).for('update');
+    const [row] = await tx
+      .update(refunds)
+      .set({ status: 'processing', claimedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(refunds.id, id), or(inArray(refunds.status, ['requested', 'failed']), staleProcessing())))
+      .returning();
+    if (row && prev!.status !== 'processing') await auditRefund(tx, id, prev!.status, 'processing');
+    return row ?? null;
+  });
 }
 
+/** The Razorpay refund currently carrying this row's receipt (a retry after a failed attempt replaces it). */
 export async function setGatewayRefundId(db: DbOrTx, id: string, gatewayRefundId: string): Promise<void> {
-  await db.update(refunds).set({ gatewayRefundId, updatedAt: new Date() }).where(and(eq(refunds.id, id), isNull(refunds.gatewayRefundId)));
+  await db.update(refunds).set({ gatewayRefundId, updatedAt: new Date() }).where(and(eq(refunds.id, id), eq(refunds.status, 'processing')));
 }
 
 /** Leaves the row processing but releases the claim, so the next sweep retries it. */
@@ -70,6 +75,7 @@ export async function markRefundProcessed(db: DbOrTx, id: string): Promise<boole
     .set({ status: 'processed', processedAt: new Date(), claimedAt: null, lastError: null, updatedAt: new Date() })
     .where(and(eq(refunds.id, id), eq(refunds.status, 'processing')))
     .returning({ id: refunds.id });
+  if (rows.length) await auditRefund(db, id, 'processing', 'processed');
   return rows.length > 0;
 }
 
@@ -79,6 +85,7 @@ export async function markRefundFailed(db: DbOrTx, id: string, error: string): P
     .set({ status: 'failed', claimedAt: null, lastError: error.slice(0, 500), updatedAt: new Date() })
     .where(and(eq(refunds.id, id), eq(refunds.status, 'processing')))
     .returning({ id: refunds.id });
+  if (rows.length) await auditRefund(db, id, 'processing', 'failed', { error: error.slice(0, 300) });
   return rows.length > 0;
 }
 
@@ -90,7 +97,7 @@ export async function listRefundsToSweep(db: DbOrTx, limit = 50): Promise<string
     .where(
       or(
         eq(refunds.status, 'requested'),
-        and(eq(refunds.status, 'processing'), or(isNull(refunds.claimedAt), lt(refunds.claimedAt, sql`now() - make_interval(mins => ${STALE_CLAIM_MINUTES})`))),
+        staleProcessing(),
       ),
     )
     .limit(limit);

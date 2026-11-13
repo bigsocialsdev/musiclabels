@@ -24,7 +24,7 @@ export interface PaymentGateway {
   listPayments(from: Date, to: Date): Promise<GatewayPayment[]>;
   /** Full refund; `receipt` is our refund row id. */
   refund(input: { paymentId: string; amountPaise: number; receipt: string }): Promise<GatewayRefund>;
-  /** The refund already made for this receipt, if any: makes a retried refund call safe. */
+  /** A refund for this receipt that Razorpay accepted and has not failed, if any: makes a retried refund call safe. */
   findRefund(paymentId: string, receipt: string): Promise<GatewayRefund | null>;
 }
 

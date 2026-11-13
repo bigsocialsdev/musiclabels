@@ -29,7 +29,10 @@ BEGIN
   IF (to_jsonb(NEW) - mutable) IS DISTINCT FROM (to_jsonb(OLD) - mutable) THEN
     RAISE EXCEPTION 'refunds: only status fields may change' USING ERRCODE = 'integrity_constraint_violation';
   END IF;
-  PERFORM public.mrm_write_once('refunds.gateway_refund_id', OLD.gateway_refund_id, NEW.gateway_refund_id);
+  -- gateway_refund_id may be replaced by a retry after a failed attempt; the receipt (our row id) is the key.
+  IF NEW.gateway_refund_id IS DISTINCT FROM OLD.gateway_refund_id AND OLD.status = 'processed' THEN
+    RAISE EXCEPTION 'refunds: a processed refund keeps its gateway id' USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
   PERFORM public.mrm_write_once('refunds.processed_at', OLD.processed_at::text, NEW.processed_at::text);
   IF NEW.status IS DISTINCT FROM OLD.status AND NOT (OLD.status || '>' || NEW.status = ANY (array[
       'requested>processing', 'processing>processed', 'processing>failed', 'failed>processing'])) THEN
@@ -80,7 +83,8 @@ CREATE TRIGGER chargebacks_guard_update BEFORE UPDATE ON public.chargebacks
   FOR EACH ROW EXECUTE FUNCTION public.mrm_chargebacks_guard_update();
 --> statement-breakpoint
 
--- Payouts: amounts fixed at compute; status pending -> processing -> paid | failed; utr and paid_at write-once.
+-- Payouts: amounts fixed at compute; status pending -> processing -> paid | failed (pending -> failed drops a
+-- line from its batch); utr and paid_at write-once.
 CREATE FUNCTION mrm_payouts_guard_update() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
@@ -95,7 +99,7 @@ BEGIN
   PERFORM public.mrm_write_once('payouts.paid_at', OLD.paid_at::text, NEW.paid_at::text);
   PERFORM public.mrm_write_once('payouts.statement_pdf_key', OLD.statement_pdf_key, NEW.statement_pdf_key);
   IF NEW.status IS DISTINCT FROM OLD.status AND NOT (OLD.status || '>' || NEW.status = ANY (array[
-      'pending>processing', 'processing>paid', 'processing>failed'])) THEN
+      'pending>processing', 'pending>failed', 'processing>paid', 'processing>failed'])) THEN
     RAISE EXCEPTION 'payouts: status % -> % is not allowed', OLD.status, NEW.status
       USING ERRCODE = 'integrity_constraint_violation';
   END IF;

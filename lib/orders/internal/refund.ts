@@ -57,7 +57,10 @@ export async function executeRefund(db: DbOrTx, refundId: string, deps: { gatewa
   try {
     const [o] = await db.select({ paymentId: orders.gatewayPaymentId }).from(orders).where(eq(orders.id, refund.orderId));
     if (!o?.paymentId) throw new Error('order has no captured payment');
-    const sent = (await deps.gateway.findRefund(o.paymentId, refund.id)) ?? (await deps.gateway.refund({ paymentId: o.paymentId, amountPaise: refund.amountPaise, receipt: refund.id }));
+    // A refund Razorpay already accepted (pending or processed) is reused; after a failed one, a retry refunds anew.
+    const sent =
+      (await deps.gateway.findRefund(o.paymentId, refund.id)) ??
+      (await deps.gateway.refund({ paymentId: o.paymentId, amountPaise: refund.amountPaise, receipt: refund.id }));
     if (sent.amountPaise !== refund.amountPaise) throw new Error(`gateway refund amount ${sent.amountPaise} differs from ${refund.amountPaise}`);
     await setGatewayRefundId(db, refund.id, sent.id);
     if (sent.status === 'processed') return (await completeRefund(db, refund.id, deps.store)) ? 'processed' : 'skipped';
@@ -82,7 +85,10 @@ export async function completeRefund(db: DbOrTx, refundId: string, store?: Objec
   const done = await db.transaction(async (tx) => {
     if (!(await markRefundProcessed(tx, refundId))) return null;
     const refund = (await getRefund(tx, refundId))!;
-    await applyOrderTransition(tx, refund.orderId, 'refund_processed', { actorUserId: null, reason: refund.reason });
+    const moved = await applyOrderTransition(tx, refund.orderId, 'refund_processed', { actorUserId: null, reason: refund.reason });
+    // Never issue the credit note, revocation and reversal for an order that is not awaiting this refund: roll back
+    // and leave it to ops (the money is back with the buyer; the order needs a person to look at it).
+    if (!moved.ok) throw new Error(`refund ${refundId}: order is ${moved.status ?? 'missing'}, not refund_pending`);
 
     const invoice = await getInvoiceByOrder(tx, refund.orderId);
     const note = invoice ? (await issueCreditNote(tx, { invoiceId: invoice.id, refundId, reason: refund.reason, issuedAt: new Date() })).creditNote : null;

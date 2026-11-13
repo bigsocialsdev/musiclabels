@@ -222,6 +222,17 @@ Assumptions / deviations:
 - No admin UI in this milestone (refund approval, payout review/approve/UTR entry are S4-M10 screens over these functions).
 - Test note: payout tests use past IST months between 1980 and 2019, because a local Postgres in Asia/Calcutta reports pre-1945 timestamps with second-level offsets that JavaScript cannot parse (Supabase runs in UTC; unaffected).
 - **Carried forward:** reconciliation of settlements and of refunds against Razorpay (S4/ops); clearance requests (S3-M6) as recorded under S3-M4.
+- Code-review fixes (same PR), both money bugs mutation-checked:
+  - **A failed refund can now be retried.** `findRefund` returns only a refund Razorpay has not failed, so a retry after a failure creates a new one (the earlier test had hidden this by wiping the fake's history). The row's `gateway_refund_id` follows the current attempt (frozen once processed); the receipt (our row id) stays the idempotency key.
+  - **Payout periods run in order.** `computePayoutBatch` refuses a period whose cutoff is not after the latest batch's, under one lock for all periods: an earlier period computed after a later one would not see the later payout's debit and would pay the same royalties twice. If a month is missed, run the next one; its balance includes everything since.
+  - `completeRefund` rolls back when the order is not `refund_pending` (no credit note, revocation or reversal on a mismatched order); the refund stays processing with the error, and the sweep's failure alert brings in a person.
+  - **Audit rows for every refund, chargeback, payout and batch status change** (refund processing/processed/failed, chargeback open/won/lost, payout processing/paid/failed, batch compute/approve/submit/complete). PLAN defines no event tables for these, so `audit_log` is their transition history; the allowed moves are enforced by the 0013 triggers.
+  - Submitting a batch holds back (leaves pending, reports) a line whose bank account lost verification instead of failing the batch; finance can fail a pending line to drop it (`pending → failed` allowed).
+  - The dispute outcome is parsed, not cast; one stale-claim predicate for refunds.
+- **Open [CA]:** TDS rounds half-up per payout line; TDS is not charged retroactively on earlier sub-threshold payouts once the threshold is crossed. Confirm both.
+- **For S4-M10 (admin/reporting):** clawbacks are recorded as `refund_reversal` / `chargeback_reversal` (the `clawback` kind is unused), so an "uncollectable clawbacks" report must derive them (a reversal for an order whose royalty was in a paid payout); payouts do not list the sales they covered (derive from the cutoff windows, or add a link table then).
+- **For S3-M6:** refunds have no `dispute_id`; when a dispute reaches `refund_eligible`, S3-M6 calls `requestRefund` and needs a link (or a lookup by order) to move the dispute to `resolved_refunded` when the refund completes.
+- Tests: payout periods advance through the file (1980 onwards, then 2019, 2020 and the current month), so the payouts tests need a fresh database, as CI has.
 
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.

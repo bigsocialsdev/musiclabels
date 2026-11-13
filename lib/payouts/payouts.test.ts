@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { and, eq, sql } from 'drizzle-orm';
-import { ledgerEntries, payoutAccounts, payoutBatches, payouts, sellerProfiles } from '@/db/schema';
+import { auditLog, ledgerEntries, payoutAccounts, payoutBatches, payouts, sellerProfiles } from '@/db/schema';
 import { sellerBalance } from '@/lib/ledger/server';
 import { executeRefund, requestRefund } from '@/lib/orders/server';
 import { closeDb, getDb } from '@/lib/platform/db';
@@ -38,11 +38,16 @@ const dbMessage = async (q: ReturnType<typeof sql>) => {
 const finance = () => adminCtx(db, ['finance']);
 
 /**
- * A distinct past period per test, so tests never share a batch. Kept within 1980–2019: before ~1945 a server in
- * Asia/Calcutta reports historic offsets with seconds (e.g. +05:21:10), which JavaScript dates cannot parse.
+ * Payout periods must run in order, so each test takes the next past period (three months on, leaving room for a
+ * test's nextPeriod()). Starts in 1980: before ~1945 a server in Asia/Calcutta reports historic offsets with seconds
+ * (e.g. +05:21:10), which JavaScript dates cannot parse. Needs a fresh database, as CI has.
  */
-let eraSeq = 0;
-const pastPeriod = () => `${1980 + ((Date.now() / 1000 + eraSeq++ * 7) % 40 | 0)}-${String(1 + (eraSeq % 11)).padStart(2, '0')}`;
+let periodSeq = 0;
+const pastPeriod = () => {
+  const n = periodSeq;
+  periodSeq += 3;
+  return `${1980 + Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, '0')}`;
+};
 const nextPeriod = (p: string) => {
   const [y, m] = p.split('-').map(Number) as [number, number];
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
@@ -157,37 +162,6 @@ describe('payout runs (PLAN 5.6)', () => {
     expect(await dbMessage(sql`INSERT INTO ledger_entries (id, seller_org_id, kind, amount_paise, payout_id, available_at) VALUES (gen_random_uuid(), ${seller}, 'payout', -1, ${line.id}, now())`)).toMatch(/ledger_entries_payout_key|duplicate key/);
   });
 
-  it('refund after payout ⇒ negative balance netted against the next run (clawback)', async () => {
-    const period = pastPeriod();
-    const old = new Date(periodCutoff(period).getTime() - 40 * DAY);
-    const nets = await payableSeller(); // a new sale later outweighs the clawback
-    const owes = await payableSeller(); // nothing new: stays negative and is carried
-    const s1 = await sale(db, gw, store, { sellerOrgId: nets, priceLevel: 'L1', paidAt: old });
-    const s2 = await sale(db, gw, store, { sellerOrgId: owes, priceLevel: 'L1', paidAt: old });
-    const first = await payBatch(period);
-    expect((await lineFor(first.batch.id, nets))!.status).toBe('paid');
-
-    for (const s of [s1, s2]) {
-      const r = await requestRefund(db, await finance(), s.orderId, { reason: 'claim_not_released' });
-      if (r.ok) await executeRefund(db, r.refundId, { gateway: gw, store });
-    }
-    expect(await sellerBalance(db, nets)).toBe(-70_000);
-    await sale(db, gw, store, { sellerOrgId: nets, priceLevel: 'L3', paidAt: old }); // +210,000
-
-    // The clawback is available now, so the next run that can see it is the current month's: run it as if it had ended.
-    const now = new Date();
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date(periodCutoff(previousPeriod(new Date(now.getTime() + 35 * DAY))).getTime() + DAY));
-    try {
-      const run = await computePayoutBatch(db, await finance(), previousPeriod(new Date()));
-      expect(await lineFor(run.batch.id, nets)).toMatchObject({ royaltyBasePaise: 210_000 - 70_000 });
-      expect(await lineFor(run.batch.id, owes)).toBeUndefined();
-      expect(run.skipped).toContainEqual({ sellerOrgId: owes, reason: 'negative_balance' });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it('skips sellers below the minimum, without verified KYC or bank, or with an unsettled payout', async () => {
     const period = pastPeriod();
     const paidAt = new Date(periodCutoff(period).getTime() - 40 * DAY);
@@ -209,6 +183,46 @@ describe('payout runs (PLAN 5.6)', () => {
     await sale(db, gw, store, { sellerOrgId: busy, paidAt });
     const next = await computePayoutBatch(db, fin, nextPeriod(period));
     expect(next.skipped).toContainEqual({ sellerOrgId: busy, reason: 'previous_payout_unsettled' });
+  });
+
+  it('periods run in order: an earlier period after a later one is refused (it would pay twice)', async () => {
+    const later = pastPeriod();
+    const fin = await finance();
+    await computePayoutBatch(db, fin, later);
+    await expect(computePayoutBatch(db, fin, '1979-12')).rejects.toThrow(/run in order/); // before every period above
+    expect((await computePayoutBatch(db, fin, later)).created).toBe(false); // the same period is still idempotent
+  });
+
+  it('a line whose bank account lost verification is held back; finance can fail a pending line to drop it', async () => {
+    const period = pastPeriod();
+    const paidAt = new Date(periodCutoff(period).getTime() - 40 * DAY);
+    const ok = await payableSeller();
+    const changed = await payableSeller();
+    for (const seller of [ok, changed]) await sale(db, gw, store, { sellerOrgId: seller, paidAt });
+    const fin = await finance();
+    const c = await computePayoutBatch(db, fin, period);
+    const [owner] = await db.execute<{ user_id: string }>(sql`select user_id from memberships where org_id = ${changed} limit 1`);
+    await setPayoutAccount(db, { userId: owner!.user_id, email: null, phone: null, verified: true, aal: 'aal2' }, changed, {
+      accountNumber: '555566667777',
+      ifsc: 'SBIN0000001',
+      accountHolderName: 'Changed Ltd',
+    });
+    await approvePayoutBatch(db, fin, c.batch.id);
+    const sub = await submitPayoutBatch(db, fin, c.batch.id, rail);
+    const heldLine = (await lineFor(c.batch.id, changed))!;
+    expect(sub.held).toEqual([heldLine.id]);
+    expect(heldLine.status).toBe('pending');
+    expect((await lineFor(c.batch.id, ok))!.status).toBe('processing');
+    expect(await recordPayoutFailed(db, fin, heldLine.id, 'bank details changed after compute')).toEqual({ ok: true });
+
+    const okLine = (await lineFor(c.batch.id, ok))!;
+    await recordPayoutPaid(db, fin, okLine.id, 'UTR99990000111', store);
+    const [batch] = await db.select().from(payoutBatches).where(eq(payoutBatches.id, c.batch.id));
+    expect(batch!.status).toBe('completed');
+    const actions = (await db.select({ a: auditLog.action }).from(auditLog).where(eq(auditLog.entityId, c.batch.id))).map((r) => r.a).sort();
+    expect(actions).toEqual(['payout_batch.approve', 'payout_batch.complete', 'payout_batch.compute', 'payout_batch.submit']);
+    const lineActions = (await db.select({ a: auditLog.action }).from(auditLog).where(eq(auditLog.entityId, okLine.id))).map((r) => r.a).sort();
+    expect(lineActions).toEqual(['payout.paid', 'payout.processing']);
   });
 
   it('a failed payout writes nothing to the ledger and the balance is paid by the next run', async () => {
@@ -236,13 +250,45 @@ describe('payout runs (PLAN 5.6)', () => {
   });
 
   it('the cron computes the previous month only on the configured day (IST)', async () => {
-    // 1979 is outside pastPeriod()'s range, so no other test uses this batch.
-    const onDay = await runPayoutsCron(db, store, new Date('1979-06-05T06:00:00Z'));
-    expect(onDay).toMatchObject({ period: '1979-05' });
-    expect((await runPayoutsCron(db, store, new Date('1979-06-05T07:00:00Z'))).created).toBe(false);
-    expect((await runPayoutsCron(db, store, new Date('1979-06-06T06:00:00Z'))).period).toBeNull();
-    const [batch] = await db.select().from(payoutBatches).where(eq(payoutBatches.period, '1979-05'));
+    // 2019 is after every pastPeriod() used above and before the current month used by the last test.
+    const onDay = await runPayoutsCron(db, store, new Date('2019-06-05T06:00:00Z'));
+    expect(onDay).toMatchObject({ period: '2019-05' });
+    expect((await runPayoutsCron(db, store, new Date('2019-06-05T07:00:00Z'))).created).toBe(false);
+    expect((await runPayoutsCron(db, store, new Date('2019-06-06T06:00:00Z'))).period).toBeNull();
+    const [batch] = await db.select().from(payoutBatches).where(eq(payoutBatches.period, '2019-05'));
     expect(batch!.status).toBe('computed');
+  });
+
+  // Last in this group: it runs the current month, after which no earlier period may be computed.
+  it('refund after payout ⇒ negative balance netted against the next run (clawback)', async () => {
+    const period = '2020-03'; // after the cron test's 2019-05 batch, before the current month used below
+    const old = new Date(periodCutoff(period).getTime() - 40 * DAY);
+    const nets = await payableSeller(); // a new sale later outweighs the clawback
+    const owes = await payableSeller(); // nothing new: stays negative and is carried
+    const s1 = await sale(db, gw, store, { sellerOrgId: nets, priceLevel: 'L1', paidAt: old });
+    const s2 = await sale(db, gw, store, { sellerOrgId: owes, priceLevel: 'L1', paidAt: old });
+    const first = await payBatch(period);
+    expect((await lineFor(first.batch.id, nets))!.status).toBe('paid');
+
+    for (const s of [s1, s2]) {
+      const r = await requestRefund(db, await finance(), s.orderId, { reason: 'claim_not_released' });
+      if (r.ok) await executeRefund(db, r.refundId, { gateway: gw, store });
+    }
+    expect(await sellerBalance(db, nets)).toBe(-70_000);
+    await sale(db, gw, store, { sellerOrgId: nets, priceLevel: 'L3', paidAt: old }); // +210,000
+
+    // The clawback is available now, so the next run that can see it is the current month's: run it as if it had ended.
+    const now = new Date();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(periodCutoff(previousPeriod(new Date(now.getTime() + 35 * DAY))).getTime() + DAY));
+    try {
+      const run = await computePayoutBatch(db, await finance(), previousPeriod(new Date()));
+      expect(await lineFor(run.batch.id, nets)).toMatchObject({ royaltyBasePaise: 210_000 - 70_000 });
+      expect(await lineFor(run.batch.id, owes)).toBeUndefined();
+      expect(run.skipped).toContainEqual({ sellerOrgId: owes, reason: 'negative_balance' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

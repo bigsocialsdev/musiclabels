@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, sql } from 'drizzle-orm';
 import { auditLog, chargebacks, creditNotes, invoices, ledgerEntries, licenses, orders, outbox, refunds, tracks } from '@/db/schema';
 import { sellerBalance } from '@/lib/ledger/server';
+import { createRefundRequest } from '@/lib/payments/server';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { adminCtx, deliver, sale, setupCommerce } from '@/tests/commerce';
 import { FakeGateway, MemoryStore } from '@/tests/fakes';
@@ -117,11 +118,31 @@ describe('refunds (PLAN 5.4)', () => {
     } finally {
       gw.refundOutcome = 'processed';
     }
-    expect(await refundOf(s.orderId)).toMatchObject({ status: 'failed' });
+    const failed = await refundOf(s.orderId);
+    expect(failed).toMatchObject({ status: 'failed' });
     expect(await db.select().from(outbox).where(eq(outbox.kind, 'alert.refund_failed'))).not.toHaveLength(0);
-    gw.refunds.clear(); // Razorpay keeps failed refunds; a retry makes a new one
-    expect(await executeRefund(db, (await refundOf(s.orderId)).id, deps)).toBe('processed');
+    // Razorpay keeps the failed refund under our receipt; the retry must make a new one, not trip over the old.
+    const before = gw.refundCalls;
+    expect(await executeRefund(db, failed.id, deps)).toBe('processed');
+    expect(gw.refundCalls - before).toBe(1);
+    expect([...gw.refunds.values()].filter((r) => r.receipt === failed.id).map((r) => r.status).sort()).toEqual(['failed', 'processed']);
     expect(await order(s.orderId)).toMatchObject({ status: 'refunded' });
+    const actions = (await db.select({ a: auditLog.action }).from(auditLog).where(eq(auditLog.entityId, failed.id))).map((r) => r.a);
+    expect(actions).toEqual(expect.arrayContaining(['refund.processing', 'refund.failed', 'refund.processed']));
+  });
+
+  it('a refund whose order is not awaiting it rolls back: no credit note, revocation or reversal', async () => {
+    const s = await sale(db, gw, store);
+    const total = (await order(s.orderId)).totalPaise;
+    // A refund row on a still-fulfilled order (bypassing requestRefund) stands in for any order-state conflict.
+    const refund = await createRefundRequest(db, { orderId: s.orderId, reason: 'platform_error', amountPaise: total, requestedBy: null });
+    await expect(executeRefund(db, refund.id, deps)).rejects.toThrow(/not refund_pending/);
+    expect(await refundOf(s.orderId)).toMatchObject({ status: 'processing', claimedAt: null });
+    expect(await order(s.orderId)).toMatchObject({ status: 'fulfilled' });
+    const [inv] = await db.select().from(invoices).where(eq(invoices.orderId, s.orderId));
+    expect(await db.select().from(creditNotes).where(eq(creditNotes.invoiceId, inv!.id))).toHaveLength(0);
+    expect((await db.select().from(licenses).where(eq(licenses.orderId, s.orderId)))[0]!.status).toBe('active');
+    expect(await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.orderId, s.orderId), eq(ledgerEntries.kind, 'refund_reversal')))).toHaveLength(0);
   });
 
   it('an order unsellable at fulfilment is refunded automatically: no invoice, so no credit note', async () => {
@@ -174,5 +195,8 @@ describe('chargebacks', () => {
     expect((await db.select().from(licenses).where(eq(licenses.orderId, s.orderId)))[0]).toMatchObject({ status: 'revoked', revokedReason: 'chargeback_lost' });
     expect(await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.orderId, s.orderId), eq(ledgerEntries.kind, 'chargeback_reversal')))).toHaveLength(1);
     expect(await db.select().from(outbox).where(eq(outbox.kind, 'alert.chargeback_opened'))).not.toHaveLength(0);
+    const [cb] = await db.select().from(chargebacks).where(eq(chargebacks.gatewayDisputeId, d.id));
+    const actions = (await db.select({ a: auditLog.action }).from(auditLog).where(eq(auditLog.entityId, cb!.id))).map((r) => r.a).sort();
+    expect(actions).toEqual(['chargeback.lost', 'chargeback.open']);
   });
 });

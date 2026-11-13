@@ -92,8 +92,9 @@ export async function processPaymentEvent(db: DbOrTx, eventId: string): Promise<
     });
     return {};
   }
-  if (ev.eventType.startsWith('payment.dispute.') && body.payload.dispute?.entity) {
-    const outcome = ev.eventType.slice('payment.dispute.'.length) as 'created' | 'won' | 'lost';
+  const disputeOutcome = z.enum(['created', 'won', 'lost']).safeParse(ev.eventType.replace(/^payment\.dispute\./, ''));
+  if (ev.eventType.startsWith('payment.dispute.') && disputeOutcome.success && body.payload.dispute?.entity) {
+    const outcome = disputeOutcome.data;
     await db.transaction(async (tx) => {
       await applyDisputeEvent(tx, outcome, body.payload.dispute!.entity);
       await markPaymentEventProcessed(tx, ev.id);

@@ -1,0 +1,907 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-13T13:38:07.456Z",
+  "title": "Design System: MRM (working name)",
+  "seededFrom": {
+    "world": "Night Session",
+    "seed": "seed:c71607a50c192dcb",
+    "source": "grounded candidate, safer re-roll (user-picked)"
+  },
+  "extensions": {
+    "colorMeta": {
+      "night-ground": {
+        "role": "neutral",
+        "displayName": "Charcoal Ground (night)",
+        "canonical": "#141311",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-surface": {
+        "role": "neutral",
+        "displayName": "Stage Surface (night)",
+        "canonical": "#1C1A17",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-popover": {
+        "role": "neutral",
+        "displayName": "Raised Surface (night)",
+        "canonical": "#221F1C",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-secondary": {
+        "role": "neutral",
+        "displayName": "Secondary Fill (night)",
+        "canonical": "#262421",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-accent": {
+        "role": "neutral",
+        "displayName": "Accent Fill (night)",
+        "canonical": "#302D29",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-border": {
+        "role": "neutral",
+        "displayName": "Hairline (night)",
+        "canonical": "#2B2825",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-input": {
+        "role": "neutral",
+        "displayName": "Input Stroke (night)",
+        "canonical": "#3A3631",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-ink": {
+        "role": "primary",
+        "displayName": "Warm Ink (night)",
+        "canonical": "#F2F0EB",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-ink-2": {
+        "role": "neutral",
+        "displayName": "Ink-2 (night)",
+        "canonical": "#CDC8BF",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink-Muted (night)",
+        "canonical": "#9C968D",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-ink-faint": {
+        "role": "neutral",
+        "displayName": "Ink-Faint (night)",
+        "canonical": "#6F6A62",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-wave-idle": {
+        "role": "neutral",
+        "displayName": "Wave Idle (night)",
+        "canonical": "#47423C",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "night-stage-glow": {
+        "role": "secondary",
+        "displayName": "Stage Glow (night)",
+        "canonical": "rgba(255, 106, 43, 0.26)",
+        "tonalRamp": [
+          "oklch(15% 0.080 42)",
+          "oklch(26% 0.130 42)",
+          "oklch(37% 0.170 42)",
+          "oklch(48% 0.200 42)",
+          "oklch(60% 0.200 42)",
+          "oklch(72% 0.170 42)",
+          "oklch(84% 0.100 42)",
+          "oklch(95% 0.040 42)"
+        ]
+      },
+      "night-ok": {
+        "role": "tertiary",
+        "displayName": "Clear Green (night)",
+        "canonical": "#3DD68C",
+        "tonalRamp": [
+          "oklch(15% 0.060 160)",
+          "oklch(26% 0.098 160)",
+          "oklch(37% 0.128 160)",
+          "oklch(48% 0.150 160)",
+          "oklch(60% 0.150 160)",
+          "oklch(72% 0.128 160)",
+          "oklch(84% 0.075 160)",
+          "oklch(95% 0.030 160)"
+        ]
+      },
+      "night-attention": {
+        "role": "tertiary",
+        "displayName": "Amber Pending (night)",
+        "canonical": "#F5B83D",
+        "tonalRamp": [
+          "oklch(15% 0.060 75)",
+          "oklch(26% 0.098 75)",
+          "oklch(37% 0.128 75)",
+          "oklch(48% 0.150 75)",
+          "oklch(60% 0.150 75)",
+          "oklch(72% 0.128 75)",
+          "oklch(84% 0.075 75)",
+          "oklch(95% 0.030 75)"
+        ]
+      },
+      "night-blocked": {
+        "role": "tertiary",
+        "displayName": "Blocked Red (night)",
+        "canonical": "#FF6B6B",
+        "tonalRamp": [
+          "oklch(15% 0.076 27)",
+          "oklch(26% 0.124 27)",
+          "oklch(37% 0.162 27)",
+          "oklch(48% 0.190 27)",
+          "oklch(60% 0.190 27)",
+          "oklch(72% 0.162 27)",
+          "oklch(84% 0.095 27)",
+          "oklch(95% 0.038 27)"
+        ]
+      },
+      "night-info": {
+        "role": "tertiary",
+        "displayName": "Info Blue (night)",
+        "canonical": "#7AB0FF",
+        "tonalRamp": [
+          "oklch(15% 0.068 264)",
+          "oklch(26% 0.111 264)",
+          "oklch(37% 0.145 264)",
+          "oklch(48% 0.170 264)",
+          "oklch(60% 0.170 264)",
+          "oklch(72% 0.145 264)",
+          "oklch(84% 0.085 264)",
+          "oklch(95% 0.034 264)"
+        ]
+      },
+      "daylight-ground": {
+        "role": "neutral",
+        "displayName": "Daylight Ground",
+        "canonical": "#F6F5F2",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-surface": {
+        "role": "neutral",
+        "displayName": "Paper White",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-secondary": {
+        "role": "neutral",
+        "displayName": "Secondary Fill (daylight)",
+        "canonical": "#EDEBE7",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-accent": {
+        "role": "neutral",
+        "displayName": "Accent Fill (daylight)",
+        "canonical": "#E6E3DE",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-border": {
+        "role": "neutral",
+        "displayName": "Hairline (daylight)",
+        "canonical": "#E3E0DB",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-input": {
+        "role": "neutral",
+        "displayName": "Input Stroke (daylight)",
+        "canonical": "#D4D0CA",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-ink": {
+        "role": "primary",
+        "displayName": "Warm Ink (daylight)",
+        "canonical": "#1A1815",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-ink-2": {
+        "role": "neutral",
+        "displayName": "Ink-2 (daylight)",
+        "canonical": "#403C36",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink-Muted (daylight)",
+        "canonical": "#66615A",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-ink-faint": {
+        "role": "neutral",
+        "displayName": "Ink-Faint (daylight)",
+        "canonical": "#A6A199",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-wave-idle": {
+        "role": "neutral",
+        "displayName": "Wave Idle (daylight)",
+        "canonical": "#D2CEC7",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-wave-played": {
+        "role": "secondary",
+        "displayName": "Wave Played (daylight)",
+        "canonical": "#F05A1C",
+        "tonalRamp": [
+          "oklch(15% 0.080 42)",
+          "oklch(26% 0.130 42)",
+          "oklch(37% 0.170 42)",
+          "oklch(48% 0.200 42)",
+          "oklch(60% 0.200 42)",
+          "oklch(72% 0.170 42)",
+          "oklch(84% 0.100 42)",
+          "oklch(95% 0.040 42)"
+        ]
+      },
+      "daylight-stage-glow": {
+        "role": "secondary",
+        "displayName": "Stage Glow (daylight)",
+        "canonical": "rgba(255, 106, 43, 0.14)",
+        "tonalRamp": [
+          "oklch(15% 0.080 42)",
+          "oklch(26% 0.130 42)",
+          "oklch(37% 0.170 42)",
+          "oklch(48% 0.200 42)",
+          "oklch(60% 0.200 42)",
+          "oklch(72% 0.170 42)",
+          "oklch(84% 0.100 42)",
+          "oklch(95% 0.040 42)"
+        ]
+      },
+      "daylight-ok": {
+        "role": "tertiary",
+        "displayName": "Clear Green (daylight)",
+        "canonical": "#12804F",
+        "tonalRamp": [
+          "oklch(15% 0.060 160)",
+          "oklch(26% 0.098 160)",
+          "oklch(37% 0.128 160)",
+          "oklch(48% 0.150 160)",
+          "oklch(60% 0.150 160)",
+          "oklch(72% 0.128 160)",
+          "oklch(84% 0.075 160)",
+          "oklch(95% 0.030 160)"
+        ]
+      },
+      "daylight-attention": {
+        "role": "tertiary",
+        "displayName": "Amber Pending (daylight)",
+        "canonical": "#9A5B00",
+        "tonalRamp": [
+          "oklch(15% 0.060 75)",
+          "oklch(26% 0.098 75)",
+          "oklch(37% 0.128 75)",
+          "oklch(48% 0.150 75)",
+          "oklch(60% 0.150 75)",
+          "oklch(72% 0.128 75)",
+          "oklch(84% 0.075 75)",
+          "oklch(95% 0.030 75)"
+        ]
+      },
+      "daylight-blocked": {
+        "role": "tertiary",
+        "displayName": "Blocked Red (daylight)",
+        "canonical": "#B82B27",
+        "tonalRamp": [
+          "oklch(15% 0.076 27)",
+          "oklch(26% 0.124 27)",
+          "oklch(37% 0.162 27)",
+          "oklch(48% 0.190 27)",
+          "oklch(60% 0.190 27)",
+          "oklch(72% 0.162 27)",
+          "oklch(84% 0.095 27)",
+          "oklch(95% 0.038 27)"
+        ]
+      },
+      "daylight-info": {
+        "role": "tertiary",
+        "displayName": "Info Blue (daylight)",
+        "canonical": "#2459C9",
+        "tonalRamp": [
+          "oklch(15% 0.068 264)",
+          "oklch(26% 0.111 264)",
+          "oklch(37% 0.145 264)",
+          "oklch(48% 0.170 264)",
+          "oklch(60% 0.170 264)",
+          "oklch(72% 0.145 264)",
+          "oklch(84% 0.085 264)",
+          "oklch(95% 0.034 264)"
+        ]
+      },
+      "tape-orange": {
+        "role": "secondary",
+        "displayName": "Tape Orange",
+        "canonical": "#FF6A2B",
+        "tonalRamp": [
+          "oklch(15% 0.080 42)",
+          "oklch(26% 0.130 42)",
+          "oklch(37% 0.170 42)",
+          "oklch(48% 0.200 42)",
+          "oklch(60% 0.200 42)",
+          "oklch(72% 0.170 42)",
+          "oklch(84% 0.100 42)",
+          "oklch(95% 0.040 42)"
+        ]
+      },
+      "tape-orange-ink": {
+        "role": "secondary",
+        "displayName": "Tape Orange Ink",
+        "canonical": "#160A03",
+        "tonalRamp": [
+          "oklch(15% 0.080 42)",
+          "oklch(26% 0.130 42)",
+          "oklch(37% 0.170 42)",
+          "oklch(48% 0.200 42)",
+          "oklch(60% 0.200 42)",
+          "oklch(72% 0.170 42)",
+          "oklch(84% 0.100 42)",
+          "oklch(95% 0.040 42)"
+        ]
+      },
+      "scrim": {
+        "role": "neutral",
+        "displayName": "scrim",
+        "canonical": "rgba(0, 0, 0, 0.55)",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Stage track title; one per screen. 40px at <=1366, 36px at <=1180."
+      },
+      "display-laptop": {
+        "displayName": "Display Laptop",
+        "purpose": ""
+      },
+      "display-tablet": {
+        "displayName": "Display Tablet",
+        "purpose": ""
+      },
+      "display-mobile": {
+        "displayName": "Display Mobile",
+        "purpose": "Stage title at <=900px."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles (storefront results heading, console queue title); 20px on mobile."
+      },
+      "headline-mobile": {
+        "displayName": "Headline Mobile",
+        "purpose": ""
+      },
+      "headline-detail": {
+        "displayName": "Headline Detail",
+        "purpose": "Title atop a console detail pane."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "License receipt heading."
+      },
+      "title-row": {
+        "displayName": "Title Row",
+        "purpose": "Track titles in result rows."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Storefront base text."
+      },
+      "body-console": {
+        "displayName": "Body Console",
+        "purpose": "Seller and admin base text."
+      },
+      "body-table": {
+        "displayName": "Body Table",
+        "purpose": "Queue tables, console selects and textareas."
+      },
+      "body-small": {
+        "displayName": "Body Small",
+        "purpose": "Sub-lines, notes, receipt lines, hints."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, column headers, filter-group headings; ink-muted, sentence case."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Storefront button labels."
+      },
+      "button-console": {
+        "displayName": "Button Console",
+        "purpose": "Console button labels."
+      },
+      "mono-measure": {
+        "displayName": "Mono Measure",
+        "purpose": "Timecode, BPM, duration, receipt amounts."
+      },
+      "mono-small": {
+        "displayName": "Mono Small",
+        "purpose": "Counts, IDs, sizes, hashes, ages, key hints."
+      },
+      "mono-price": {
+        "displayName": "Mono Price",
+        "purpose": "Tier prices."
+      }
+    },
+    "shadows": [
+      {
+        "name": "float",
+        "value": "0 12px 28px -10px rgba(0,0,0,.6)",
+        "purpose": "Mobile mini player, the only element floating over content."
+      },
+      {
+        "name": "segment-thumb",
+        "value": "0 1px 2px rgba(26,24,21,.1)",
+        "purpose": "Pressed button in a daylight segmented control."
+      },
+      {
+        "name": "knob-halo",
+        "value": "0 0 0 4px var(--background)",
+        "purpose": "Range-slider knobs cut out of the track."
+      },
+      {
+        "name": "scrim",
+        "value": "rgba(0,0,0,.55)",
+        "purpose": "Backdrop behind the mobile receipt sheet (background, not box-shadow)."
+      },
+      {
+        "name": "stage-glow",
+        "value": "radial-gradient(90% 120% at 30% 120%, var(--stage-glow), transparent 60%)",
+        "purpose": "Warm atmospheric wash on the stage card only."
+      },
+      {
+        "name": "top-bar-glass",
+        "value": "background: color-mix(in srgb, var(--background) 88%, transparent); backdrop-filter: blur(12px)",
+        "purpose": "Sticky storefront top bar."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The one easing curve: presses, sheets, toasts, beat decay."
+      },
+      {
+        "name": "dur-fast",
+        "value": "120ms",
+        "purpose": "Hover fills, press scales (buttons 0.97, stage play 0.93, row play 0.92)."
+      },
+      {
+        "name": "dur-base",
+        "value": "200ms",
+        "purpose": "Waveform bar colour changes."
+      },
+      {
+        "name": "dur-slow",
+        "value": "320ms",
+        "purpose": "Bottom sheet, scrim, mini player, toast."
+      },
+      {
+        "name": "beat",
+        "value": "calc(60s / BPM), set as --beat on the root per selected track",
+        "purpose": "One clock: played bars scaleY 1.12 to 1, head bar 1.5 to 1, beat dot scale 1.7 to 1, each beat, only while playing."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }",
+        "purpose": "No pulse, no slide; playhead and timecode update as plain state."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "900px",
+        "purpose": "<=900: single column, chips, bottom-sheet receipt, mini player."
+      },
+      {
+        "name": "tablet",
+        "value": "1180px",
+        "purpose": "<=1180: rail hidden, fluid centre plus 340px receipt."
+      },
+      {
+        "name": "laptop",
+        "value": "1366px",
+        "purpose": "<=1366: stage controls wrap under the title."
+      },
+      {
+        "name": "max",
+        "value": "1440px",
+        "purpose": "Storefront content max width; console comps drawn at 1440."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ink primary for License, Approve and every default action; never orange.",
+      "html": "<button class=\"ds-btn-primary\">License for ₹1,178.82</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border:0;border-radius:var(--radius-sm, 10px);background:var(--primary, #1A1815);color:var(--primary-foreground, #F6F5F2);font:600 14px \"Hanken Grotesk\",system-ui,sans-serif;cursor:pointer;transition:background 120ms,transform 120ms cubic-bezier(0.16,1,0.3,1)}.ds-btn-primary:hover{background:color-mix(in srgb,var(--primary, #1A1815) 88%,var(--background, #F6F5F2))}.ds-btn-primary:active{transform:scale(.97)}.ds-btn-primary:focus-visible{outline:2px solid var(--ring, #1A1815);outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary-night",
+      "description": "Secondary-fill button (Sign in).",
+      "html": "<button class=\"ds-btn-secondary\">Sign in</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;height:40px;padding:0 16px;border:0;border-radius:var(--radius-sm, 10px);background:var(--secondary, #EDEBE7);color:var(--foreground, #1A1815);font:600 14px \"Hanken Grotesk\",system-ui,sans-serif;cursor:pointer;transition:background 120ms}.ds-btn-secondary:hover{background:var(--accent, #E6E3DE)}.ds-btn-secondary:active{transform:scale(.97)}.ds-btn-secondary:focus-visible{outline:2px solid var(--ring, #1A1815);outline-offset:2px}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost-night",
+      "description": "Ink-2 text action that fills on hover (Similar).",
+      "html": "<button class=\"ds-btn-ghost\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 12h3l3-8 4 16 3-8h7\"/></svg>Similar</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border:0;border-radius:var(--radius-sm, 10px);background:none;color:var(--fg-2, #403C36);font:600 14px \"Hanken Grotesk\",system-ui,sans-serif;cursor:pointer;transition:background 120ms}.ds-btn-ghost:hover{background:var(--secondary, #EDEBE7);color:var(--foreground, #1A1815)}.ds-btn-ghost:focus-visible{outline:2px solid var(--ring, #1A1815);outline-offset:2px}"
+    },
+    {
+      "name": "Reject (Outline Destructive)",
+      "kind": "button",
+      "refersTo": "button-console-reject",
+      "description": "Console outline button with blocked-red text for destructive decisions.",
+      "html": "<button class=\"ds-btn-reject\">Reject…</button>",
+      "css": ".ds-btn-reject{display:inline-flex;align-items:center;height:36px;padding:0 14px;border:1px solid var(--input, #D4D0CA);border-radius:var(--radius-sm, 10px);background:var(--card, #FFFFFF);color:var(--blocked, #B82B27);font:600 13.5px \"Hanken Grotesk\",system-ui,sans-serif;cursor:pointer;transition:background 120ms}.ds-btn-reject:hover{background:var(--secondary, #EDEBE7)}.ds-btn-reject:focus-visible{outline:2px solid var(--ring, #1A1815);outline-offset:2px}"
+    },
+    {
+      "name": "Play Button",
+      "kind": "custom",
+      "refersTo": "play-button-playing",
+      "description": "Circular play control: secondary at idle, tape orange only while playing.",
+      "html": "<button class=\"ds-play\" aria-label=\"Play\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\"><path d=\"M7 4.5v15l12.5-7.5z\"/></svg></button><button class=\"ds-play is-playing\" aria-label=\"Pause\"><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\"><rect x=\"6\" y=\"4.5\" width=\"4\" height=\"15\" rx=\"1\"/><rect x=\"14\" y=\"4.5\" width=\"4\" height=\"15\" rx=\"1\"/></svg></button>",
+      "css": ".ds-play{width:40px;height:40px;margin-right:8px;border:0;border-radius:50%;display:inline-grid;place-items:center;background:var(--secondary, #262421);color:var(--foreground, #F2F0EB);cursor:pointer;transition:background 120ms,transform 120ms cubic-bezier(0.16,1,0.3,1)}.ds-play:hover{background:var(--accent, #302D29)}.ds-play:active{transform:scale(.92)}.ds-play.is-playing{background:var(--signal, #FF6A2B);color:var(--signal-foreground, #160A03)}.ds-play:focus-visible{outline:2px solid var(--ring, #F2F0EB);outline-offset:2px}"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "search-field-night",
+      "description": "Storefront search with slash key hint; border shifts to ink-2 on focus.",
+      "html": "<label class=\"ds-search\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m20 20-3.5-3.5\"/></svg><input placeholder=\"Search tracks, moods, artists\"><kbd>/</kbd></label>",
+      "css": ".ds-search{display:flex;align-items:center;gap:10px;height:44px;width:360px;padding:0 14px;border-radius:var(--radius-sm, 10px);background:var(--card, #1C1A17);border:1px solid var(--border, #2B2825);color:var(--muted-foreground, #9C968D);transition:border-color 120ms}.ds-search:focus-within{border-color:var(--fg-2, #CDC8BF)}.ds-search input{flex:1;background:none;border:0;outline:0;font:500 15px \"Hanken Grotesk\",system-ui,sans-serif;color:var(--foreground, #F2F0EB)}.ds-search input::placeholder{color:var(--muted-foreground, #9C968D)}.ds-search kbd{font:500 11px \"Red Hat Mono\",monospace;border:1px solid var(--border, #2B2825);border-radius:5px;padding:2px 6px}"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "Mobile facet chip; selected inverts to ink.",
+      "html": "<button class=\"ds-chip\" aria-pressed=\"true\">Romantic</button><button class=\"ds-chip\" aria-pressed=\"false\">Upbeat</button>",
+      "css": ".ds-chip{height:34px;padding:0 12px;margin-right:6px;border-radius:var(--radius-sm, 10px);background:var(--card, #1C1A17);border:1px solid var(--border, #2B2825);color:var(--fg-2, #CDC8BF);font:600 13px \"Hanken Grotesk\",system-ui,sans-serif;cursor:pointer}.ds-chip:hover{color:var(--foreground, #F2F0EB)}.ds-chip[aria-pressed=true]{background:var(--foreground, #F2F0EB);color:var(--background, #141311);border-color:var(--foreground, #F2F0EB)}.ds-chip:focus-visible{outline:2px solid var(--ring, #F2F0EB);outline-offset:2px}"
+    },
+    {
+      "name": "Status Label",
+      "kind": "chip",
+      "refersTo": "sample-marker",
+      "description": "Dot plus label status, and the amber sample-data marker.",
+      "html": "<span class=\"ds-st ds-ok\"><span>Ready</span></span> <span class=\"ds-st ds-blk\"><span>1 possible match</span></span> <span class=\"ds-st ds-att\"><span>Unavailable</span></span> <span class=\"ds-sample\">Sample data</span>",
+      "css": ".ds-st{display:inline-flex;align-items:center;gap:6px;margin-right:12px;font:500 13px \"Hanken Grotesk\",system-ui,sans-serif}.ds-st::before{content:\"\";width:7px;height:7px;border-radius:50%;background:currentColor}.ds-st span{color:var(--foreground, #1A1815)}.ds-ok{color:var(--ok, #12804F)}.ds-att{color:var(--attention, #9A5B00)}.ds-blk{color:var(--blocked, #B82B27)}.ds-sample{display:inline-flex;align-items:center;height:20px;padding:0 6px;font:600 11px \"Hanken Grotesk\",system-ui,sans-serif;color:var(--attention, #9A5B00);border:1px solid color-mix(in srgb,var(--attention, #9A5B00) 40%,transparent);border-radius:5px}"
+    },
+    {
+      "name": "Waveform Strip",
+      "kind": "custom",
+      "refersTo": "stage-card",
+      "description": "Signature: idle bars warm grey, played bars tape orange, breathing on the one clock while playing.",
+      "html": "<div class=\"ds-wave is-playing\"><i class=\"on\" style=\"height:25%\"></i><i class=\"on\" style=\"height:35%\"></i><i class=\"on\" style=\"height:41%\"></i><i class=\"on\" style=\"height:34%\"></i><i class=\"on\" style=\"height:36%\"></i><i class=\"on\" style=\"height:53%\"></i><i class=\"on\" style=\"height:50%\"></i><i class=\"on\" style=\"height:26%\"></i><i class=\"on\" style=\"height:57%\"></i><i class=\"on\" style=\"height:67%\"></i><i class=\"on\" style=\"height:44%\"></i><i class=\"on\" style=\"height:48%\"></i><i class=\"on\" style=\"height:76%\"></i><i class=\"on\" style=\"height:67%\"></i><i class=\"on\" style=\"height:27%\"></i><i class=\"on\" style=\"height:73%\"></i><i class=\"on\" style=\"height:85%\"></i><i class=\"on\" style=\"height:50%\"></i><i class=\"on\" style=\"height:56%\"></i><i class=\"on head\" style=\"height:91%\"></i><i class=\"\" style=\"height:76%\"></i><i class=\"\" style=\"height:28%\"></i><i class=\"\" style=\"height:82%\"></i><i class=\"\" style=\"height:92%\"></i><i class=\"\" style=\"height:52%\"></i><i class=\"\" style=\"height:59%\"></i><i class=\"\" style=\"height:94%\"></i><i class=\"\" style=\"height:76%\"></i><i class=\"\" style=\"height:30%\"></i><i class=\"\" style=\"height:80%\"></i><i class=\"\" style=\"height:88%\"></i><i class=\"\" style=\"height:48%\"></i><i class=\"\" style=\"height:56%\"></i><i class=\"\" style=\"height:84%\"></i><i class=\"\" style=\"height:67%\"></i><i class=\"\" style=\"height:30%\"></i><i class=\"\" style=\"height:69%\"></i><i class=\"\" style=\"height:72%\"></i><i class=\"\" style=\"height:41%\"></i><i class=\"\" style=\"height:47%\"></i><i class=\"\" style=\"height:64%\"></i><i class=\"\" style=\"height:51%\"></i><i class=\"\" style=\"height:28%\"></i><i class=\"\" style=\"height:49%\"></i><i class=\"\" style=\"height:48%\"></i><i class=\"\" style=\"height:32%\"></i><i class=\"\" style=\"height:34%\"></i><i class=\"\" style=\"height:38%\"></i></div>",
+      "css": ".ds-wave{--beat:.65s;display:flex;align-items:center;gap:3px;height:64px;width:420px}.ds-wave i{flex:1;border-radius:1px;background:var(--wave-idle, #47423C);transition:background 200ms}.ds-wave:hover i:not(.on){background:color-mix(in srgb,var(--wave-idle, #47423C) 55%,var(--muted-foreground, #9C968D))}.ds-wave i.on{background:var(--wave-played, #FF6A2B)}.ds-wave.is-playing i.on{animation:ds-breathe var(--beat) cubic-bezier(0.16,1,0.3,1) infinite}.ds-wave.is-playing i.head{animation:ds-beat var(--beat) cubic-bezier(0.16,1,0.3,1) infinite}@keyframes ds-breathe{0%{transform:scaleY(1.12)}100%{transform:scaleY(1)}}@keyframes ds-beat{0%{transform:scaleY(1.5)}100%{transform:scaleY(1)}}@media (prefers-reduced-motion:reduce){.ds-wave i{animation:none!important;transition:none!important}}"
+    },
+    {
+      "name": "License Receipt Lines",
+      "kind": "card",
+      "refersTo": "receipt-card",
+      "description": "Exact GST lines under a dashed rule, mono amounts, total in the button.",
+      "html": "<div class=\"ds-receipt\"><div class=\"ds-lines\"><div><span>License fee</span><span>₹999.00</span></div><div><span>IGST 18%</span><span>₹179.82</span></div><div class=\"ds-tot\"><span>Total</span><span>₹1,178.82</span></div></div><button class=\"ds-pay\">License for ₹1,178.82</button></div>",
+      "css": ".ds-receipt{width:320px;padding:18px 18px 16px;border-radius:var(--radius-lg, 18px);background:var(--card, #1C1A17);border:1px solid var(--border, #2B2825);color:var(--foreground, #F2F0EB);font:500 13px \"Hanken Grotesk\",system-ui,sans-serif}.ds-lines{border-top:1px dashed var(--input, #3A3631);padding-top:10px;display:flex;flex-direction:column;gap:5px}.ds-lines div{display:flex;justify-content:space-between;color:var(--fg-2, #CDC8BF)}.ds-lines div span:last-child{font-family:\"Red Hat Mono\",monospace}.ds-lines .ds-tot{color:var(--foreground, #F2F0EB);font-weight:700;font-size:15px;border-top:1px solid var(--border, #2B2825);padding-top:8px;margin-top:3px}.ds-pay{width:100%;height:46px;margin-top:12px;border:0;border-radius:var(--radius-sm, 10px);background:var(--primary, #F2F0EB);color:var(--primary-foreground, #141311);font:600 15px \"Hanken Grotesk\",system-ui,sans-serif;cursor:pointer}.ds-pay:hover{background:color-mix(in srgb,var(--primary, #F2F0EB) 88%,var(--background, #141311))}.ds-pay:active{transform:scale(.97)}.ds-pay:focus-visible{outline:2px solid var(--ring, #F2F0EB);outline-offset:2px}"
+    },
+    {
+      "name": "Console Area Tabs",
+      "kind": "nav",
+      "refersTo": "decision-bar",
+      "description": "Admin top bar: wordmark with on-air dot, area tabs with ink underline, overdue counts in red.",
+      "html": "<nav class=\"ds-areas\"><span class=\"ds-mark\"><i></i>MRM <small>Admin</small></span><a aria-current=\"page\">Verification <span>23</span></a><a>Clearance <span>6</span></a><a>Disputes <span class=\"hot\">2 overdue</span></a></nav>",
+      "css": ".ds-areas{display:flex;align-items:stretch;gap:2px;height:52px;padding:0 20px;background:var(--card, #FFFFFF);border-bottom:1px solid var(--border, #E3E0DB);font:600 13px \"Hanken Grotesk\",system-ui,sans-serif}.ds-mark{display:flex;align-items:center;gap:7px;margin-right:18px;font-weight:700;font-size:17px;letter-spacing:-.03em;color:var(--foreground, #1A1815)}.ds-mark i{width:8px;height:8px;border-radius:50%;background:var(--signal, #FF6A2B)}.ds-mark small{font-size:13px;font-weight:600;letter-spacing:0;color:var(--muted-foreground, #66615A)}.ds-areas a{display:flex;align-items:center;gap:6px;padding:0 10px;color:var(--muted-foreground, #66615A);border-bottom:2px solid transparent;cursor:pointer}.ds-areas a:hover{color:var(--foreground, #1A1815)}.ds-areas a[aria-current]{color:var(--foreground, #1A1815);border-bottom-color:var(--foreground, #1A1815)}.ds-areas a span{font-weight:500;font-size:12px;color:var(--muted-foreground, #66615A)}.ds-areas a span.hot{color:var(--blocked, #B82B27);font-weight:600}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Night Session",
+    "overview": "The track's own sound is the cover. Every surface is a warm charcoal (or, for operators, warm daylight) room in which the loudest, brightest object is the playing track's waveform. There is no catalogue imagery and none is needed: a title set large and tight, a line of measured facts in mono, and a bar waveform that fills with tape orange as it plays carry the whole storefront. The same session continues into the seller portal and admin console with the house lights up: identical type, ink ramp, radii and single accent, on a light ground built for eight-hour queue work.\n\nDensity follows the job. The storefront is Persuade mode: one stage hero, a scannable results list, and a sticky license receipt that states the exact price with GST. The console is Operate mode: a queue table, a detail pane and a sticky decision bar, at 13 to 14px, where status, age and the next action read in one glance. Proof over promise governs both: the record, the tax lines, the status and the process are shown exactly, never dressed up.\n\nConfirmed rejections: the category's look (hoopr.ai: pure black, hot-pink pills, AI cover art on every row, gradient subscription cards, sale banners, \"no copyright claims\" promises), the cover-art grid, the streaming-app clone, and the generic SaaS dashboard of KPI tiles and coloured sidebars.",
+    "keyCharacteristics": [
+      "Warm charcoal ground in stacked tonal steps (R >= G > B, never blue-black, never #000); warm off-white ink.",
+      "A named four-step ink ramp: ink, ink-2, ink-muted, ink-faint.",
+      "Neutral ink is the primary colour: every default button, checked control and focus ring is ink.",
+      "Tape orange belongs to sound alone, plus one sanctioned non-sound use: the wordmark's on-air light.",
+      "One clock: the playing waveform and beat dot pulse at the track's own tempo; silence is stillness.",
+      "Hanken Grotesk for all words, tight negative tracking at display size; Red Hat Mono only for measurements.",
+      "Flat, hairline-divided, softly rounded (6 to 18px); depth by tonal step, not shadow."
+    ],
+    "rules": [
+      {
+        "name": "The Sound-Only Rule",
+        "body": "Tape orange marks sound and nothing else: play while playing, played waveform, playhead or progress, beat dot, stage glow. The single exception is the wordmark's on-air light (the 8 to 9px dot beside the name). It never colours selection, links, primary actions, badges, focus or hover. A `signal` Button variant may be added only where sound is controlled.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink-Is-Primary Rule",
+        "body": "`--primary` and `--ring` are neutral ink, so every shadcn default renders ink, never orange. Test: put any shadcn primitive on the page with no variant; if it shows orange, the tokens are wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm-Dark Rule",
+        "body": "Every dark value keeps R >= G > B. No #000 grounds, no blue-black, no cool greys. (A translucent black scrim over content is allowed; it is a shadow, not a ground.)",
+        "section": "colors"
+      },
+      {
+        "name": "The Measurements-Only Mono Rule",
+        "body": "Red Hat Mono sets timecode, BPM, durations, prices and tax amounts, counts, IDs, hashes, sizes and ages, and nothing else. Words, names, statuses and labels stay in Hanken Grotesk.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Eyebrow Rule",
+        "body": "No small uppercase or tracked kicker above a heading, anywhere. A heading stands alone; context goes in the sub-line beneath it.",
+        "section": "typography"
+      },
+      {
+        "name": "The Stage-First Rule",
+        "body": "On any storefront listing, the selected track's stage card (title, facts, play, License, full-width waveform, beat dot, timecode) is the first and largest object in the content column, above the list it belongs to.",
+        "section": "layout"
+      },
+      {
+        "name": "The One-Viewport Decision Rule",
+        "body": "The decision is reachable without scrolling: the receipt with its total and License action fits inside 1440x900; the console's decision bar is always pinned and visible.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat-At-Rest Rule",
+        "body": "Cards, rows, tables and panels never cast shadows. Only an element that physically floats over scrolling content (mini player, sheet, popover, toast) may lift.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One-Clock Rule",
+        "body": "All motion while a track plays runs on a single beat, `--beat = 60 / BPM` seconds, set once on the root when a track is selected. On each beat, played bars breathe from scaleY 1.12 to 1, the head bar from scaleY 1.5 to 1, and the beat dot from scale 1.7 to 1, all on the ease-out curve. Nothing else on the page pulses. When nothing plays, nothing moves; the beat dot rests at 35% opacity.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** keep every default control ink: shadcn Button, Badge, Checkbox, Radio, Switch, Slider, Progress and the focus ring take `--primary`/`--ring`, never tape orange.",
+      "**Do** reserve tape orange for sound (play while playing, played waveform, playhead, progress, beat dot, stage glow) plus the wordmark's on-air dot.",
+      "**Do** lead every storefront listing and track page with the stage: display title, facts, play, License and a full-width waveform.",
+      "**Do** run all playback motion on one clock (`--beat = 60/BPM`): played bars breathe at scaleY 1.12, the head bar at 1.5, and stop completely when audio stops or reduced motion is on.",
+      "**Do** show money exactly: license fee, CGST + SGST or IGST, total, all in Red Hat Mono from integer paise, and put the total in the button label.",
+      "**Do** show status as a 7px dot plus a word, and ages and due dates in mono, red when overdue.",
+      "**Do** state why an action is disabled, next to the disabled action, with a link to fix it.",
+      "**Do** mark every sample screen with the amber \"Sample data\" (or \"Sample prices\") marker and use fictional names for artists, sellers, rightsholders and admins.",
+      "**Do** describe clearance as a process (\"our clearance desk takes it up with the rightsholder\").",
+      "**Do** force the storefront route group dark and default seller and admin surfaces to light."
+    ],
+    "donts": [
+      "**Don't** copy the category look of hoopr.ai: pure #000 grounds, hot-pink pills, AI cover art on every row, gradient subscription cards, sale banners.",
+      "**Don't** promise \"no copyright claims\", \"zero strikes\", \"instant protection\" or any guaranteed outcome.",
+      "**Don't** use eyebrow labels or uppercase tracked kickers above headings.",
+      "**Don't** build cover-art grids or album-tile layouts; there is no catalogue imagery, and the waveform is the cover.",
+      "**Don't** build KPI-tile dashboards, stat cards or coloured sidebars on seller or admin screens; use tables, receipt lines and dot-plus-label status.",
+      "**Don't** set words, names or statuses in Red Hat Mono; mono is for measurements only.",
+      "**Don't** use filled status banners or filled coloured badges.",
+      "**Don't** add drop shadows to cards, rows or panels at rest.",
+      "**Don't** use #000, blue-black or cool greys for any ground or surface.",
+      "**Don't** fabricate artists, testimonials, customer logos, sales numbers or press."
+    ]
+  }
+}

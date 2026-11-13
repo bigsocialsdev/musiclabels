@@ -1,3 +1,4 @@
+import { listKycQueue, reinstateOrg, searchAccounts, suspendOrg, viewOrgSummary } from '@/lib/accounts/server';
 import { listAuditLog } from '@/lib/audit/server';
 import { approveTrack, createTaxonomyItem, listAdminTracks, listTaxonomyAdmin, reclassifyTrack, rejectTrack, rightsDocumentDownloadUrl, setTaxonomyActive, setTrackAvailability } from '@/lib/catalog/server';
 import { adminConfirmChannel, escalateClearance, listClearanceQueue, resendClearance, resolveClearance } from '@/lib/clearance/server';
@@ -85,5 +86,10 @@ export const ADMIN_CALLS: readonly AdminCall[] = [
   { name: 'legal.list', permission: 'superadmin', mutates: false, run: (db, a) => listLegalDocuments(db, a) },
   { name: 'legal.publish', permission: 'superadmin', mutates: true, run: (db, a) => rolledBack(db, (tx) => publishLegalDocument(tx, a, { kind: 'tos', bodyMarkdown: 'Matrix probe terms of service text.' })) },
   { name: 'terms.publish', permission: 'superadmin', mutates: true, run: (db, a) => publishTermsVersion(db, a, { tier: 'creator', termKind: 'perpetual', termMonths: null, videoCap: null, maxChannels: 1, allowedPlatforms: ['youtube'], organicOnly: true, licenseTextDocumentId: ID }) },
+  { name: 'accounts.search', permission: 'superadmin', mutates: false, run: (db, a) => searchAccounts(db, a, 'matrix probe') },
+  { name: 'accounts.summary', permission: 'superadmin', mutates: true, run: (db, a) => viewOrgSummary(db, a, ID) },
+  { name: 'accounts.suspend', permission: 'superadmin', mutates: true, run: (db, a) => suspendOrg(db, a, { orgId: ID, reason: 'fraud' }) },
+  { name: 'accounts.reinstate', permission: 'superadmin', mutates: true, run: (db, a) => reinstateOrg(db, a, { orgId: ID, reason: 'resolved' }) },
+  { name: 'kyc.queue', permission: 'verification', mutates: false, run: (db, a) => listKycQueue(db, a) },
   { name: 'audit.list', permission: 'superadmin', mutates: false, run: (db, a) => listAuditLog(db, a) },
 ];

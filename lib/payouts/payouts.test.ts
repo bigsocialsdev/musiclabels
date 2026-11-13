@@ -162,7 +162,7 @@ describe('payout runs (PLAN 5.6)', () => {
     expect(await dbMessage(sql`INSERT INTO ledger_entries (id, seller_org_id, kind, amount_paise, payout_id, available_at) VALUES (gen_random_uuid(), ${seller}, 'payout', -1, ${line.id}, now())`)).toMatch(/ledger_entries_payout_key|duplicate key/);
   });
 
-  it('skips sellers below the minimum, without verified KYC or bank, or with an unsettled payout', async () => {
+  it('skips sellers below the minimum, without verified KYC or bank, suspended, or with an unsettled payout', async () => {
     const period = pastPeriod();
     const paidAt = new Date(periodCutoff(period).getTime() - 40 * DAY);
     const small = await payableSeller();
@@ -171,12 +171,14 @@ describe('payout runs (PLAN 5.6)', () => {
     await db.update(sellerProfiles).set({ kycStatus: 'pending' }).where(eq(sellerProfiles.orgId, noKyc));
     const noBank = (await makeSeller(db)).orgId;
     const busy = await payableSeller();
-    for (const seller of [small, noKyc, noBank, busy]) await sale(db, gw, store, { sellerOrgId: seller, paidAt });
+    const held = await payableSeller();
+    for (const seller of [small, noKyc, noBank, busy, held]) await sale(db, gw, store, { sellerOrgId: seller, paidAt });
+    await db.update(sellerProfiles).set({ status: 'suspended' }).where(eq(sellerProfiles.orgId, held)); // after its sale: fulfilment refuses a suspended seller
 
     const fin = await finance();
     const c = await computePayoutBatch(db, fin, period);
     const reasons = Object.fromEntries(c.skipped.map((s) => [s.sellerOrgId, s.reason]));
-    expect([reasons[small], reasons[noKyc], reasons[noBank]]).toEqual(['below_minimum', 'kyc_not_verified', 'bank_not_verified']);
+    expect([reasons[small], reasons[noKyc], reasons[noBank], reasons[held]]).toEqual(['below_minimum', 'kyc_not_verified', 'bank_not_verified', 'seller_suspended']);
     await approvePayoutBatch(db, fin, c.batch.id);
     await submitPayoutBatch(db, fin, c.batch.id, rail); // busy's payout is now processing, not settled
 
@@ -191,6 +193,28 @@ describe('payout runs (PLAN 5.6)', () => {
     await computePayoutBatch(db, fin, later);
     await expect(computePayoutBatch(db, fin, '1979-12')).rejects.toThrow(/run in order/); // before every period above
     expect((await computePayoutBatch(db, fin, later)).created).toBe(false); // the same period is still idempotent
+  });
+
+  it('a seller suspended after compute is held back at submit; the line waits until reinstatement or is failed', async () => {
+    const period = pastPeriod();
+    const paidAt = new Date(periodCutoff(period).getTime() - 40 * DAY);
+    const ok = await payableSeller();
+    const suspended = await payableSeller();
+    for (const seller of [ok, suspended]) await sale(db, gw, store, { sellerOrgId: seller, paidAt });
+    const fin = await finance();
+    const c = await computePayoutBatch(db, fin, period);
+    await approvePayoutBatch(db, fin, c.batch.id);
+    await db.update(sellerProfiles).set({ status: 'suspended' }).where(eq(sellerProfiles.orgId, suspended)); // after approval, before the bank file
+    const sub = await submitPayoutBatch(db, fin, c.batch.id, rail);
+    const heldLine = (await lineFor(c.batch.id, suspended))!;
+    expect(sub.held).toEqual([heldLine.id]);
+    expect(heldLine.status).toBe('pending');
+    expect((await lineFor(c.batch.id, ok))!.status).toBe('processing');
+    // Reinstated: the same line goes out on a second submit.
+    await db.update(sellerProfiles).set({ status: 'active' }).where(eq(sellerProfiles.orgId, suspended));
+    const again = await submitPayoutBatch(db, fin, c.batch.id, rail);
+    expect(again).toMatchObject({ submitted: 1, held: [] });
+    expect((await lineFor(c.batch.id, suspended))!.status).toBe('processing');
   });
 
   it('a line whose bank account lost verification is held back; finance can fail a pending line to drop it', async () => {

@@ -39,6 +39,13 @@ export class OrgAccessError extends Error {
   }
 }
 
+/** The user belongs to a suspended organisation of this kind, so they cannot start a new one to get round the suspension (S4-M10c). */
+export class OrgSuspendedError extends Error {
+  constructor() {
+    super('suspended');
+  }
+}
+
 export function requirePermission(admin: AdminContext, permission: AdminPermission): void {
   if (!admin.permissions.includes('superadmin') && !admin.permissions.includes(permission)) {
     throw new PermissionError(`This action requires the ${permission} permission`);

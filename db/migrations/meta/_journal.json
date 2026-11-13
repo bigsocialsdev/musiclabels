@@ -141,6 +141,13 @@
       "when": 1794582093074,
       "tag": "0019_buyer_verify_display",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794605288065,
+      "tag": "0020_org_suspension",
+      "breakpoints": true
     }
   ]
 }

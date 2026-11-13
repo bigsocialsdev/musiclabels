@@ -23,7 +23,16 @@ export default async function CheckoutPage({ params, searchParams }: { params: P
   const track = z.uuid().safeParse(trackId).success ? await getPublishedTrack(db, { id: trackId }) : null;
   if (!track) notFound();
 
-  const orgs = await listBuyerOrgs(db, session.userId);
+  const allOrgs = await listBuyerOrgs(db, session.userId);
+  const orgs = allOrgs.filter((o) => !o.suspendedAt);
+  if (allOrgs.length > 0 && orgs.length === 0) {
+    return (
+      <main className="mx-auto max-w-xl p-8">
+        <h1 className="text-xl font-semibold">Your organisation is suspended</h1>
+        <p className="mt-2">Purchases are closed to it for now. If you think this is a mistake, contact the platform team.</p>
+      </main>
+    );
+  }
   if (orgs.length === 0) {
     return (
       <main className="mx-auto max-w-xl p-8">

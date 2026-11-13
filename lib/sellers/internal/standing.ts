@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { sellerProfiles } from '@/db/schema';
 import type { DbOrTx } from '@/lib/platform/db';
 
@@ -27,4 +27,14 @@ export async function getSellerStanding(db: DbOrTx, orgId: string): Promise<Sell
     .from(sellerProfiles)
     .where(eq(sellerProfiles.orgId, orgId));
   return (row as SellerStanding | undefined) ?? null;
+}
+
+/**
+ * Moves a seller between `active` and `suspended` (the accounts slice does this with an org suspension). A closed
+ * account is never touched. Returns the status before, or null when nothing changed (no profile, or already there).
+ */
+export async function setSellerStatus(db: DbOrTx, orgId: string, to: 'active' | 'suspended'): Promise<'active' | 'suspended' | null> {
+  const from = to === 'suspended' ? 'active' : 'suspended';
+  const rows = await db.update(sellerProfiles).set({ status: to }).where(and(eq(sellerProfiles.orgId, orgId), eq(sellerProfiles.status, from))).returning({ id: sellerProfiles.orgId });
+  return rows.length ? from : null;
 }

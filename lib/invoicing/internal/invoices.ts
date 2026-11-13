@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
-import { creditNotes, invoiceSeries, invoices, licenses, memberships, orders } from '@/db/schema';
+import { creditNotes, invoiceSeries, invoices, licenses, memberships, orders, organizations } from '@/db/schema';
 import { getEnv } from '@/lib/platform/env';
 import type { DbOrTx, Tx } from '@/lib/platform/db';
 import { BUCKETS, type ObjectStore } from '@/lib/platform/storage';
@@ -171,7 +171,12 @@ export type BuyerBillingRow = {
 
 /** Invoices (and the credit note that reverses one, if any) for every license bought by an org the user belongs to, newest first. */
 export async function listBuyerBilling(db: DbOrTx, userId: string, limit = 200): Promise<BuyerBillingRow[]> {
-  const mine = db.select({ orgId: memberships.orgId }).from(memberships).where(eq(memberships.userId, userId));
+  // A suspended organisation's members lose access to it everywhere (S4-M10c): leave it out of "my orgs" too.
+  const mine = db
+    .select({ orgId: memberships.orgId })
+    .from(memberships)
+    .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+    .where(and(eq(memberships.userId, userId), isNull(organizations.suspendedAt)));
   const rows = await db
     .select({ licenseId: licenses.id, trackTitle: licenses.trackTitle, invoice: invoices, creditNote: creditNotes })
     .from(invoices)

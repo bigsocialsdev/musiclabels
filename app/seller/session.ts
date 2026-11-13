@@ -13,5 +13,6 @@ export async function requireSellerSession(returnTo: string): Promise<{ session:
   const db = getDb();
   await ensureUser(db, guard.value); // memberships and acceptances reference users(id)
   const orgs = await listSellerOrgs(db, guard.value.userId);
+  if (orgs[0]?.suspendedAt) redirect('/seller/suspended'); // an admin suspended the org: nothing else in the seller area is open to them
   return { session: guard.value, orgId: orgs[0]?.id ?? null };
 }

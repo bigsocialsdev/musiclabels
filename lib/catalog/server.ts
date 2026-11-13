@@ -28,6 +28,7 @@ export {
 export { listAdminTracks, reclassifyTrack, listTaxonomyAdmin, createTaxonomyItem, setTaxonomyActive, type TaxonomyKind } from './internal/admin-catalog';
 export { processVersion, sweepCatalog, moveToReviewIfDone } from './internal/pipeline';
 export { applyTransition, type TransitionResult } from './internal/transition';
+export { pauseOrgTracks, resumeOrgTracks } from './internal/org-pause';
 export { getPublishedTrack, getTrackFacts } from './internal/public';
 export { searchTracks, facetCounts, suggestTracks, trackCardBySlug, listSellableSlugs, getSellableTrack } from './internal/search';
 export { previewUrl, trackPeaks } from './internal/playback';

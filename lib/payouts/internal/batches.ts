@@ -81,6 +81,7 @@ export async function computePayoutBatch(db: DbOrTx, admin: AdminContext | null,
       if (unsettled.has(sellerOrgId)) { skip('previous_payout_unsettled'); continue; }
       const standing = await getSellerStanding(tx, sellerOrgId);
       if (standing?.kycStatus !== 'verified') { skip('kyc_not_verified'); continue; }
+      if (standing.status === 'suspended') { skip('seller_suspended'); continue; } // an admin suspension holds the balance; reinstating releases it at the next run
       if (!(await getVerifiedBankDetails(tx, sellerOrgId))) { skip('bank_not_verified'); continue; }
 
       // Earlier payouts to this seller for periods in the same financial year (failed ones paid nothing).
@@ -150,12 +151,14 @@ export async function submitPayoutBatch(
   const pending = await db.select().from(payouts).where(and(eq(payouts.batchId, batchId), eq(payouts.status, 'pending')));
   if (pending.length === 0) return { submitted: 0, held: [], railRef: batch.railFileKey };
 
-  // A line whose bank account lost its verification since compute is held back (left pending) rather than
-  // blocking the batch; finance re-verifies and submits again, or fails the line to drop it.
+  // A line whose bank account lost its verification since compute, or whose seller has been suspended since, is held
+  // back (left pending) rather than blocking the batch; finance re-verifies or waits for reinstatement and submits
+  // again, or fails the line to drop it. A line already `processing` is in the bank file and cannot be recalled here.
   const lines: RailLine[] = [];
   const held: string[] = [];
   for (const p of pending) {
-    const bank = await getVerifiedBankDetails(db, p.sellerOrgId);
+    const suspended = (await getSellerStanding(db, p.sellerOrgId))?.status === 'suspended';
+    const bank = suspended ? null : await getVerifiedBankDetails(db, p.sellerOrgId);
     if (bank) lines.push({ payoutId: p.id, netPaise: p.netPaise, ...bank, reference: p.id });
     else held.push(p.id);
   }

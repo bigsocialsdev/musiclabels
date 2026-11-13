@@ -32,6 +32,7 @@ const DONE: Record<string, string> = {
 };
 const ERRORS: Record<string, string> = {
   need_reason: 'Write a reason.',
+  org_suspended: 'This track’s organisation is suspended. Reinstate the organisation under Users and orgs; its paused tracks go back on sale then.',
   cannot_move: 'That change is not allowed from the track’s current status. A class C track is never reinstated.',
   not_found: 'Track not found.',
   not_live: 'Only published or suspended tracks can be reclassified.',

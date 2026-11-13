@@ -13,8 +13,6 @@ import {
   trackInputSchema,
   type DocType,
   type GuardResult,
-  type RightsDeclarationInput,
-  type TrackInput,
 } from '../index';
 import { applyTransition } from './transition';
 
@@ -38,7 +36,7 @@ function slugify(title: string) {
   return `${base || 'track'}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function createTrack(db: DbOrTx, actor: SellerActor, input: TrackInput): Promise<string> {
+export async function createTrack(db: DbOrTx, actor: SellerActor, input: unknown): Promise<string> {
   if (!(await getMembershipRole(db, actor.userId, actor.orgId))) throw new CatalogError('Not a member of this organisation');
   const standing = await getSellerStanding(db, actor.orgId);
   if (!standing) throw new CatalogError('Complete seller onboarding before adding tracks');
@@ -48,7 +46,7 @@ export async function createTrack(db: DbOrTx, actor: SellerActor, input: TrackIn
 }
 
 /** Metadata is editable while the track is a draft (a rejected track returns to draft via `editTrack`). */
-export async function updateTrack(db: DbOrTx, actor: SellerActor, trackId: string, input: TrackInput): Promise<void> {
+export async function updateTrack(db: DbOrTx, actor: SellerActor, trackId: string, input: unknown): Promise<void> {
   const track = await ownTrack(db, actor, trackId);
   if (track.status !== 'draft') throw new CatalogError('Only draft tracks can be edited');
   await db.update(tracks).set({ ...trackInputSchema.parse(input), updatedAt: new Date() }).where(and(eq(tracks.id, trackId), eq(tracks.status, 'draft')));
@@ -61,7 +59,7 @@ export async function editTrack(db: DbOrTx, actor: SellerActor, trackId: string)
   return applyTransition(db, trackId, 'edit', actor.userId);
 }
 
-export async function saveRightsDeclaration(db: DbOrTx, actor: SellerActor, trackId: string, input: RightsDeclarationInput): Promise<void> {
+export async function saveRightsDeclaration(db: DbOrTx, actor: SellerActor, trackId: string, input: unknown): Promise<void> {
   await ownTrack(db, actor, trackId);
   const data = rightsDeclarationSchema.parse(input);
   const agreement = await getCurrentDocument(db, 'seller_agreement');

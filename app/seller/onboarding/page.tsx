@@ -9,13 +9,14 @@ import { getCurrentDocument } from '@/lib/legal/server';
 import { getDb } from '@/lib/platform/db';
 import { ENTITY_TYPES, getOnboardingStatus, getPayoutAccount, getSellerProfile, listSellerDocuments, type OnboardingStatus } from '@/lib/sellers/server';
 import { requireSellerSession } from '../session';
-import { acceptTermsAction, createSellerAction, setBankAction, setPanAction, updateProfileAction } from './actions';
-import { KycUpload } from './kyc-upload';
+import { UploadForm } from '../upload-form';
+import { acceptTermsAction, confirmKycDocumentAction, createSellerAction, requestKycUploadAction, setBankAction, setPanAction, updateProfileAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
 const ENTITY_LABELS: Record<(typeof ENTITY_TYPES)[number], string> = { individual: 'An individual artist', company: 'A company', partnership: 'A partnership firm', llp: 'An LLP' };
-const KIND_LABELS: Record<string, string> = { pan_card: 'PAN card', id_proof: 'ID proof', gst_certificate: 'GST certificate', bank_proof: 'Bank proof' };
+const KIND_LABELS: Record<string, string> = { pan_card: 'PAN card', id_proof: 'ID proof', gst_certificate: 'GST certificate', bank_proof: 'Bank proof (cancelled cheque or statement)' };
+const KYC_OPTIONS = Object.entries(KIND_LABELS) as [string, string][];
 const selectClass = 'h-9 w-full rounded-md border bg-transparent px-3 text-sm';
 
 function Step({ title, done, description, children }: { title: string; done: boolean; description?: string; children: ReactNode }) {
@@ -155,7 +156,14 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
             ))}
           </ul>
         )}
-        <KycUpload />
+        <UploadForm
+          bucket="documents"
+          accept="application/pdf,image/jpeg,image/png"
+          fileLabel="File (PDF, JPG or PNG, up to 10 MB)"
+          choice={{ label: 'Document', options: KYC_OPTIONS }}
+          request={requestKycUploadAction}
+          confirm={confirmKycDocumentAction}
+        />
       </Step>
 
       <Step title="Bank account" done={status.bank !== 'missing'} description="Royalties are paid here once a month. Finance verifies the account before the first payout.">

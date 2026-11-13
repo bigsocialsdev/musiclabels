@@ -11,7 +11,7 @@ Phase 3 — Plan (Architect): outputs written (docs/PLAN.md, root CLAUDE.md) —
 | 1. Understand | Done — docs/PRD-analysis.md written; open questions resolved via assumptions |
 | 2. Critique | Done — docs/PRD-critique.md written; all recommendations ACCEPTED by user (2026-11-11) |
 | 3. Plan | Done pending [GATE] — docs/PLAN.md + CLAUDE.md written (2026-11-12) |
-| 4. Build | In progress — Session 3 (S3-M0 to S3-M6) merged; S4-M7 seller portal in progress (part a, onboarding, in review) |
+| 4. Build | In progress — Session 3 (S3-M0 to S3-M6) merged; S4-M7 seller portal in progress (part a, onboarding, merged; part b, catalog management, in review) |
 | 5. Review | Not started |
 
 ## Decisions Made
@@ -269,6 +269,17 @@ Assumptions / deviations:
 - **Concierge sellers (`onboarding_mode`)** can edit entity type, GSTIN and contact once they have an owner login, without a KYC reset; revisit with concierge onboarding.
 - **PLAN not amended:** §2.3 still says platform holds no business logic (the document checks now live there) and lists no owner for `seller_documents` (it is `sellers`'). Fold into the next PLAN pass.
 - **Not verified in a browser or with Playwright:** the local Supabase Auth stack is not available here (no Docker), so no one can sign in to the pages. The Playwright exit criteria (artist onboards, uploads, resubmits; seller sees only own data) are covered at function level for now and need the e2e run once an Auth stack is available.
+
+### S4-M7b Seller portal: catalog management, 2026-11-13
+Built (the second of three S4-M7 PRs). Slice: `lib/catalog` gains the seller read side (`listOwnTracks`, `getOwnTrack`, `listTaxonomy`; scoped by the caller's org inside the function, no storage keys leave it; `getOwnTrack` returns null for another org's track, so the page shows it as not found) and `createTrack`/`updateTrack`/`saveRightsDeclaration` take `unknown` (zod validates; the form no longer needs type casts). Pages: `/seller/tracks` (list), `/seller/tracks/new`, `/seller/tracks/[id]` (details and rights declaration while draft; audio versions with browser upload to a signed URL, then confirm, then `after(processVersion)` and the cron sweep as backstop; rights documents with the same upload flow and the F9 checks; submit for review with the guard issues shown together; a rejected track shows the reviewer's reason and "Edit and resubmit", except class C; delist for published or suspended tracks). Shared pieces: `app/seller/form-action.ts` (`runForm`, `attempt`, `friendly`: the slices' deliberate errors become messages, anything else propagates) and `app/seller/upload-form.tsx` (one client component for the KYC, rights-document and audio uploads, replacing the KYC-only one from part a). `app/seller/layout.tsx` adds the nav.
+Tests (real Postgres): a seller lists and opens only their own org's tracks and a stranger to the org is refused; the detail shows versions, documents and declaration without storage keys; the rejection reason appears when rejected and is the latest one after a second rejection; inactive genres are hidden. Mutation-checked: the org scope in `getOwnTrack`. `next build` passes.
+Assumptions / deviations:
+- **"New version upload" means a new audio version of a draft** (a draft or a rejected-then-edited track): the catalog slice only allows audio changes in `draft`. A new version of an already **published** track is still not possible: PLAN 4.1 has no edge from `published` back to review, and adding one changes the state machine. Open decision for the user: (a) leave published tracks as they are (delist and add a new track), or (b) add a "version in review" flow that keeps the track on sale until approval swaps `current_version_id`.
+- Transient ingest failures are still terminal (the seller sees the reason and uploads again), as noted in S3-M2.
+- Seller emails for approval and rejection are not sent by this PR; the reason shows on the track page.
+- The track form takes comma-separated credits and up to three rights registrations; moods are checkboxes (max 5, validated by the schema).
+- Not verified in a browser or with Playwright (no Auth stack here), as in part a.
+
 
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.

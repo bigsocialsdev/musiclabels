@@ -179,3 +179,15 @@ export async function suggestTracks(db: DbOrTx, trackId: string, opts: { tier?: 
     LIMIT ${Math.min(opts.limit ?? 8, 24)}`);
   return rows.map(toCard);
 }
+
+/** One track as a listing card, by slug, if it can be bought today (the same rule as the listing). Null otherwise. */
+export async function trackCardBySlug(db: DbOrTx, slug: string): Promise<TrackCard | null> {
+  const rows = await db.execute<CardRow>(sql`SELECT ${CARD_COLUMNS} ${FROM_SELLABLE} AND t.slug = ${slug} LIMIT 1`);
+  return rows[0] ? toCard(rows[0]) : null;
+}
+
+/** Slugs of every track on sale, for the sitemap. Newest first, capped (one sitemap file holds 50,000 URLs). */
+export async function listSellableSlugs(db: DbOrTx, limit = 50_000): Promise<{ slug: string; publishedAt: Date | null }[]> {
+  const rows = await db.execute<{ slug: string; published_at: string | null }>(sql`SELECT t.slug, t.published_at::text AS published_at ${FROM_SELLABLE} ORDER BY t.published_at DESC NULLS LAST, t.id LIMIT ${limit}`);
+  return rows.map((r) => ({ slug: r.slug, publishedAt: r.published_at ? new Date(r.published_at) : null }));
+}

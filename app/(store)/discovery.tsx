@@ -27,7 +27,9 @@ function useMobile() {
  * the signed preview; the waveforms come from the track's own peaks. Slots (`rail`, `header`, `footer`, `chips`) are
  * server-rendered by the page so filters stay plain links.
  */
-export function Discovery({ tracks, rail, chips, header, footer }: { tracks: TrackCard[]; rail: ReactNode; chips: ReactNode; header: ReactNode; footer: ReactNode }) {
+export function Discovery({ tracks, rail, chips, header, footer, stageOnly = false }: { tracks: TrackCard[]; rail: ReactNode; chips: ReactNode; header: ReactNode; footer: ReactNode; stageOnly?: boolean }) {
+  // On a track page the first track is the page's subject: it fills the stage but is not repeated in the list below it.
+  const listed = stageOnly ? tracks.slice(1) : tracks;
   const mobile = useMobile();
   const audio = useRef<HTMLAudioElement>(null);
   const stageRef = useRef<HTMLElement>(null);
@@ -165,7 +167,7 @@ export function Discovery({ tracks, rail, chips, header, footer }: { tracks: Tra
   return (
     <div
       style={{ '--beat': beat } as React.CSSProperties}
-      className="mx-auto grid max-w-[1440px] gap-x-8 gap-y-7 px-6 pt-6 pb-16 max-[900px]:flex max-[900px]:flex-col max-[900px]:gap-3.5 max-[900px]:px-4 max-[900px]:pt-3 max-[900px]:pb-[120px] min-[901px]:grid-cols-[minmax(0,1fr)_340px] min-[901px]:[grid-template-areas:'stage_receipt'_'results_receipt'] min-[1181px]:grid-cols-[220px_minmax(0,1fr)_360px] min-[1181px]:[grid-template-areas:'rail_stage_receipt'_'rail_results_receipt']"
+      className={cn("mx-auto grid max-w-[1440px] gap-x-8 gap-y-7 px-6 pt-6 pb-16 max-[900px]:flex max-[900px]:flex-col max-[900px]:gap-3.5 max-[900px]:px-4 max-[900px]:pt-3 max-[900px]:pb-[120px] min-[901px]:grid-cols-[minmax(0,1fr)_340px] min-[901px]:[grid-template-areas:'stage_receipt'_'results_receipt']", rail ? "min-[1181px]:grid-cols-[220px_minmax(0,1fr)_360px] min-[1181px]:[grid-template-areas:'rail_stage_receipt'_'rail_results_receipt']" : 'min-[1181px]:grid-cols-[minmax(0,1fr)_360px]')}
     >
       <audio
         ref={audio}
@@ -181,10 +183,12 @@ export function Discovery({ tracks, rail, chips, header, footer }: { tracks: Tra
           setAudioError(true);
         }}
       />
-      <aside aria-label="Filters" className="sticky top-[88px] flex flex-col gap-[26px] self-start [grid-area:rail] max-[1180px]:hidden">
-        {rail}
-      </aside>
-      <div className="flex flex-col gap-3.5 min-[901px]:hidden">{chips}</div>
+      {rail && (
+        <aside aria-label="Filters" className="sticky top-[88px] flex flex-col gap-[26px] self-start [grid-area:rail] max-[1180px]:hidden">
+          {rail}
+        </aside>
+      )}
+      {chips && <div className="flex flex-col gap-3.5 min-[901px]:hidden">{chips}</div>}
 
       {sel ? (
         <section
@@ -247,7 +251,7 @@ export function Discovery({ tracks, rail, chips, header, footer }: { tracks: Tra
 
       <main className="min-w-0 [grid-area:results]">
         {header}
-        {tracks.length > 0 && (
+        {listed.length > 0 && (
           <>
             <div className="grid grid-cols-[44px_minmax(150px,1.1fr)_minmax(0,2fr)_64px_48px] gap-4 border-b px-3 pb-2 text-xs font-semibold text-muted-foreground max-[900px]:hidden">
               <span />
@@ -257,7 +261,7 @@ export function Discovery({ tracks, rail, chips, header, footer }: { tracks: Tra
               <span className="text-right">Time</span>
             </div>
             <ol>
-              {tracks.map((t) => (
+              {listed.map((t) => (
                 <Row
                   key={t.id}
                   track={t}

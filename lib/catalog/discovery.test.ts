@@ -6,7 +6,7 @@ import { setupCommerce, sale } from '@/tests/commerce';
 import { makeSeller, makeSellableTrack } from '@/tests/factories';
 import { FakeGateway, MemoryStore } from '@/tests/fakes';
 import { discoverySearchSchema, type DiscoverySearch } from './index';
-import { facetCounts, searchTracks, suggestTracks } from './server';
+import { facetCounts, listSellableSlugs, searchTracks, suggestTracks, trackCardBySlug } from './server';
 
 afterAll(closeDb);
 const db = getDb();
@@ -181,5 +181,29 @@ describe('alternative suggestions', () => {
     expect(forAds).toContain(best);
     expect(forAds).not.toContain(src);
     expect(await suggestTracks(db, '00000000-0000-7000-8000-000000000000')).toEqual([]);
+  });
+});
+
+describe('the track page and sitemap', () => {
+  const slugOf = async (id: string) => (await db.select({ s: tracks.slug }).from(tracks).where(eq(tracks.id, id)))[0]!.s;
+
+  it('finds a card by slug only while the track can be bought', async () => {
+    const ok = await listed({ title: 'Slug Song', artist: 'Slug Artist' });
+    const draft = await listed({ status: 'draft' });
+    const card = await trackCardBySlug(db, await slugOf(ok));
+    expect(card).toMatchObject({ id: ok, title: 'Slug Song', primaryArtist: 'Slug Artist' });
+    expect(card!.tiers.length).toBeGreaterThan(0);
+    expect(await trackCardBySlug(db, await slugOf(draft))).toBeNull();
+    expect(await trackCardBySlug(db, 'no-such-slug')).toBeNull();
+  });
+
+  it('lists exactly the tracks on sale in the sitemap', async () => {
+    const ok = await listed();
+    const hidden = [await listed({ status: 'suspended' }), await listed({ cls: 'C' }), await listed({ preview: false })];
+    const slugs = (await listSellableSlugs(db)).map((r) => r.slug);
+    expect(slugs).toContain(await slugOf(ok));
+    for (const h of hidden) expect(slugs).not.toContain(await slugOf(h));
+    expect((await listSellableSlugs(db, 1)).length).toBe(1);
+    expect((await listSellableSlugs(db))[0]!.publishedAt).toBeInstanceOf(Date);
   });
 });

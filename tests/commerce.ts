@@ -53,14 +53,14 @@ export async function sale(
   db: Db,
   gw: FakeGateway,
   store: MemoryStore,
-  opts: { sellerOrgId?: string; priceLevel?: PriceLevel; paidAt?: Date; tier?: Tier; fulfil?: boolean; clearanceClass?: 'A' | 'B' } = {},
+  opts: { sellerOrgId?: string; priceLevel?: PriceLevel; paidAt?: Date; tier?: Tier; fulfil?: boolean; clearanceClass?: 'A' | 'B'; buyer?: Awaited<ReturnType<typeof readyBuyer>>; buyerType?: 'individual' | 'business' | 'agency'; clientName?: string } = {},
 ) {
   const track = await makeSellableTrack(db, { sellerOrgId: opts.sellerOrgId, priceLevel: opts.priceLevel ?? 'L1', clearanceClass: opts.clearanceClass });
-  const buyer = await readyBuyer(db);
+  const buyer = opts.buyer ?? (await readyBuyer(db, opts.buyerType ?? (opts.clientName ? 'agency' : 'business')));
   const r = await createOrder(
     db,
     buyer.session,
-    { trackId: track.trackId, tier: opts.tier ?? 'creator', channels: [{ platform: 'youtube', handleOrUrl: '@b' }], billingStateCode: '27', idempotencyKey: `k-${Math.random()}` },
+    { trackId: track.trackId, tier: opts.tier ?? 'creator', channels: [{ platform: 'youtube', handleOrUrl: '@b' }], billingStateCode: '27', clientName: opts.clientName, idempotencyKey: `k-${Math.random()}` },
     gw,
   );
   if (!r.ok) throw new Error(r.issues.join());

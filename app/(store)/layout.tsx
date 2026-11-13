@@ -22,8 +22,8 @@ export default function StoreLayout({ children }: { children: ReactNode }) {
           <Link href="/" className="rounded-sm px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground">
             Browse
           </Link>
-          <Link href="/auth/sign-in" className={buttonVariants({ variant: 'secondary', size: 'lg' })}>
-            Sign in
+          <Link href="/licenses" className={buttonVariants({ variant: 'secondary', size: 'lg' })}>
+            My licenses
           </Link>
         </nav>
       </header>

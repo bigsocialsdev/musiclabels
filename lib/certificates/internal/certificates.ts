@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { desc, eq, max } from 'drizzle-orm';
 import { certificates } from '@/db/schema';
 import { getOrganization } from '@/lib/identity/server';
-import { getInvoiceByOrder } from '@/lib/invoicing/server';
+import { getCreditNoteByOrder, getInvoiceByOrder } from '@/lib/invoicing/server';
 import { getLegalDocument } from '@/lib/legal/server';
 import {
   getLicenseByPublicId,
@@ -89,7 +89,7 @@ export type VerifyView = {
 };
 
 /**
- * The public verify page (PLAN §7), read live from the database. Individual licensees are masked. A record
+ * The public verify page (PLAN §7), read live from the database. Individual licensees are masked unless they opted in to full display. A record
  * whose stored fields no longer match its hash still renders (flagged) and raises an ops alert, at most daily.
  */
 export async function getVerifyView(db: DbOrTx, rawPublicId: string): Promise<VerifyView | null> {
@@ -99,7 +99,7 @@ export async function getVerifyView(db: DbOrTx, rawPublicId: string): Promise<Ve
   if (!l.recordIntact && (await consume(`alert:record_hash:${l.id}`, { capacity: 1, refillPerSecond: 1 / 86_400 }, db))) {
     await enqueueOpsAlert(db, 'record_hash_mismatch', 'License record hash mismatch', { licenseId: l.id, publicId: l.publicId });
   }
-  const individual = !l.clientName && org?.buyerType === 'individual';
+  const individual = !l.clientName && org?.buyerType === 'individual' && !org.verifyFullName;
   return {
     publicId: l.publicId,
     status: l.effectiveStatus,
@@ -121,11 +121,15 @@ export async function getVerifyView(db: DbOrTx, rawPublicId: string): Promise<Ve
 
 type Sign = typeof createSignedDownloadUrl;
 
-/** Signed 15-minute URL for the buyer's latest certificate or the invoice; null when not theirs or not rendered yet. */
-export async function buyerDocumentUrl(db: DbOrTx, actor: BuyerActor, licenseId: string, doc: 'certificate' | 'invoice', sign: Sign = createSignedDownloadUrl) {
+/** Signed 15-minute URL for the buyer's latest certificate, the invoice or its credit note; null when not theirs, not issued or not rendered yet. */
+export async function buyerDocumentUrl(db: DbOrTx, actor: BuyerActor, licenseId: string, doc: 'certificate' | 'invoice' | 'credit-note', sign: Sign = createSignedDownloadUrl) {
   const owned = await getLicenseForBuyer(db, actor, licenseId);
   if (!owned) return null;
   const l = owned.license;
+  if (doc === 'credit-note') {
+    const note = await getCreditNoteByOrder(db, l.orderId);
+    return note?.pdfKey ? sign(BUCKETS.pdfs, note.pdfKey, 900, `${note.number.replaceAll('/', '-')}.pdf`) : null;
+  }
   if (doc === 'invoice') {
     const inv = await getInvoiceByOrder(db, l.orderId);
     return inv?.pdfKey ? sign(BUCKETS.pdfs, inv.pdfKey, 900, `${inv.number.replaceAll('/', '-')}.pdf`) : null;

@@ -1,5 +1,5 @@
-import { and, asc, count, eq, isNull } from 'drizzle-orm';
-import { licenseDownloads, licensedChannels, licensedVideos, licenses, trackVersions } from '@/db/schema';
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { licenseDownloads, licensedChannels, licensedVideos, licenses, memberships, trackVersions } from '@/db/schema';
 import { getMembershipRole } from '@/lib/identity/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import { BUCKETS, createSignedDownloadUrl } from '@/lib/platform/storage';
@@ -146,4 +146,54 @@ export async function listActiveLicensesForTrack(db: DbOrTx, trackId: string) {
     .from(licenses)
     .where(and(eq(licenses.trackId, trackId), eq(licenses.status, 'active')))
     .orderBy(asc(licenses.createdAt));
+}
+
+export const LICENSE_LIST_PAGE_SIZE = 25;
+
+export type BuyerLicenseRow = {
+  id: string;
+  publicId: string;
+  trackTitle: string;
+  primaryArtist: string;
+  tier: string;
+  licenseeName: string;
+  clientName: string | null;
+  startsAt: Date;
+  endsAt: Date | null;
+  status: LicenseStatus;
+};
+
+/**
+ * Every license bought by any org the user belongs to, newest first. `client` filters by client name (agencies buy for
+ * clients, PLAN §6.4); `clients` lists the names to filter by. Scoped by membership in the query itself, so another org's
+ * license can never appear whatever the caller passes.
+ */
+export async function listBuyerLicenses(db: DbOrTx, userId: string, opts: { client?: string; page?: number; pageSize?: number } = {}, now: Date = new Date()) {
+  const mine = db.select({ orgId: memberships.orgId }).from(memberships).where(eq(memberships.userId, userId));
+  const scope = inArray(licenses.purchaserOrgId, mine);
+  const client = opts.client?.trim().slice(0, 100);
+  // Escape LIKE wildcards: the filter is a substring match on what the buyer typed, not a pattern.
+  const where = client ? and(scope, ilike(licenses.clientName, `%${client.replace(/[\\%_]/g, '\\$&')}%`)) : scope;
+  const page = Math.max(1, Math.floor(opts.page ?? 1));
+  const size = opts.pageSize ?? LICENSE_LIST_PAGE_SIZE;
+  const [rows, [total], clientRows] = await Promise.all([
+    db
+      .select()
+      .from(licenses)
+      .where(where)
+      .orderBy(desc(licenses.createdAt), desc(licenses.id))
+      .limit(size)
+      .offset((page - 1) * size),
+    db.select({ n: count() }).from(licenses).where(where),
+    db.selectDistinct({ name: licenses.clientName }).from(licenses).where(and(scope, isNotNull(licenses.clientName))).orderBy(asc(licenses.clientName)).limit(100),
+  ]);
+  return {
+    licenses: rows.map(
+      (r): BuyerLicenseRow => ({ id: r.id, publicId: r.publicId, trackTitle: r.trackTitle, primaryArtist: r.primaryArtist, tier: r.tier, licenseeName: r.licenseeName, clientName: r.clientName, startsAt: r.startsAt, endsAt: r.endsAt, status: effectiveStatus(r, now) }),
+    ),
+    total: total!.n,
+    pages: Math.max(1, Math.ceil(total!.n / size)),
+    page,
+    clients: clientRows.flatMap((c) => (c.name ? [c.name] : [])),
+  };
 }

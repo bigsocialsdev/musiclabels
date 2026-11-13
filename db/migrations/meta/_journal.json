@@ -134,6 +134,13 @@
       "when": 1794578836552,
       "tag": "0018_search_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794582093074,
+      "tag": "0019_buyer_verify_display",
+      "breakpoints": true
     }
   ]
 }

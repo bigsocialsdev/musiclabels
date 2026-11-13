@@ -1,0 +1,1 @@
+ALTER TABLE "organizations" ADD COLUMN "verify_full_name" boolean DEFAULT false NOT NULL;

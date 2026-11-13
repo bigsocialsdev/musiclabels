@@ -1,5 +1,5 @@
-import { and, eq, isNull } from 'drizzle-orm';
-import { creditNotes, invoiceSeries, invoices } from '@/db/schema';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { creditNotes, invoiceSeries, invoices, licenses, memberships, orders } from '@/db/schema';
 import { getEnv } from '@/lib/platform/env';
 import type { DbOrTx, Tx } from '@/lib/platform/db';
 import { BUCKETS, type ObjectStore } from '@/lib/platform/storage';
@@ -160,4 +160,37 @@ export async function storeInvoicePdf(db: DbOrTx, invoiceId: string, store: Obje
   await store.upload(BUCKETS.pdfs, key, await renderInvoicePdf(inv), 'application/pdf');
   await db.update(invoices).set({ pdfKey: key }).where(and(eq(invoices.id, invoiceId), isNull(invoices.pdfKey)));
   return key;
+}
+
+export type BuyerBillingRow = {
+  licenseId: string;
+  trackTitle: string;
+  invoice: { number: string; issuedAt: Date; taxablePaise: number; cgstPaise: number; sgstPaise: number; igstPaise: number; totalPaise: number; hasPdf: boolean };
+  creditNote: { number: string; issuedAt: Date; reason: string; totalPaise: number; hasPdf: boolean } | null;
+};
+
+/** Invoices (and the credit note that reverses one, if any) for every license bought by an org the user belongs to, newest first. */
+export async function listBuyerBilling(db: DbOrTx, userId: string, limit = 200): Promise<BuyerBillingRow[]> {
+  const mine = db.select({ orgId: memberships.orgId }).from(memberships).where(eq(memberships.userId, userId));
+  const rows = await db
+    .select({ licenseId: licenses.id, trackTitle: licenses.trackTitle, invoice: invoices, creditNote: creditNotes })
+    .from(invoices)
+    .innerJoin(orders, eq(orders.id, invoices.orderId))
+    .innerJoin(licenses, eq(licenses.orderId, orders.id))
+    .leftJoin(creditNotes, eq(creditNotes.invoiceId, invoices.id))
+    .where(inArray(orders.buyerOrgId, mine))
+    .orderBy(desc(invoices.issuedAt), desc(invoices.id))
+    .limit(limit);
+  return rows.map((r) => ({
+    licenseId: r.licenseId,
+    trackTitle: r.trackTitle,
+    invoice: { number: r.invoice.number, issuedAt: r.invoice.issuedAt, taxablePaise: r.invoice.taxablePaise, cgstPaise: r.invoice.cgstPaise, sgstPaise: r.invoice.sgstPaise, igstPaise: r.invoice.igstPaise, totalPaise: r.invoice.totalPaise, hasPdf: !!r.invoice.pdfKey },
+    creditNote: r.creditNote ? { number: r.creditNote.number, issuedAt: r.creditNote.issuedAt, reason: r.creditNote.reason, totalPaise: r.creditNote.totalPaise, hasPdf: !!r.creditNote.pdfKey } : null,
+  }));
+}
+
+/** The credit note that reversed an order's invoice, if the order was refunded. */
+export async function getCreditNoteByOrder(db: DbOrTx, orderId: string): Promise<CreditNote | null> {
+  const [row] = await db.select({ note: creditNotes }).from(creditNotes).innerJoin(invoices, eq(invoices.id, creditNotes.invoiceId)).where(eq(invoices.orderId, orderId));
+  return row?.note ?? null;
 }

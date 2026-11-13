@@ -10,10 +10,12 @@ export type DisputeEvent = (typeof DISPUTE_EVENTS)[number];
 
 /**
  * PLAN §4.6. `resolved_kit_issued` can still become refund-eligible on its window ("refund_eligible still applies
- * on its window"); every other resolved state is final.
+ * on its window"); every other resolved state is final. An unresolved dispute, `open` or `in_progress`, becomes
+ * refund-eligible when ops misses its resolution deadline (decision after the S3-M6 review; PLAN §4.6 predates it).
  */
 export const DISPUTE_TRANSITIONS: readonly { from: DisputeStatus; event: DisputeEvent; to: DisputeStatus }[] = [
   { from: 'open', event: 'first_action', to: 'in_progress' },
+  { from: 'open', event: 'make_refund_eligible', to: 'refund_eligible' }, // ops never acted and the resolution deadline passed
   { from: 'in_progress', event: 'release', to: 'resolved_released' },
   { from: 'in_progress', event: 'deny', to: 'resolved_denied' },
   { from: 'in_progress', event: 'make_refund_eligible', to: 'refund_eligible' },

@@ -25,8 +25,8 @@ const idsOf = async (db: DbOrTx, q: ReturnType<typeof sql>) => (await db.execute
 
 /**
  * → refund_eligible, then finance approves the refund. Two ways in (PLAN §4.6 and the later decision, STATE.md S3-M6):
- * - an in-progress dispute whose 48-hour resolution deadline ops missed (protects the buyer from an ops failure; a
- *   Class C dispute has no deadline);
+ * - an open or in-progress dispute whose 48-hour resolution deadline ops missed (protects the buyer from an ops
+ *   failure; a Class C dispute has no deadline);
  * - an in-progress or kit-issued dispute whose refund window has passed with the claim unreleased, for a Class A
  *   claim or one by a cataloged rightsholder.
  */
@@ -34,7 +34,7 @@ export async function makeRefundEligible(db: DbOrTx, limit = BATCH): Promise<num
   const ids = await idsOf(
     db,
     sql`SELECT id FROM disputes
-        WHERE (status = 'in_progress' AND resolution_due_at < now())
+        WHERE (status IN ('open','in_progress') AND resolution_due_at < now())
            OR (status IN ('in_progress','resolved_kit_issued') AND refund_eligible_at <= now()
                AND (clearance_class_at_open = 'A' OR claimant_cataloged))
         ORDER BY refund_eligible_at LIMIT ${limit}`,

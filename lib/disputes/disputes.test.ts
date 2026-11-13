@@ -214,9 +214,7 @@ describe('refund eligibility (PLAN 4.6, 5.4)', () => {
   it('a Class A claim that is not released within the window becomes refund_eligible, once, with the buyer and finance told', async () => {
     const s = await sale(db, gw, store, { clearanceClass: 'A' });
     const id = await opened(s, {}, old());
-    expect(await dbMessage(sql`UPDATE disputes SET status = 'refund_eligible' WHERE id = ${id}`)).toMatch(/not allowed/);
-    await makeRefundEligible(db, 1000);
-    expect((await row(id)).status).toBe('open'); // no first action yet: PLAN 4.6 moves in_progress disputes only
+    expect(await dbMessage(sql`UPDATE disputes SET status = 'resolved_refunded' WHERE id = ${id}`)).toMatch(/open -> resolved_refunded is not allowed/);
     await recordFirstAction(db, await dispatcher(), id, { note: 'seller contacted' });
     await makeRefundEligible(db, 1000);
     await makeRefundEligible(db, 1000);
@@ -252,8 +250,6 @@ describe('refund eligibility (PLAN 4.6, 5.4)', () => {
     const inTimeId = await opened(inTime, {}, new Date(Date.now() - DAY)); // still inside 48h
     const resolved = await sale(db, gw, store, { clearanceClass: 'B' });
     const resolvedId = await opened(resolved, {}, new Date(Date.now() - 3 * DAY));
-    const open = await sale(db, gw, store, { clearanceClass: 'B' });
-    const openId = await opened(open, {}, new Date(Date.now() - 3 * DAY)); // no first action: not covered
     const admin = await dispatcher();
     for (const id of [missedId, inTimeId, resolvedId]) await recordFirstAction(db, admin, id, { note: 'x' });
     await resolveDispute(db, admin, resolvedId, { resolution: 'denied', note: 'out of scope' });
@@ -262,9 +258,26 @@ describe('refund eligibility (PLAN 4.6, 5.4)', () => {
     expect((await row(missedId)).status).toBe('refund_eligible');
     expect((await row(inTimeId)).status).toBe('in_progress');
     expect((await row(resolvedId)).status).toBe('resolved_denied');
-    expect((await row(openId)).status).toBe('open');
     expect((await mailsTo(missed.buyer.owner.email!, 'dispute.refund_eligible'))).toHaveLength(1);
     expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, missedId), eq(auditLog.action, 'dispute.make_refund_eligible')))).toHaveLength(1);
+  });
+
+  it('a dispute ops never touched (still open) becomes refund_eligible once its 48h deadline passes; none before, none for Class C', async () => {
+    const untouched = await sale(db, gw, store, { clearanceClass: 'B' });
+    const untouchedId = await opened(untouched, {}, new Date(Date.now() - 3 * DAY));
+    const fresh = await sale(db, gw, store, { clearanceClass: 'B' });
+    const freshId = await opened(fresh, {}, new Date(Date.now() - DAY));
+    const c = await sale(db, gw, store, { clearanceClass: 'B' });
+    await db.update(tracks).set({ clearanceClass: 'C' }).where(eq(tracks.id, c.trackId));
+    const cId = await opened(c, {}, new Date(Date.now() - 3 * DAY)); // no deadline: nothing to miss
+
+    await makeRefundEligible(db, 1000);
+    expect((await row(untouchedId)).status).toBe('refund_eligible');
+    expect((await row(freshId)).status).toBe('open');
+    expect((await row(cId)).status).toBe('open');
+    expect((await db.select({ k: disputeEvents.kind }).from(disputeEvents).where(eq(disputeEvents.disputeId, untouchedId))).map((e) => e.k)).toEqual(expect.arrayContaining(['opened', 'make_refund_eligible']));
+    expect((await mailsTo(untouched.buyer.owner.email!, 'dispute.refund_eligible'))).toHaveLength(1);
+    expect(await dbMessage(sql`UPDATE disputes SET status = 'in_progress' WHERE id = ${untouchedId}`)).toMatch(/refund_eligible -> in_progress is not allowed/); // too late for ops to take it back
   });
 
   it('a kit-issued dispute becomes refund-eligible on its window too; a released one never does', async () => {

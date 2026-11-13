@@ -1,13 +1,8 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { genres, moods, rightsDeclarations, rightsDocuments, trackEvents, trackVersions, tracks } from '@/db/schema';
-import { getMembershipRole } from '@/lib/identity/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import type { ClearanceClass, DocType, TrackStatus } from '../index';
-import { CatalogError, type SellerActor } from './seller';
-
-async function requireMember(db: DbOrTx, actor: SellerActor) {
-  if (!(await getMembershipRole(db, actor.userId, actor.orgId))) throw new CatalogError('Not a member of this organisation');
-}
+import { requireMember, type SellerActor } from './seller';
 
 /** The org's tracks, newest first. Scoped by the caller's org here; storage keys never leave the slice. */
 export async function listOwnTracks(db: DbOrTx, actor: SellerActor) {
@@ -47,8 +42,11 @@ export async function getOwnTrack(db: DbOrTx, actor: SellerActor, trackId: strin
     declaration: declaration ?? null,
     documents: documents.map((d) => ({ ...d, docType: d.docType as DocType })),
     versions,
-    /** Why the latest review rejected it, as the seller sees it. */
-    rejection: track.status === 'rejected' ? { reason: track.rejectionReason ?? lastRejection?.reason ?? null } : null,
+    /**
+     * Why the latest review rejected it. Kept while the track is back in draft for changes (the seller needs the
+     * reason most then); gone once it is resubmitted, and replaced if it is rejected again.
+     */
+    rejection: track.status === 'rejected' || (track.status === 'draft' && lastRejection) ? { reason: track.rejectionReason ?? lastRejection?.reason ?? null } : null,
   };
 }
 

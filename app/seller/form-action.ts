@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { ZodError } from 'zod';
 import { CatalogError } from '@/lib/catalog/server';
 import type { Session } from '@/lib/identity/server';
+import { sealFlash } from '@/lib/platform/flash';
 import { clientIp } from '@/lib/platform/request';
 import { OnboardingError, PayoutAccountError } from '@/lib/sellers/server';
 import { requireSellerSession } from './session';
@@ -18,7 +19,12 @@ const MESSAGES: Record<string, string> = {
 
 /** User-facing text for the errors the slices raise on purpose; anything else is a bug and propagates. */
 export function friendly(e: unknown): string | null {
-  if (e instanceof ZodError) return e.issues[0]?.message ?? 'Check the form and try again.';
+  if (e instanceof ZodError) {
+    const issue = e.issues[0];
+    if (!issue) return 'Check the form and try again.';
+    const field = issue.path.join('.'); // names the field the form should fix
+    return field ? `${field}: ${issue.message}` : issue.message;
+  }
   if (e instanceof OnboardingError || e instanceof PayoutAccountError || e instanceof CatalogError) return MESSAGES[e.message] ?? e.message;
   return null;
 }
@@ -35,7 +41,7 @@ export function requireOrg(orgId: string | null): string {
 
 /**
  * Runs one form action as the signed-in seller and comes back to `here` with a message. `fn` may return a path to
- * land on instead (a new track's page). Redirect messages are server-written text, never user input.
+ * land on instead (a new track's page). The message travels sealed in the URL (`?m=`), see `FlashBanner`.
  */
 export async function runForm(here: string, done: string, fn: (ctx: SellerCtx) => Promise<string | void>): Promise<never> {
   const { session, orgId } = await requireSellerSession(here);
@@ -49,7 +55,7 @@ export async function runForm(here: string, done: string, fn: (ctx: SellerCtx) =
     if (error === null) throw e;
   }
   revalidatePath(here);
-  redirect(`${to}?${error ? `error=${encodeURIComponent(error)}` : `done=${encodeURIComponent(done)}`}`);
+  redirect(`${to}?m=${encodeURIComponent(sealFlash(error ? 'error' : 'done', error ?? done))}`);
 }
 
 /** The same for calls from client components (uploads): the slices' deliberate errors come back as `{ ok: false }`. */

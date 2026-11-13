@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LANGUAGES, PRICE_LEVELS } from '@/lib/catalog';
+import { Check, Field, selectClass } from '../ui';
 
 export type TrackDefaults = {
   title?: string;
@@ -20,26 +20,6 @@ export type TrackDefaults = {
   editsAllowed?: boolean;
   proposedPriceLevel?: string | null;
 };
-
-const selectClass = 'h-9 w-full rounded-md border bg-transparent px-3 text-sm';
-
-function Field({ id, label, ...props }: { id: string; label: string } & React.ComponentProps<typeof Input>) {
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Input id={id} name={id} {...props} />
-    </div>
-  );
-}
-
-function Check({ name, label, defaultChecked }: { name: string; label: string; defaultChecked?: boolean }) {
-  return (
-    <label className="flex items-start gap-2 text-sm">
-      <input type="checkbox" name={name} defaultChecked={defaultChecked} className="mt-1" />
-      <span>{label}</span>
-    </label>
-  );
-}
 
 /** Track details: used to create a track and to edit a draft. The catalog's zod schema validates. */
 export function TrackForm({
@@ -87,7 +67,7 @@ export function TrackForm({
       </div>
       {taxonomy.moods.length > 0 && (
         <fieldset className="grid gap-1.5">
-          <legend className="text-sm font-medium">Moods (up to 5)</legend>
+          <legend className="text-sm font-medium">Moods (choose up to 5)</legend>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {taxonomy.moods.map((m) => (
               <label key={m.id} className="flex items-center gap-1.5 text-sm">

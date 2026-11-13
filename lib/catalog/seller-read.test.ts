@@ -58,10 +58,13 @@ describe('what a seller can read', () => {
     expect((await getOwnTrack(db, actorOf(s), id))!.rejection).toEqual({ reason: 'The composition credits are missing' });
 
     await applyTransition(db, id, 'edit', s.owner.userId);
-    expect((await getOwnTrack(db, actorOf(s), id))!.rejection).toBeNull(); // back in draft: nothing to show
+    expect((await getOwnTrack(db, actorOf(s), id))!.rejection).toEqual({ reason: 'The composition credits are missing' }); // still there while the seller edits
     await db.update(tracks).set({ status: 'in_review' }).where(eq(tracks.id, id));
     await rejectTrack(db, admin, { trackId: id, reason: 'The audio still contains a sample' });
     expect((await getOwnTrack(db, actorOf(s), id))!.rejection).toEqual({ reason: 'The audio still contains a sample' });
+
+    const fresh = await makeTrack(db, s.orgId, 'draft'); // never rejected: no banner
+    expect((await getOwnTrack(db, actorOf(s), fresh))!.rejection).toBeNull();
   });
 
   it('lists only active genres and moods', async () => {

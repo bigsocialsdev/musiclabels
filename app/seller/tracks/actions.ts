@@ -1,5 +1,5 @@
 'use server';
-import { after } from 'next/server';
+import { notFound } from 'next/navigation';
 import { z } from 'zod';
 import {
   CatalogError,
@@ -18,12 +18,18 @@ import {
   type SellerActor,
 } from '@/lib/catalog/server';
 import { getDb } from '@/lib/platform/db';
+import { kick } from '@/lib/platform/tasks';
 import { attempt, requireOrg, runForm, text, type SellerCtx } from '../form-action';
 import { requireSellerSession } from '../session';
 import { REGISTRATION_ROWS } from './form-fields';
 
 const trackPath = (id: string) => `/seller/tracks/${id}`;
-const trackIdOf = (f: FormData) => z.uuid().parse(text(f, 'trackId'));
+/** The hidden track id of a form; a malformed one is a missing track, not a server error. */
+function trackIdOf(f: FormData): string {
+  const id = z.uuid().safeParse(text(f, 'trackId'));
+  if (!id.success) notFound();
+  return id.data;
+}
 const actorOf = (c: Pick<SellerCtx, 'session' | 'orgId'>): SellerActor => ({ userId: c.session.userId, orgId: requireOrg(c.orgId) });
 
 const list = (f: FormData, k: string) => text(f, k).split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
@@ -65,8 +71,6 @@ export async function updateTrackAction(formData: FormData) {
   });
 }
 
-
-
 export async function saveDeclarationAction(formData: FormData) {
   const id = trackIdOf(formData);
   return runForm(trackPath(id), 'Rights declaration saved.', async (c) => {
@@ -81,7 +85,7 @@ export async function saveDeclarationAction(formData: FormData) {
       coOwnerConsentWarranted: checked(formData, 'coOwnerConsentWarranted'),
       sampleFreeWarranted: checked(formData, 'sampleFreeWarranted'),
       notACoverWarranted: checked(formData, 'notACoverWarranted'),
-      registrations: registrations,
+      registrations,
     });
   });
 }
@@ -99,8 +103,8 @@ export async function submitTrackAction(formData: FormData) {
   const id = trackIdOf(formData);
   return runForm(trackPath(id), 'Submitted for review.', async (c) => {
     const r = await submitTrack(getDb(), actorOf(c), id);
-    if (!r.ok) throw new CatalogError(`Not ready yet: ${r.issues.join('; ')}.`);
-    after(() => processVersion(r.value.versionId)); // the cron sweep reruns it if this is cut short
+    if (!r.ok) throw new CatalogError(`Not ready yet: ${r.issues.map((i) => i.replace(/\.$/, '')).join('; ')}.`);
+    kick('ingest', () => processVersion(r.value.versionId)); // the cron sweep reruns it if this is cut short
   });
 }
 
@@ -112,41 +116,49 @@ export async function delistTrackAction(formData: FormData) {
   });
 }
 
-// ---- uploads (called from the client UploadForm; the track id is bound by the page) ----
+// ---- uploads (called from the client UploadForm; the page binds the track id) ----
+// The track id and every other input are parsed inside `attempt`, so a malformed value comes back as a message.
 
 const AUDIO_ID = /^([0-9a-f-]{36})\.(wav|mp3)$/;
 
+/** The signed-in seller; a malformed track id only affects the sign-in return path. */
+function uploadSession(trackId: string) {
+  return requireSellerSession(z.uuid().safeParse(trackId).success ? trackPath(trackId) : '/seller/tracks');
+}
+
 /** The upload form's id for an audio file is `<versionId>.<ext>`, so confirm needs nothing else from the browser. */
 export async function requestAudioUploadAction(trackId: string, raw: { filename: string }) {
-  const { session, orgId } = await requireSellerSession(trackPath(trackId));
-  const ext = z.string().max(300).parse(raw.filename).split('.').pop() ?? '';
+  const { session, orgId } = await uploadSession(trackId);
   return attempt(async () => {
+    const ext = z.string().max(300).parse(raw.filename).split('.').pop() ?? '';
     const r = await requestMasterUpload(getDb(), actorOf({ session, orgId }), z.uuid().parse(trackId), ext);
     return { id: `${r.versionId}.${ext.toLowerCase()}`, key: r.key, token: r.token };
   });
 }
 
 export async function confirmAudioUploadAction(trackId: string, uploadId: string) {
-  const { session, orgId } = await requireSellerSession(trackPath(trackId));
-  const m = AUDIO_ID.exec(z.string().max(60).parse(uploadId));
-  if (!m) return { ok: false as const, error: 'Invalid upload.' };
-  const r = await attempt(async () => ({ versionId: await confirmMasterUpload(getDb(), actorOf({ session, orgId }), z.uuid().parse(trackId), m[1]!, m[2]!) }));
+  const { session, orgId } = await uploadSession(trackId);
+  const r = await attempt(async () => {
+    const m = AUDIO_ID.exec(z.string().max(60).parse(uploadId));
+    if (!m) throw new CatalogError('Invalid upload.');
+    return { versionId: await confirmMasterUpload(getDb(), actorOf({ session, orgId }), z.uuid().parse(trackId), m[1]!, m[2]!) };
+  });
   if (!r.ok) return r;
-  after(() => processVersion(r.versionId));
+  kick('ingest', () => processVersion(r.versionId));
   return { ok: true as const, message: 'Uploaded. We are processing the audio; this can take a few minutes.' };
 }
 
 export async function requestDocumentUploadAction(trackId: string, raw: { choice: string; mime: string }) {
-  const { session, orgId } = await requireSellerSession(trackPath(trackId));
-  const input = z.object({ choice: z.enum(DOC_TYPES), mime: z.string().max(100) }).parse(raw);
+  const { session, orgId } = await uploadSession(trackId);
   return attempt(async () => {
+    const input = z.object({ choice: z.enum(DOC_TYPES), mime: z.string().max(100) }).parse(raw);
     const r = await requestRightsDocumentUpload(getDb(), actorOf({ session, orgId }), z.uuid().parse(trackId), { docType: input.choice, mime: input.mime });
     return { id: r.documentId, key: r.key, token: r.token };
   });
 }
 
 export async function confirmDocumentUploadAction(trackId: string, documentId: string) {
-  const { session, orgId } = await requireSellerSession(trackPath(trackId));
+  const { session, orgId } = await uploadSession(trackId);
   const r = await attempt(() => confirmRightsDocument(getDb(), actorOf({ session, orgId }), z.uuid().parse(documentId)));
   if (!r.ok) return r;
   return r.status === 'valid' ? { ok: true as const, message: 'Uploaded and checked.' } : { ok: false as const, error: r.error ?? 'The file was rejected.' };

@@ -3,12 +3,13 @@ import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getCurrentDocument } from '@/lib/legal/server';
 import { getDb } from '@/lib/platform/db';
 import { ENTITY_TYPES, getOnboardingStatus, getPayoutAccount, getSellerProfile, listSellerDocuments, type OnboardingStatus } from '@/lib/sellers/server';
 import { requireSellerSession } from '../session';
+import { FlashBanner } from '../flash';
+import { Field, selectClass } from '../ui';
 import { UploadForm } from '../upload-form';
 import { acceptTermsAction, confirmKycDocumentAction, createSellerAction, requestKycUploadAction, setBankAction, setPanAction, updateProfileAction } from './actions';
 
@@ -17,7 +18,6 @@ export const dynamic = 'force-dynamic';
 const ENTITY_LABELS: Record<(typeof ENTITY_TYPES)[number], string> = { individual: 'An individual artist', company: 'A company', partnership: 'A partnership firm', llp: 'An LLP' };
 const KIND_LABELS: Record<string, string> = { pan_card: 'PAN card', id_proof: 'ID proof', gst_certificate: 'GST certificate', bank_proof: 'Bank proof (cancelled cheque or statement)' };
 const KYC_OPTIONS = Object.entries(KIND_LABELS) as [string, string][];
-const selectClass = 'h-9 w-full rounded-md border bg-transparent px-3 text-sm';
 
 function Step({ title, done, description, children }: { title: string; done: boolean; description?: string; children: ReactNode }) {
   return (
@@ -30,15 +30,6 @@ function Step({ title, done, description, children }: { title: string; done: boo
       </CardHeader>
       <CardContent className="space-y-3">{children}</CardContent>
     </Card>
-  );
-}
-
-function Field({ id, label, ...props }: { id: string; label: string } & React.ComponentProps<typeof Input>) {
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Input id={id} name={id} {...props} />
-    </div>
   );
 }
 
@@ -63,16 +54,11 @@ function kycBadge(s: OnboardingStatus) {
   return <Badge variant="outline">KYC in review</Badge>;
 }
 
-export default async function SellerOnboardingPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
-  const { error, done } = await searchParams;
+export default async function SellerOnboardingPage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
+  const { m } = await searchParams;
   const { session, orgId } = await requireSellerSession('/seller/onboarding');
   const db = getDb();
-  const banner = (
-    <>
-      {error && <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-      {done && <p role="status" className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">{done}</p>}
-    </>
-  );
+  const banner = <FlashBanner token={m} />;
 
   if (!orgId) {
     return (

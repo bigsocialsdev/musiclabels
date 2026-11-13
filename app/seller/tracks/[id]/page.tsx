@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { z } from 'zod';
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,10 @@ import { Input } from '@/components/ui/input';
 import { DOC_TYPES } from '@/lib/catalog';
 import { getOwnTrack, listTaxonomy } from '@/lib/catalog/server';
 import { getDb } from '@/lib/platform/db';
+import { FlashBanner } from '../../flash';
+import { Check, selectClass } from '../../ui';
 import { UploadForm } from '../../upload-form';
+import { AutoRefresh } from './auto-refresh';
 import { requireSellerSession } from '../../session';
 import {
   confirmAudioUploadAction,
@@ -49,7 +53,6 @@ const SYSTEMS = [
   ['meta_rm', 'Meta Rights Manager'],
   ['other', 'Other'],
 ] as const;
-const selectClass = 'h-9 rounded-md border bg-transparent px-3 text-sm';
 const checkState = (s: string) => (s === 'valid' ? 'accepted' : s);
 const ingestLabel: Record<string, string> = { pending: 'waiting', processing: 'processing', ready: 'ready', failed: 'failed' };
 
@@ -76,13 +79,13 @@ function TrackAction({ action, trackId, label, variant }: { action: (f: FormData
   );
 }
 
-export default async function SellerTrackPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; done?: string }> }) {
+export default async function SellerTrackPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ m?: string }> }) {
   const { id } = await params;
-  const { error, done } = await searchParams;
+  const { m } = await searchParams;
   const { session, orgId } = await requireSellerSession(`/seller/tracks/${id}`);
   if (!orgId) redirect('/seller/onboarding');
   const db = getDb();
-  const detail = /^[0-9a-f-]{36}$/.test(id) ? await getOwnTrack(db, { userId: session.userId, orgId }, id) : null;
+  const detail = z.uuid().safeParse(id).success ? await getOwnTrack(db, { userId: session.userId, orgId }, id) : null;
   if (!detail) notFound(); // another org's track looks exactly like a missing one
   const { track, declaration, documents, versions, rejection } = detail;
   const draft = track.status === 'draft';
@@ -91,6 +94,7 @@ export default async function SellerTrackPage({ params, searchParams }: { params
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
+      {versions.some((v) => v.ingestStatus === 'pending' || v.ingestStatus === 'processing') && <AutoRefresh />}
       <Link href="/seller/tracks" className="text-sm underline">
         All tracks
       </Link>
@@ -99,28 +103,19 @@ export default async function SellerTrackPage({ params, searchParams }: { params
         <Badge variant={statusVariant(track.status)}>{STATUS_LABELS[track.status]}</Badge>
       </div>
       <p className="text-sm text-muted-foreground">{track.primaryArtist}</p>
-      {error && (
-        <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-      {done && (
-        <p role="status" className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">
-          {done}
-        </p>
-      )}
+      <FlashBanner token={m} />
 
       {rejection && (
-        <Section title="Changes needed" description="Our review team could not publish this track yet.">
+        <Section title="Changes needed" description="Our review team could not publish this track yet. Fix what the note says, then submit it again.">
           <p className="whitespace-pre-wrap text-sm">{rejection.reason ?? 'No reason was recorded.'}</p>
-          {track.clearanceClass === 'C' ? (
+          {track.status !== 'rejected' ? null : track.clearanceClass === 'C' ? (
             <p className="text-sm text-muted-foreground">This track cannot be cleared for licensing, so it cannot be sent again.</p>
           ) : (
             <TrackAction action={editTrackAction} trackId={track.id} label="Edit and resubmit" />
           )}
         </Section>
       )}
-      {(track.status === 'submitted' || track.status === 'in_review') && <p className="text-sm text-muted-foreground">Your track is with our review team. You will get an email when there is a decision.</p>}
+      {(track.status === 'submitted' || track.status === 'in_review') && <p className="text-sm text-muted-foreground">Your track is with our review team. Check back here for the decision.</p>}
       {track.status === 'suspended' && <p className="text-sm text-muted-foreground">This track is suspended and cannot be bought. Contact support if you think this is a mistake.</p>}
       {track.status === 'delisted' && <p className="text-sm text-muted-foreground">This track is delisted. Licenses already sold stay valid.</p>}
 
@@ -160,10 +155,7 @@ export default async function SellerTrackPage({ params, searchParams }: { params
           <form action={saveDeclarationAction} className="space-y-3">
             <input type="hidden" name="trackId" value={track.id} />
             {WARRANTIES.map(([name, label]) => (
-              <label key={name} className="flex items-start gap-2 text-sm">
-                <input type="checkbox" name={name} defaultChecked={declaration?.[name] ?? false} className="mt-1" />
-                <span>{label}</span>
-              </label>
+              <Check key={name} name={name} label={label} defaultChecked={declaration?.[name] ?? false} />
             ))}
             <p className="text-sm font-medium">Already registered somewhere?</p>
             {Array.from({ length: REGISTRATION_ROWS }, (_, i) => (

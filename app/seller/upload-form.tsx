@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { selectClass } from './ui';
 import { createSupabaseBrowserClient } from '@/lib/platform/supabase-browser';
 
 type Requested = { ok: true; id: string; key: string; token: string } | { ok: false; error: string };
@@ -61,7 +62,7 @@ export function UploadForm({
       {choice && (
         <div className="grid gap-1.5">
           <Label htmlFor={`${uid}-choice`}>{choice.label}</Label>
-          <select id={`${uid}-choice`} name="choice" className="h-9 rounded-md border bg-transparent px-3 text-sm">
+          <select id={`${uid}-choice`} name="choice" className={selectClass}>
             {choice.options.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}

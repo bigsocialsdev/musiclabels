@@ -301,6 +301,13 @@ Owner approved the "Night Session" direction after review (chosen from a minimal
 - Applying it: follow DESIGN.md "Applying to the app" (globals.css on main still defines only `--background`/`--foreground`, so the shadcn components added in S4-M7 lack most tokens until then). Restyling existing screens is a separate task, not part of this decision.
 - Still open: product name and logo ("MRM" is a working name), real catalogue imagery (none), buyer dashboard theme if buyers push back, the gated checkout/onboarding sequence comp.
 
+### Night Session applied: token layer + S4-M7 seller restyle, 2026-11-13
+Visual pass only; no props, actions, form fields, queries or flows changed.
+- `app/globals.css` now carries the full light/dark token set, an `@theme inline` mapping (shadcn colours plus `fg-2`, `fg-4`, `surface-3`, `signal`, `wave-*`, `ok/attention/blocked/info`; radii; `text-display/headline/title` roles) and base styles. The old `prefers-color-scheme` switch is gone: the theme follows the surface (no class = daylight; a `.dark` ancestor = night). Fonts load via `next/font` (Hanken Grotesk, Red Hat Mono; Red Hat Mono has no ₹ glyph, so the mono stack falls back to Hanken for it).
+- shadcn primitives: no shadows at rest, card radius 14px, labels in the DESIGN label role, `destructive` button is outlined red text, new `signal` button variant reserved for audio controls. New `components/ui/status.tsx` (`StatusLabel`, dot plus word) replaces filled badges for status.
+- Seller portal: sticky top bar with wordmark and current-page tabs (`app/seller/nav.tsx`), shared `Page`/`PageHeader`/`Notice` (`app/seller/ui.tsx`) and console `Table` (`app/seller/table.tsx`); Sales' three KPI cards became receipt-style balance lines; money, dates, periods and UTRs in mono.
+- Not verified against live data: the seller pages need a Supabase Auth stack (no Docker here); checked with a temporary preview route rendering the same components with sample data, removed before commit. Other S3 pages (track, checkout, verify, admin) still carry hardcoded colours; they are restyled with M8-M10, and the storefront's forced-dark wrapper arrives with M8.
+
 
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.

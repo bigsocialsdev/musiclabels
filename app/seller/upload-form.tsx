@@ -58,7 +58,7 @@ export function UploadForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-3 rounded-md border border-dashed border-input p-4">
       {choice && (
         <div className="grid gap-1.5">
           <Label htmlFor={`${uid}-choice`}>{choice.label}</Label>
@@ -73,13 +73,20 @@ export function UploadForm({
       )}
       <div className="grid gap-1.5">
         <Label htmlFor={`${uid}-file`}>{fileLabel}</Label>
-        <input id={`${uid}-file`} name="file" type="file" accept={accept} required className="text-sm" />
+        <input
+          id={`${uid}-file`}
+          name="file"
+          type="file"
+          accept={accept}
+          required
+          className="text-sm text-muted-foreground file:mr-3 file:h-9 file:cursor-pointer file:rounded-md file:border file:border-input file:bg-card file:px-3 file:text-sm file:font-semibold file:text-foreground hover:file:bg-secondary"
+        />
       </div>
       <Button type="submit" disabled={busy}>
         {busy ? 'Uploading…' : 'Upload'}
       </Button>
       {message && (
-        <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'text-sm text-green-700' : 'text-sm text-red-700'}>
+        <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'text-sm font-semibold text-ok' : 'text-sm font-semibold text-blocked'}>
           {message.text}
         </p>
       )}

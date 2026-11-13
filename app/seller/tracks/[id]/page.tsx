@@ -2,15 +2,15 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { z } from 'zod';
 import type { ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { StatusLabel } from '@/components/ui/status';
 import { DOC_TYPES } from '@/lib/catalog';
 import { getOwnTrack, listTaxonomy } from '@/lib/catalog/server';
 import { getDb } from '@/lib/platform/db';
 import { FlashBanner } from '../../flash';
-import { Check, selectClass } from '../../ui';
+import { Check, Notice, Page, PageHeader, selectClass } from '../../ui';
 import { UploadForm } from '../../upload-form';
 import { AutoRefresh } from './auto-refresh';
 import { requireSellerSession } from '../../session';
@@ -26,7 +26,7 @@ import {
   updateTrackAction,
 } from '../actions';
 import { REGISTRATION_ROWS } from '../form-fields';
-import { STATUS_LABELS, statusVariant } from '../status';
+import { STATUS_LABELS, checkTone, statusTone } from '../status';
 import { TrackForm } from '../track-form';
 
 export const dynamic = 'force-dynamic';
@@ -93,16 +93,21 @@ export default async function SellerTrackPage({ params, searchParams }: { params
   const regs = (Array.isArray(declaration?.registrations) ? declaration.registrations : []) as { system: string; administeredBy: string; sellerControlsRelease: boolean }[];
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-6">
+    <Page>
       {versions.some((v) => v.ingestStatus === 'pending' || v.ingestStatus === 'processing') && <AutoRefresh />}
-      <Link href="/seller/tracks" className="text-sm underline">
+      <Link href="/seller/tracks" className="text-[13px] font-semibold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
         All tracks
       </Link>
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">{track.title}</h1>
-        <Badge variant={statusVariant(track.status)}>{STATUS_LABELS[track.status]}</Badge>
-      </div>
-      <p className="text-sm text-muted-foreground">{track.primaryArtist}</p>
+      <PageHeader
+        title={
+          <>
+            {track.title}
+            <StatusLabel tone={statusTone(track.status)}>{STATUS_LABELS[track.status]}</StatusLabel>
+          </>
+        }
+      >
+        {track.primaryArtist}
+      </PageHeader>
       <FlashBanner token={m} />
 
       {rejection && (
@@ -115,9 +120,9 @@ export default async function SellerTrackPage({ params, searchParams }: { params
           )}
         </Section>
       )}
-      {(track.status === 'submitted' || track.status === 'in_review') && <p className="text-sm text-muted-foreground">Your track is with our review team. Check back here for the decision.</p>}
-      {track.status === 'suspended' && <p className="text-sm text-muted-foreground">This track is suspended and cannot be bought. Contact support if you think this is a mistake.</p>}
-      {track.status === 'delisted' && <p className="text-sm text-muted-foreground">This track is delisted. Licenses already sold stay valid.</p>}
+      {(track.status === 'submitted' || track.status === 'in_review') && <Notice tone="info">Your track is with our review team. Check back here for the decision.</Notice>}
+      {track.status === 'suspended' && <Notice tone="blocked">This track is suspended and cannot be bought. Contact support if you think this is a mistake.</Notice>}
+      {track.status === 'delisted' && <Notice tone="muted">This track is delisted. Licenses already sold stay valid.</Notice>}
 
       {draft && (
         <Section title="Details">
@@ -127,11 +132,13 @@ export default async function SellerTrackPage({ params, searchParams }: { params
 
       <Section title="Audio" description={draft ? 'WAV or MP3. Uploading again adds a new version; the latest one is reviewed.' : undefined}>
         {versions.length > 0 ? (
-          <ul className="space-y-1 text-sm">
+          <ul className="divide-y rounded-md border text-sm">
             {versions.map((v) => (
-              <li key={v.id} className="flex flex-wrap items-center gap-2">
-                Version {v.versionNo}
-                <Badge variant={v.ingestStatus === 'ready' ? 'default' : v.ingestStatus === 'failed' ? 'destructive' : 'outline'}>{ingestLabel[v.ingestStatus] ?? v.ingestStatus}</Badge>
+              <li key={v.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                <span className="font-semibold">
+                  Version <span className="font-mono">{v.versionNo}</span>
+                </span>
+                <StatusLabel tone={v.ingestStatus === 'ready' ? 'ok' : v.ingestStatus === 'failed' ? 'blocked' : 'info'}>{ingestLabel[v.ingestStatus] ?? v.ingestStatus}</StatusLabel>
                 {v.ingestError && <span className="text-muted-foreground">{v.ingestError}</span>}
               </li>
             ))}
@@ -157,7 +164,7 @@ export default async function SellerTrackPage({ params, searchParams }: { params
             {WARRANTIES.map(([name, label]) => (
               <Check key={name} name={name} label={label} defaultChecked={declaration?.[name] ?? false} />
             ))}
-            <p className="text-sm font-medium">Already registered somewhere?</p>
+            <p className="pt-1 text-xs font-semibold text-muted-foreground">Already registered somewhere?</p>
             {Array.from({ length: REGISTRATION_ROWS }, (_, i) => (
               <div key={i} className="grid gap-2 sm:grid-cols-[10rem_1fr_auto] sm:items-center">
                 <select name={`reg${i}System`} defaultValue={regs[i]?.system ?? ''} aria-label="Registration system" className={selectClass}>
@@ -168,8 +175,8 @@ export default async function SellerTrackPage({ params, searchParams }: { params
                   ))}
                 </select>
                 <Input name={`reg${i}By`} placeholder="Administered by (distributor, label…)" defaultValue={regs[i]?.administeredBy ?? ''} />
-                <label className="flex items-center gap-1.5 text-sm">
-                  <input type="checkbox" name={`reg${i}Release`} defaultChecked={regs[i]?.sellerControlsRelease ?? false} />I can release claims
+                <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+                  <input type="checkbox" className="size-4" name={`reg${i}Release`} defaultChecked={regs[i]?.sellerControlsRelease ?? false} />I can release claims
                 </label>
               </div>
             ))}
@@ -179,13 +186,13 @@ export default async function SellerTrackPage({ params, searchParams }: { params
           <p className="text-sm text-muted-foreground">Declared on {declaration.declaredAt.toLocaleDateString('en-IN')}.</p>
         ) : null}
 
-        <h3 className="pt-2 text-sm font-medium">Rights documents</h3>
+        <h3 className="border-t pt-4 text-xs font-semibold text-muted-foreground">Rights documents</h3>
         {documents.length > 0 ? (
-          <ul className="space-y-1 text-sm">
+          <ul className="divide-y rounded-md border text-sm">
             {documents.map((d) => (
-              <li key={d.id} className="flex flex-wrap items-center gap-2">
+              <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                 {DOC_LABELS[d.docType] ?? d.docType}
-                <Badge variant={d.status === 'valid' ? 'default' : d.status === 'rejected' ? 'destructive' : 'outline'}>{checkState(d.status)}</Badge>
+                <StatusLabel tone={checkTone(d.status)}>{checkState(d.status)}</StatusLabel>
                 {d.error && <span className="text-muted-foreground">{d.error}</span>}
               </li>
             ))}
@@ -216,6 +223,6 @@ export default async function SellerTrackPage({ params, searchParams }: { params
           <TrackAction action={delistTrackAction} trackId={track.id} label="Delist this track" variant="destructive" />
         </Section>
       )}
-    </main>
+    </Page>
   );
 }

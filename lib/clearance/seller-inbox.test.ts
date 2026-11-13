@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { auditLog, clearanceRequests } from '@/db/schema';
+import { auditLog, clearanceRequests, memberships } from '@/db/schema';
+import { OrgAccessError } from '@/lib/identity';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { sale, setupCommerce } from '@/tests/commerce';
 import { makeSeller, makeUser } from '@/tests/factories';
@@ -42,7 +43,7 @@ describe('the seller’s clearance inbox', () => {
     expect(rows[1]).toMatchObject({ status: 'completed', awaitingSeller: false });
     expect(rows.map((r) => r.id)).not.toContain(theirs);
     expect(JSON.stringify(rows)).not.toMatch(/respond_token|respondToken/i); // no way to read or reuse the emailed link
-    expect(await err(listSellerClearance(db, { userId: (await makeUser(db)).userId, orgId: mine.orgId }))).toBeInstanceOf(ClearanceInboxError);
+    expect(await err(listSellerClearance(db, { userId: (await makeUser(db)).userId, orgId: mine.orgId }))).toBeInstanceOf(OrgAccessError);
   });
 
   it('keeps open requests first even when the limit would otherwise cut them off', async () => {
@@ -75,7 +76,11 @@ describe('the seller’s clearance inbox', () => {
     const other = await makeSeller(db);
     const id = await sentRequest(seller);
     expect(await respondAsSeller(db, actorOf(other), id, { outcome: 'released' })).toEqual({ ok: false, reason: 'not_found' }); // not theirs
-    expect(await err(respondAsSeller(db, { userId: (await makeUser(db)).userId, orgId: seller.orgId }, id, { outcome: 'released' }))).toBeInstanceOf(ClearanceInboxError);
+    expect(await err(respondAsSeller(db, { userId: (await makeUser(db)).userId, orgId: seller.orgId }, id, { outcome: 'released' }))).toBeInstanceOf(OrgAccessError); // not a member
+    const member = await makeUser(db);
+    await db.insert(memberships).values({ userId: member.userId, orgId: seller.orgId, role: 'member' });
+    expect(await err(respondAsSeller(db, { userId: member.userId, orgId: seller.orgId }, id, { outcome: 'released' }))).toBeInstanceOf(ClearanceInboxError); // a member who is not the owner
+    expect((await listSellerClearance(db, { userId: member.userId, orgId: seller.orgId })).map((r) => r.id)).toEqual([id]); // but they can look
     expect(await err(respondAsSeller(db, actorOf(seller), id, { outcome: 'maybe' }))).not.toBeNull();
     expect((await db.select().from(clearanceRequests).where(eq(clearanceRequests.id, id)))[0]!.status).toBe('sent');
   });

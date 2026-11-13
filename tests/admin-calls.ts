@@ -2,8 +2,8 @@ import { escalateClearance, listClearanceQueue, resendClearance, resolveClearanc
 import { getDisputeDetail, listComplaints, listRefundEligibleDisputes, listDisputes, recordFirstAction, requestDisputeRefund, resolveComplaint, resolveDispute, setClaimantCataloged, startInvestigation } from '@/lib/disputes/server';
 import { listEnquiries, setEnquiryStatus } from '@/lib/enquiries/server';
 import type { AdminContext, AdminPermission } from '@/lib/identity/server';
-import { listReconciliationItems, listRefunds, resolveReconciliationItem, retryRefund } from '@/lib/payments/server';
-import { approvePayoutBatch, computePayoutBatch, getPayoutBatchDetail, listPayoutBatches, payoutBankFileUrl, recordPayoutFailed, recordPayoutPaid, submitPayoutBatch } from '@/lib/payouts/server';
+import { listReconciliationItems, listRefunds, refundCreditNoteUrl, resolveReconciliationItem, retryRefund } from '@/lib/payments/server';
+import { approvePayoutBatch, computePayoutBatch, getPayoutBatchDetail, listPayoutBatches, payoutBankFileUrl, payoutStatementUrl, recordPayoutFailed, recordPayoutPaid, submitPayoutBatch } from '@/lib/payouts/server';
 import type { Db } from '@/lib/platform/db';
 
 const ID = '00000000-0000-7000-8000-000000000000'; // a well-formed id nothing owns: past the permission check the call just finds nothing
@@ -32,6 +32,7 @@ export const ADMIN_CALLS: readonly AdminCall[] = [
   { name: 'refunds.list', permission: 'finance', mutates: false, run: (db, a) => listRefunds(db, a) },
   { name: 'refunds.eligible_disputes', permission: 'finance', mutates: false, run: (db, a) => listRefundEligibleDisputes(db, a) },
   { name: 'refunds.retry', permission: 'finance', mutates: true, run: (db, a) => retryRefund(db, a, ID) },
+  { name: 'refunds.credit_note', permission: 'finance', mutates: true, run: (db, a) => refundCreditNoteUrl(db, a, ID) },
   { name: 'payouts.list', permission: 'finance', mutates: false, run: (db, a) => listPayoutBatches(db, a) },
   { name: 'payouts.detail', permission: 'finance', mutates: false, run: (db, a) => getPayoutBatchDetail(db, a, ID) },
   // A period that has not ended: past the permission check the compute refuses, so the shared test database gains no batch.
@@ -39,6 +40,7 @@ export const ADMIN_CALLS: readonly AdminCall[] = [
   { name: 'payouts.approve', permission: 'finance', mutates: true, run: (db, a) => approvePayoutBatch(db, a, ID) },
   { name: 'payouts.submit', permission: 'finance', mutates: true, run: (db, a) => submitPayoutBatch(db, a, ID, { id: 'bank_file', submit: async () => ({ railRef: 'x' }) }) },
   { name: 'payouts.bank_file', permission: 'finance', mutates: true, run: (db, a) => payoutBankFileUrl(db, a, ID) },
+  { name: 'payouts.statement', permission: 'finance', mutates: true, run: (db, a) => payoutStatementUrl(db, a, ID) },
   { name: 'payouts.record_paid', permission: 'finance', mutates: true, run: (db, a) => recordPayoutPaid(db, a, ID, 'UTR123456') },
   { name: 'payouts.record_failed', permission: 'finance', mutates: true, run: (db, a) => recordPayoutFailed(db, a, ID, 'bank rejected') },
   { name: 'reconciliation.list', permission: 'finance', mutates: false, run: (db, a) => listReconciliationItems(db, a) },

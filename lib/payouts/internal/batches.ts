@@ -34,8 +34,8 @@ export function getPayoutConfig(): PayoutTaxConfig {
   };
 }
 
-const audit = (tx: DbOrTx, actor: string | null, action: string, entityId: string, after: unknown) =>
-  writeAudit(tx, { actorUserId: actor, action, entityType: 'payout_batch', entityId, after });
+const audit = (tx: DbOrTx, actor: string | null, action: string, entityId: string, after: unknown, ip?: string | null) =>
+  writeAudit(tx, { actorUserId: actor, action, entityType: 'payout_batch', entityId, after, ip });
 
 export type ComputeResult = { batch: PayoutBatch; created: boolean; lines: number; skipped: { sellerOrgId: string; reason: string }[] };
 
@@ -46,7 +46,7 @@ export type ComputeResult = { batch: PayoutBatch; created: boolean; lines: numbe
  * forward, including negative balances from clawbacks (F2). Re-running for the same period returns the batch.
  * `admin` null = the payouts cron.
  */
-export async function computePayoutBatch(db: DbOrTx, admin: AdminContext | null, period: string): Promise<ComputeResult> {
+export async function computePayoutBatch(db: DbOrTx, admin: AdminContext | null, period: string, ip?: string | null): Promise<ComputeResult> {
   if (admin) requirePermission(admin, 'finance');
   const cutoffAt = periodCutoff(period);
   const cfg = getPayoutConfig();
@@ -101,7 +101,7 @@ export async function computePayoutBatch(db: DbOrTx, admin: AdminContext | null,
       .set({ status: 'computed', updatedAt: new Date() })
       .where(and(eq(payoutBatches.id, batch!.id), eq(payoutBatches.status, 'draft')))
       .returning();
-    await audit(tx, admin?.userId ?? null, 'payout_batch.compute', batch!.id, { period, cutoffAt, lines, skipped });
+    await audit(tx, admin?.userId ?? null, 'payout_batch.compute', batch!.id, { period, cutoffAt, lines, skipped }, ip);
     return { batch: computed!, created: true, lines, skipped };
   });
 }
@@ -112,7 +112,7 @@ function fyStart(fy: string): Date {
 }
 
 /** computed → approved by finance (the AdminContext carries the AAL2 check). */
-export async function approvePayoutBatch(db: DbOrTx, admin: AdminContext, batchId: string): Promise<boolean> {
+export async function approvePayoutBatch(db: DbOrTx, admin: AdminContext, batchId: string, ip?: string | null): Promise<boolean> {
   requirePermission(admin, 'finance');
   return db.transaction(async (tx) => {
     const rows = await tx
@@ -120,7 +120,7 @@ export async function approvePayoutBatch(db: DbOrTx, admin: AdminContext, batchI
       .set({ status: 'approved', approvedBy: admin.userId, approvedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(payoutBatches.id, batchId), eq(payoutBatches.status, 'computed')))
       .returning({ id: payoutBatches.id });
-    if (rows.length) await audit(tx, admin.userId, 'payout_batch.approve', batchId, {});
+    if (rows.length) await audit(tx, admin.userId, 'payout_batch.approve', batchId, {}, ip);
     return rows.length > 0;
   });
 }
@@ -134,6 +134,7 @@ export async function submitPayoutBatch(
   admin: AdminContext,
   batchId: string,
   rail: PayoutRail,
+  ip?: string | null,
 ): Promise<{ submitted: number; held: string[]; railRef: string | null }> {
   requirePermission(admin, 'finance');
   await db.transaction(async (tx) => {
@@ -142,7 +143,7 @@ export async function submitPayoutBatch(
       .set({ status: 'processing', updatedAt: new Date() })
       .where(and(eq(payoutBatches.id, batchId), eq(payoutBatches.status, 'approved')))
       .returning({ id: payoutBatches.id });
-    if (moved.length) await audit(tx, admin.userId, 'payout_batch.submit', batchId, { rail: rail.id });
+    if (moved.length) await audit(tx, admin.userId, 'payout_batch.submit', batchId, { rail: rail.id }, ip);
   });
   const [batch] = await db.select().from(payoutBatches).where(eq(payoutBatches.id, batchId));
   if (batch?.status !== 'processing') throw new PayoutRefusal(`batch is ${batch?.status ?? 'missing'}, not approved`);
@@ -167,15 +168,15 @@ export async function submitPayoutBatch(
       .set({ status: 'processing', railRef, updatedAt: new Date() })
       .where(and(eq(payouts.batchId, batchId), eq(payouts.status, 'pending'), inArray(payouts.id, lines.map((l) => l.payoutId))))
       .returning({ id: payouts.id });
-    for (const m of moved) await auditPayout(tx, admin.userId, m.id, 'pending', 'processing', { railRef });
+    for (const m of moved) await auditPayout(tx, admin.userId, m.id, 'pending', 'processing', { railRef }, ip);
   });
   return { submitted: lines.length, held, railRef };
 }
 
-const auditPayout = (tx: DbOrTx, actor: string, id: string, from: string, to: string, extra: Record<string, unknown> = {}) =>
-  writeAudit(tx, { actorUserId: actor, action: `payout.${to}`, entityType: 'payout', entityId: id, before: { status: from }, after: { status: to, ...extra } });
+const auditPayout = (tx: DbOrTx, actor: string, id: string, from: string, to: string, extra: Record<string, unknown> = {}, ip?: string | null) =>
+  writeAudit(tx, { actorUserId: actor, action: `payout.${to}`, entityType: 'payout', entityId: id, before: { status: from }, after: { status: to, ...extra }, ip });
 
-async function completeBatchIfSettled(tx: DbOrTx, batchId: string, actor: string): Promise<void> {
+async function completeBatchIfSettled(tx: DbOrTx, batchId: string, actor: string, ip?: string | null): Promise<void> {
   const [open] = await tx.select({ id: payouts.id }).from(payouts).where(and(eq(payouts.batchId, batchId), inArray(payouts.status, ['pending', 'processing']))).limit(1);
   if (open) return;
   const done = await tx
@@ -183,7 +184,7 @@ async function completeBatchIfSettled(tx: DbOrTx, batchId: string, actor: string
     .set({ status: 'completed', updatedAt: new Date() })
     .where(and(eq(payoutBatches.id, batchId), eq(payoutBatches.status, 'processing')))
     .returning({ id: payoutBatches.id });
-  if (done.length) await audit(tx, actor, 'payout_batch.complete', batchId, {});
+  if (done.length) await audit(tx, actor, 'payout_batch.complete', batchId, {}, ip);
 }
 
 export type RecordResult = { ok: true } | { ok: false; reason: 'not_found' | 'not_processing' };
@@ -193,7 +194,7 @@ export type RecordResult = { ok: true } | { ok: false; reason: 'not_found' | 'no
  * transaction (one debit per payout, enforced by a unique index). The seller is emailed; the statement PDF is
  * rendered after commit and re-renderable.
  */
-export async function recordPayoutPaid(db: DbOrTx, admin: AdminContext, payoutId: string, utr: string, store?: ObjectStore): Promise<RecordResult> {
+export async function recordPayoutPaid(db: DbOrTx, admin: AdminContext, payoutId: string, utr: string, store?: ObjectStore, ip?: string | null): Promise<RecordResult> {
   requirePermission(admin, 'finance');
   const cleanUtr = utr.trim().toUpperCase();
   if (!/^[A-Z0-9]{6,30}$/.test(cleanUtr)) throw new Error('invalid UTR');
@@ -209,12 +210,12 @@ export async function recordPayoutPaid(db: DbOrTx, admin: AdminContext, payoutId
     }
     const [batch] = await tx.select().from(payoutBatches).where(eq(payoutBatches.id, p.batchId));
     await debitPayout(tx, { payoutId: p.id, sellerOrgId: p.sellerOrgId, amountPaise: p.royaltyBasePaise, cutoffAt: batch!.cutoffAt, createdBy: admin.userId });
-    await auditPayout(tx, admin.userId, p.id, 'processing', 'paid', { utr: cleanUtr, netPaise: p.netPaise });
+    await auditPayout(tx, admin.userId, p.id, 'processing', 'paid', { utr: cleanUtr, netPaise: p.netPaise }, ip);
     const standing = await getSellerStanding(tx, p.sellerOrgId);
     if (standing?.opsContactEmail) {
       await enqueueEmail(tx, { kind: 'payout.paid', to: standing.opsContactEmail, template: 'payout_paid', payload: { period: batch!.period, netPaise: p.netPaise, utr: cleanUtr } });
     }
-    await completeBatchIfSettled(tx, p.batchId, admin.userId);
+    await completeBatchIfSettled(tx, p.batchId, admin.userId, ip);
     return { ok: true } as const;
   });
   if (res.ok && store) await storePayoutStatement(db, payoutId, store);
@@ -222,7 +223,7 @@ export async function recordPayoutPaid(db: DbOrTx, admin: AdminContext, payoutId
 }
 
 /** pending | processing → failed. Nothing is written to the ledger, so the balance carries into the next run (PLAN §5.6). */
-export async function recordPayoutFailed(db: DbOrTx, admin: AdminContext, payoutId: string, reason: string): Promise<RecordResult> {
+export async function recordPayoutFailed(db: DbOrTx, admin: AdminContext, payoutId: string, reason: string, ip?: string | null): Promise<RecordResult> {
   requirePermission(admin, 'finance');
   return db.transaction(async (tx) => {
     const [cur] = await tx.select({ status: payouts.status }).from(payouts).where(eq(payouts.id, payoutId)).for('update');
@@ -234,8 +235,8 @@ export async function recordPayoutFailed(db: DbOrTx, admin: AdminContext, payout
       .where(and(eq(payouts.id, payoutId), inArray(payouts.status, ['pending', 'processing'])))
       .returning();
     if (!p) return { ok: false, reason: 'not_processing' } as const;
-    await auditPayout(tx, admin.userId, p.id, cur.status, 'failed', { reason });
-    await completeBatchIfSettled(tx, p.batchId, admin.userId);
+    await auditPayout(tx, admin.userId, p.id, cur.status, 'failed', { reason }, ip);
+    await completeBatchIfSettled(tx, p.batchId, admin.userId, ip);
     return { ok: true } as const;
   });
 }

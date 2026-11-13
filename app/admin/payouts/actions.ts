@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { productionDeps } from '@/lib/orders/server';
-import { approvePayoutBatch, BankFileRail, computePayoutBatch, PayoutRefusal, payoutBankFileUrl, recordPayoutFailed, recordPayoutPaid, submitPayoutBatch } from '@/lib/payouts/server';
+import { approvePayoutBatch, BankFileRail, computePayoutBatch, PayoutRefusal, payoutBankFileUrl, payoutStatementUrl, recordPayoutFailed, recordPayoutPaid, submitPayoutBatch } from '@/lib/payouts/server';
 import { getDb } from '@/lib/platform/db';
 import { clientIp } from '@/lib/platform/request';
 import { requireAdminArea } from '../guard';
@@ -19,7 +19,7 @@ export async function computeBatchAction(form: FormData) {
   if (!input.success) list({ error: 'bad_period' });
   let created;
   try {
-    created = await computePayoutBatch(getDb(), admin, input.data.period);
+    created = await computePayoutBatch(getDb(), admin, input.data.period, clientIp(await headers()));
   } catch (e) {
     // Only the period-order refusals are the admin's to fix; anything else (a database error) surfaces as one.
     if (e instanceof PayoutRefusal) list({ error: 'compute_refused' });
@@ -30,7 +30,7 @@ export async function computeBatchAction(form: FormData) {
 
 export async function approveBatchAction(batchId: string) {
   const admin = await requireAdminArea('finance', `/admin/payouts/${batchId}`);
-  const ok = await approvePayoutBatch(getDb(), admin, id.parse(batchId));
+  const ok = await approvePayoutBatch(getDb(), admin, id.parse(batchId), clientIp(await headers()));
   batch(batchId, ok ? { done: 'approved' } : { error: 'not_computed' });
 }
 
@@ -38,7 +38,7 @@ export async function submitBatchAction(batchId: string) {
   const admin = await requireAdminArea('finance', `/admin/payouts/${batchId}`);
   let r;
   try {
-    r = await submitPayoutBatch(getDb(), admin, id.parse(batchId), new BankFileRail(productionDeps().store));
+    r = await submitPayoutBatch(getDb(), admin, id.parse(batchId), new BankFileRail(productionDeps().store), clientIp(await headers()));
   } catch (e) {
     // Only "not approved" is a refusal; a rail or storage failure after the batch moved to processing is a fault, and a rerun resumes it.
     if (e instanceof PayoutRefusal) batch(batchId, { error: 'not_approved' });
@@ -55,11 +55,19 @@ export async function downloadBankFileAction(batchId: string) {
   redirect(url);
 }
 
+/** Hands finance a paid line's statement PDF through a short-lived signed link; each download is audited. */
+export async function downloadStatementAction(batchId: string, payoutId: string) {
+  const admin = await requireAdminArea('finance', `/admin/payouts/${batchId}`);
+  const url = await payoutStatementUrl(getDb(), admin, id.parse(payoutId), clientIp(await headers()));
+  if (!url) batch(batchId, { error: 'no_statement' });
+  redirect(url);
+}
+
 export async function recordPaidAction(batchId: string, payoutId: string, form: FormData) {
   const admin = await requireAdminArea('finance', `/admin/payouts/${batchId}`);
   const input = z.object({ utr: z.string().trim().regex(/^[A-Za-z0-9]{6,30}$/) }).safeParse(Object.fromEntries(form));
   if (!input.success) batch(batchId, { error: 'bad_utr' });
-  const r = await recordPayoutPaid(getDb(), admin, id.parse(payoutId), input.data.utr, productionDeps().store);
+  const r = await recordPayoutPaid(getDb(), admin, id.parse(payoutId), input.data.utr, productionDeps().store, clientIp(await headers()));
   batch(batchId, r.ok ? { done: 'paid' } : { error: 'not_processing' });
 }
 
@@ -67,6 +75,6 @@ export async function recordFailedAction(batchId: string, payoutId: string, form
   const admin = await requireAdminArea('finance', `/admin/payouts/${batchId}`);
   const input = z.object({ reason: z.string().trim().min(1).max(500) }).safeParse(Object.fromEntries(form));
   if (!input.success) batch(batchId, { error: 'no_reason' });
-  const r = await recordPayoutFailed(getDb(), admin, id.parse(payoutId), input.data.reason);
+  const r = await recordPayoutFailed(getDb(), admin, id.parse(payoutId), input.data.reason, clientIp(await headers()));
   batch(batchId, r.ok ? { done: 'failed' } : { error: 'not_processing' });
 }

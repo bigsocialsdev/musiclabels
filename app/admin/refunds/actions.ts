@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requestDisputeRefund } from '@/lib/disputes/server';
 import { executeRefund, productionDeps } from '@/lib/orders/server';
-import { retryRefund } from '@/lib/payments/server';
+import { refundCreditNoteUrl, retryRefund } from '@/lib/payments/server';
 import { getDb } from '@/lib/platform/db';
 import { clientIp } from '@/lib/platform/request';
 import { kick } from '@/lib/platform/tasks';
@@ -30,4 +30,12 @@ export async function retryRefundAction(refundId: string) {
   if (!r.ok) back({ error: 'refund_settled' });
   send(refundId);
   back({ done: 'retry' });
+}
+
+/** Hands finance the credit note PDF through a short-lived signed link; each download is audited. */
+export async function downloadCreditNoteAction(refundId: string) {
+  const admin = await requireAdminArea('finance', '/admin/refunds');
+  const url = await refundCreditNoteUrl(getDb(), admin, id.parse(refundId), clientIp(await headers()));
+  if (!url) back({ error: 'no_credit_note' });
+  redirect(url);
 }

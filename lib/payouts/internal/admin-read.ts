@@ -1,4 +1,4 @@
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { organizations, payoutBatches, payouts } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
 import { requirePermission, type AdminContext } from '@/lib/identity';
@@ -49,4 +49,18 @@ export async function payoutBankFileUrl(db: DbOrTx, admin: AdminContext, batchId
   const url = await createSignedDownloadUrl(BUCKETS.documents, batch.key, 120, `payout-bank-file-${batch.period}.csv`);
   await writeAudit(db, { actorUserId: admin.userId, action: 'payout_batch.download_bank_file', entityType: 'payout_batch', entityId: batchId, ip });
   return url; // audited only once a link exists
+}
+
+/** A short-lived attachment link to a paid payout's statement PDF (a seller's tax figures), audited. Null until it has been rendered; the daily cron renders missing ones. */
+export async function payoutStatementUrl(db: DbOrTx, admin: AdminContext, payoutId: string, ip?: string | null): Promise<string | null> {
+  requirePermission(admin, 'finance');
+  const [row] = await db
+    .select({ key: payouts.statementPdfKey, period: payoutBatches.period })
+    .from(payouts)
+    .innerJoin(payoutBatches, eq(payoutBatches.id, payouts.batchId))
+    .where(and(eq(payouts.id, payoutId), eq(payouts.status, 'paid')));
+  if (!row?.key) return null;
+  const url = await createSignedDownloadUrl(BUCKETS.pdfs, row.key, 120, `payout-statement-${row.period}.pdf`);
+  await writeAudit(db, { actorUserId: admin.userId, action: 'payout.download_statement', entityType: 'payout', entityId: payoutId, ip });
+  return url;
 }

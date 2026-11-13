@@ -12,7 +12,7 @@ import { formatInr } from '@/lib/invoicing';
 import { getPayoutBatchDetail } from '@/lib/payouts/server';
 import { getDb } from '@/lib/platform/db';
 import { requireAdminArea } from '../../guard';
-import { approveBatchAction, downloadBankFileAction, recordFailedAction, recordPaidAction, submitBatchAction } from '../actions';
+import { approveBatchAction, downloadBankFileAction, downloadStatementAction, recordFailedAction, recordPaidAction, submitBatchAction } from '../actions';
 import { BATCH_STATUS, LINE_STATUS } from '../labels';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +30,7 @@ const ERRORS: Record<string, string> = {
   not_computed: 'That batch is no longer waiting for approval.',
   not_approved: 'Only an approved batch can be submitted.',
   no_file: 'No bank file exists yet: submit the batch first.',
+  no_statement: 'The statement PDF is not ready yet. It is rendered by the daily job after the payment is recorded.',
   bad_utr: 'A UTR is 6 to 30 letters and digits.',
   no_reason: 'Say why the payment failed.',
   not_processing: 'That line is no longer with the bank.',
@@ -128,6 +129,11 @@ export default async function PayoutBatchPage({ params, searchParams }: { params
                     <form action={recordPaidAction.bind(null, batch.id, l.id)} className="flex items-center gap-2">
                       <input name="utr" required minLength={6} maxLength={30} placeholder="Bank UTR" aria-label={`UTR for ${l.seller}`} className="h-9 w-40 rounded-md border border-input bg-card px-3 font-mono text-sm outline-none focus-visible:border-ring" />
                       <button className={docActionClass}>Record paid</button>
+                    </form>
+                  )}
+                  {l.status === 'paid' && (
+                    <form action={downloadStatementAction.bind(null, batch.id, l.id)}>
+                      <button className={docActionClass}>Statement PDF</button>
                     </form>
                   )}
                   {(l.status === 'pending' || l.status === 'processing') && (

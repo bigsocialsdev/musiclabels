@@ -15,6 +15,6 @@ export {
   type PayoutBatch,
   type RecordResult,
 } from './internal/batches';
-export { listPayoutBatches, getPayoutBatchDetail, payoutBankFileUrl } from './internal/admin-read';
+export { listPayoutBatches, getPayoutBatchDetail, payoutBankFileUrl, payoutStatementUrl } from './internal/admin-read';
 export { BankFileRail, bankFileCsv, csvCell } from './internal/bank-file';
 export { listSellerPayouts, sellerStatementUrl, type SellerPayoutRow } from './internal/seller-read';

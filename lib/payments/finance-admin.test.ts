@@ -2,11 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { auditLog, payoutBatches, reconciliationItems } from '@/db/schema';
 import { executeRefund, requestRefund } from '@/lib/orders/server';
-import { getPayoutBatchDetail, payoutBankFileUrl } from '@/lib/payouts/server';
+import { approvePayoutBatch, getPayoutBatchDetail, payoutBankFileUrl, payoutStatementUrl } from '@/lib/payouts/server';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { adminCtx, sale, setupCommerce } from '@/tests/commerce';
 import { FakeGateway, MemoryStore } from '@/tests/fakes';
-import { listReconciliationItems, listRefunds, resolveReconciliationItem, retryRefund } from './server';
+import { listReconciliationItems, listRefunds, refundCreditNoteUrl, resolveReconciliationItem, retryRefund } from './server';
 
 afterAll(closeDb);
 const db = getDb();
@@ -61,6 +61,23 @@ describe('finance reads', () => {
     expect(await payoutBankFileUrl(db, finance, batch!.id)).toBeNull();
     expect(await getPayoutBatchDetail(db, finance, '00000000-0000-7000-8000-000000000000')).toBeNull();
     expect(await db.select().from(auditLog).where(eq(auditLog.entityId, batch!.id))).toEqual([]);
+  });
+});
+
+describe('payout audit rows carry the caller IP', () => {
+  it('approving a batch records the address with the admin', async () => {
+    const finance = await adminCtx(db, ['finance']);
+    const [batch] = await db.insert(payoutBatches).values({ period: '1961-07', cutoffAt: new Date('1961-08-01T00:00:00Z'), status: 'computed' }).returning();
+    expect(await approvePayoutBatch(db, finance, batch!.id, '203.0.113.5')).toBe(true);
+    expect(await db.select().from(auditLog).where(eq(auditLog.entityId, batch!.id))).toMatchObject([{ action: 'payout_batch.approve', actorUserId: finance.userId, ip: '203.0.113.5' }]);
+  });
+
+  it('hands out no credit note or statement that does not exist, and audits nothing for it', async () => {
+    const finance = await adminCtx(db, ['finance']);
+    const none = '00000000-0000-7000-8000-000000000000';
+    expect(await refundCreditNoteUrl(db, finance, none)).toBeNull();
+    expect(await payoutStatementUrl(db, finance, none)).toBeNull();
+    expect(await db.select().from(auditLog).where(eq(auditLog.entityId, none))).toEqual([]);
   });
 });
 

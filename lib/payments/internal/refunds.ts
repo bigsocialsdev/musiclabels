@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
-import { licenses, refunds } from '@/db/schema';
+import { creditNotes, licenses, refunds } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
 import { requirePermission, type AdminContext } from '@/lib/identity';
 import type { DbOrTx } from '@/lib/platform/db';
+import { BUCKETS, createSignedDownloadUrl } from '@/lib/platform/storage';
 
 export type Refund = typeof refunds.$inferSelect;
 export const REFUND_REASONS = ['claim_not_released', 'platform_error', 'invalid_rights', 'unsellable_at_fulfilment', 'admin_goodwill'] as const;
@@ -112,9 +113,10 @@ export async function listRefundsToSweep(db: DbOrTx, limit = 50): Promise<string
 export async function listRefunds(db: DbOrTx, admin: AdminContext, status?: Refund['status']) {
   requirePermission(admin, 'finance');
   return db
-    .select({ refund: refunds, licensePublicId: licenses.publicId, trackTitle: licenses.trackTitle })
+    .select({ refund: refunds, licensePublicId: licenses.publicId, trackTitle: licenses.trackTitle, creditNoteNumber: creditNotes.number, hasCreditNotePdf: sql<boolean>`${creditNotes.pdfKey} is not null` })
     .from(refunds)
     .leftJoin(licenses, eq(licenses.orderId, refunds.orderId))
+    .leftJoin(creditNotes, eq(creditNotes.refundId, refunds.id))
     .where(status ? eq(refunds.status, status) : undefined)
     .orderBy(desc(refunds.createdAt))
     .limit(500);
@@ -132,4 +134,14 @@ export async function retryRefund(db: DbOrTx, admin: AdminContext, refundId: str
     await writeAudit(tx, { actorUserId: admin.userId, action: 'refund.retry', entityType: 'refund', entityId: refundId, before: { status: r.status }, after: { status: r.status }, ip });
     return { ok: true };
   });
+}
+
+/** A short-lived attachment link to the refund's credit note PDF (it carries the buyer's billing details, so each download is audited). Null until the PDF exists. */
+export async function refundCreditNoteUrl(db: DbOrTx, admin: AdminContext, refundId: string, ip?: string | null): Promise<string | null> {
+  requirePermission(admin, 'finance');
+  const [note] = await db.select({ key: creditNotes.pdfKey, number: creditNotes.number }).from(creditNotes).where(eq(creditNotes.refundId, refundId));
+  if (!note?.key) return null;
+  const url = await createSignedDownloadUrl(BUCKETS.pdfs, note.key, 120, `credit-note-${note.number.replaceAll('/', '-')}.pdf`);
+  await writeAudit(db, { actorUserId: admin.userId, action: 'refund.download_credit_note', entityType: 'refund', entityId: refundId, ip });
+  return url;
 }

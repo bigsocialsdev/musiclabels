@@ -14,6 +14,7 @@ export {
   listRefundsToSweep,
   listRefunds,
   retryRefund,
+  refundCreditNoteUrl,
   type Refund,
   type RefundReason,
 } from './internal/refunds';

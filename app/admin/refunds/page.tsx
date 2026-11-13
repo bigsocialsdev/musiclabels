@@ -9,7 +9,7 @@ import { formatInr } from '@/lib/invoicing';
 import { listRefunds } from '@/lib/payments/server';
 import { getDb } from '@/lib/platform/db';
 import { requireAdminArea } from '../guard';
-import { approveDisputeRefundAction, retryRefundAction } from './actions';
+import { approveDisputeRefundAction, downloadCreditNoteAction, retryRefundAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Refunds | MRM Admin', robots: { index: false } };
@@ -24,6 +24,7 @@ const DONE: Record<string, string> = { approved: 'Refund approved. It is being s
 const ERRORS: Record<string, string> = {
   refund_unavailable: 'That dispute can no longer be refunded: it moved on, or its order is already refunded.',
   refund_settled: 'That refund is already with Razorpay or done, so it cannot be sent again.',
+  no_credit_note: 'The credit note PDF is not ready yet. It is rendered shortly after the refund completes.',
 };
 
 /** Refunds (PLAN §9, finance): disputes waiting for approval, then every refund and where it stands. Refunds are full-order only. */
@@ -97,7 +98,7 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
               </tr>
             </thead>
             <tbody>
-              {refunds.map(({ refund: r, licensePublicId, trackTitle }) => {
+              {refunds.map(({ refund: r, licensePublicId, trackTitle, creditNoteNumber, hasCreditNotePdf }) => {
                 const s = STATUS[r.status] ?? { tone: 'muted' as StatusTone, label: r.status };
                 return (
                   <tr key={r.id} className="align-top">
@@ -122,6 +123,18 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
                     </Td>
                     <Td className="whitespace-nowrap text-fg-2">{istDate(r.createdAt)}</Td>
                     <Td>
+                      {creditNoteNumber && (
+                        <div className="grid gap-1">
+                          <span className="font-mono text-[12px] text-fg-2">{creditNoteNumber}</span>
+                          {hasCreditNotePdf ? (
+                            <form action={downloadCreditNoteAction.bind(null, r.id)}>
+                              <button className={docActionClass}>Credit note PDF</button>
+                            </form>
+                          ) : (
+                            <span className="text-[12px] text-muted-foreground">PDF being prepared</span>
+                          )}
+                        </div>
+                      )}
                       {(r.status === 'requested' || r.status === 'failed') && (
                         <form action={retryRefundAction.bind(null, r.id)}>
                           <button className={docActionClass}>Send again</button>

@@ -61,7 +61,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ publicI
         <dd>
           {v.channels.map((c) => (
             <div key={`${c.platform}:${c.handleOrUrl}`}>
-              {c.platform}: {c.handleOrUrl} <span className="text-gray-500">({c.verificationStatus})</span>
+              {c.platform}: {c.handleOrUrl} <span className="text-gray-600">({c.verificationStatus})</span>
             </div>
           ))}
         </dd>

@@ -106,7 +106,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                   {(r.before != null || r.after != null) && (
                     <details className="text-[13px]">
                       <summary className="cursor-pointer font-semibold text-muted-foreground hover:text-foreground">Before and after</summary>
-                      <pre className="mt-2 max-w-md overflow-x-auto text-[12px] text-muted-foreground">{JSON.stringify({ before: r.before, after: r.after }, null, 1)}</pre>
+                      <pre tabIndex={0} className="mt-2 max-w-md overflow-x-auto text-[12px] text-muted-foreground">{JSON.stringify({ before: r.before, after: r.after }, null, 1)}</pre>
                     </details>
                   )}
                 </Td>

@@ -58,3 +58,13 @@ export async function listOrgOwnerEmails(db: DbOrTx, orgId: string): Promise<str
     .where(and(eq(memberships.orgId, orgId), eq(memberships.role, 'owner')));
   return rows.flatMap((r) => (r.email ? [r.email] : []));
 }
+
+/** The seller orgs a user belongs to. */
+export async function listSellerOrgs(db: DbOrTx, userId: string) {
+  return db
+    .select({ id: organizations.id, legalName: organizations.legalName, displayName: organizations.displayName, role: memberships.role })
+    .from(memberships)
+    .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+    .where(and(eq(memberships.userId, userId), eq(organizations.kind, 'seller')))
+    .orderBy(organizations.id); // uuidv7: oldest first, so callers that take the first org get a stable one
+}

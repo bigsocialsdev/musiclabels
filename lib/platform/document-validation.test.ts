@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_DOCUMENT_BYTES, sniffMime, validateRightsDocument } from './internal/document-validation';
+import { MAX_DOCUMENT_BYTES, sniffMime, validateRightsDocument } from './document-validation';
 
 const pad = (head: number[] | string, total = 200) => {
   const h = typeof head === 'string' ? Buffer.from(head, 'latin1') : Buffer.from(head);

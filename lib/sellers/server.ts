@@ -1,4 +1,5 @@
 import 'server-only';
+export * from './index';
 export { getSellerStanding, type SellerStanding } from './internal/standing';
 export {
   setPayoutAccount,
@@ -10,4 +11,20 @@ export {
   type PayoutAccountInput,
   type PayoutAccountView,
 } from './internal/payout-accounts';
-// Onboarding UI (profile, KYC, payout account form) arrives with S4-M7.
+export {
+  createSellerAccount,
+  updateSellerProfile,
+  setSellerPan,
+  requestSellerDocumentUpload,
+  confirmSellerDocument,
+  listSellerDocuments,
+  acceptSellerTerms,
+  getOnboardingStatus,
+  getSellerProfile,
+  setKycStatus,
+  sellerDocumentDownloadUrl,
+  OnboardingError,
+  SELLER_TERMS,
+  type OnboardingStatus,
+  type SellerTerm,
+} from './internal/onboarding';

@@ -16,5 +16,5 @@ test('public pages are accessible', async ({ page }) => {
     enquiry: `/enquiry/${track!.slug}`,
     verify: `/verify/${license!.public_id}`,
   };
-  for (const [name, url] of Object.entries(pages)) await expectAccessible(page, name, url);
+  for (const [name, url] of Object.entries(pages)) await expectAccessible(page, url, name);
 });

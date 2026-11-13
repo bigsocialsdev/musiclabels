@@ -4,7 +4,7 @@ import { expect, type Page } from '@playwright/test';
 // WCAG 2.1 AA (PLAN S4-M11): no serious or critical violation, and no sideways scroll at the viewport in use.
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
-export async function expectAccessible(page: Page, name: string, url: string) {
+export async function expectAccessible(page: Page, url: string, name = url) {
   const res = await page.goto(url);
   expect(res?.status(), `${name} answered ${res?.status()}`).toBeLessThan(400);
   expect(new URL(page.url()).pathname, `${name} was redirected`).toBe(new URL(url, 'http://x').pathname);

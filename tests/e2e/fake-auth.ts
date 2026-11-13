@@ -16,7 +16,10 @@ export function startFakeAuth(): Promise<Server> {
   const server = createServer((req, res) => {
     const token = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
     const payload = token.split('.')[1];
-    const claims = payload ? JSON.parse(Buffer.from(payload, 'base64url').toString()) : null;
+    let claims: { sub?: string; email?: string } | null = null;
+    try {
+      claims = payload ? JSON.parse(Buffer.from(payload, 'base64url').toString()) : null;
+    } catch {} // not a token this server made: answer 401
     if (req.url?.startsWith('/auth/v1/user') && claims) {
       const at = new Date(0).toISOString();
       res.setHeader('content-type', 'application/json');

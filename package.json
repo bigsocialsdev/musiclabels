@@ -17,6 +17,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "seed:dev": "tsx --conditions=react-server --env-file=.env.local scripts/seed-dev.ts",
+    "import:catalog": "tsx --conditions=react-server --env-file=.env.local scripts/import-catalog.ts",
     "supabase:start": "npx supabase start",
     "supabase:stop": "npx supabase stop"
   },

@@ -124,6 +124,11 @@ export async function setTrackAvailability(
   const reason = input.reason.trim();
   if (!reason) throw new CatalogError('A reason is required');
   return db.transaction(async (tx) => {
+    if (input.action === 'reinstate') {
+      // Class C has no release path (PLAN 4.2): such a track is never put back on sale.
+      const [t] = await tx.select({ clearanceClass: tracks.clearanceClass }).from(tracks).where(eq(tracks.id, input.trackId));
+      if (t?.clearanceClass === 'C') return { ok: false, reason: 'invalid', status: 'suspended' } as const;
+    }
     const result = await applyTransition(tx, input.trackId, input.action, admin.userId, { reason });
     if (result.ok) {
       await writeAudit(tx, { actorUserId: admin.userId, action: `track.${input.action}`, entityType: 'track', entityId: input.trackId, before: { status: result.from }, after: { status: result.to, reason }, ip });

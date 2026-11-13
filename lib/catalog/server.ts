@@ -25,6 +25,7 @@ export {
   type ApproveInput,
   type ReviewQueueRow,
 } from './internal/admin';
+export { listAdminTracks, reclassifyTrack, listTaxonomyAdmin, createTaxonomyItem, setTaxonomyActive, type TaxonomyKind } from './internal/admin-catalog';
 export { processVersion, sweepCatalog, moveToReviewIfDone } from './internal/pipeline';
 export { applyTransition, type TransitionResult } from './internal/transition';
 export { getPublishedTrack, getTrackFacts } from './internal/public';

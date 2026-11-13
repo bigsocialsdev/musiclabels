@@ -1,12 +1,27 @@
-import { escalateClearance, listClearanceQueue, resendClearance, resolveClearance } from '@/lib/clearance/server';
+import { listAuditLog } from '@/lib/audit/server';
+import { approveTrack, createTaxonomyItem, listAdminTracks, listTaxonomyAdmin, reclassifyTrack, rejectTrack, rightsDocumentDownloadUrl, setTaxonomyActive, setTrackAvailability } from '@/lib/catalog/server';
+import { adminConfirmChannel, escalateClearance, listClearanceQueue, resendClearance, resolveClearance } from '@/lib/clearance/server';
 import { getDisputeDetail, listComplaints, listRefundEligibleDisputes, listDisputes, recordFirstAction, requestDisputeRefund, resolveComplaint, resolveDispute, setClaimantCataloged, startInvestigation } from '@/lib/disputes/server';
 import { listEnquiries, setEnquiryStatus } from '@/lib/enquiries/server';
+import { listLegalDocuments, publishLegalDocument } from '@/lib/legal/server';
+import { adminRevokeLicense, publishTermsVersion } from '@/lib/licensing/server';
+import { requestRefund } from '@/lib/orders/server';
+import { activatePriceBook, createPriceBook, listPriceBooks } from '@/lib/pricing/server';
+import { recordClaimProbe } from '@/lib/screening/server';
+import { sellerDocumentDownloadUrl, setKycStatus, verifyPayoutAccount } from '@/lib/sellers/server';
 import type { AdminContext, AdminPermission } from '@/lib/identity/server';
 import { listReconciliationItems, listRefunds, refundCreditNoteUrl, resolveReconciliationItem, retryRefund } from '@/lib/payments/server';
 import { approvePayoutBatch, computePayoutBatch, getPayoutBatchDetail, listPayoutBatches, payoutBankFileUrl, payoutStatementUrl, recordPayoutFailed, recordPayoutPaid, submitPayoutBatch } from '@/lib/payouts/server';
 import type { Db } from '@/lib/platform/db';
 
 const ID = '00000000-0000-7000-8000-000000000000'; // a well-formed id nothing owns: past the permission check the call just finds nothing
+
+/** Runs `fn` inside a transaction that is always rolled back: a call that would really write can then run for a superadmin in the permission matrix without touching shared state. */
+const rolledBack = (db: Db, fn: (tx: Db) => Promise<unknown>) =>
+  db.transaction(async (tx) => {
+    await fn(tx as unknown as Db);
+    tx.rollback();
+  });
 
 export type AdminCall = { name: string; permission: AdminPermission | 'any'; mutates: boolean; run: (db: Db, admin: AdminContext) => Promise<unknown> };
 
@@ -47,4 +62,28 @@ export const ADMIN_CALLS: readonly AdminCall[] = [
   { name: 'reconciliation.resolve', permission: 'finance', mutates: true, run: (db, a) => resolveReconciliationItem(db, a, ID, 'refunded the buyer') },
   { name: 'enquiries.list', permission: 'any', mutates: false, run: (db, a) => listEnquiries(db, a) },
   { name: 'enquiries.set_status', permission: 'any', mutates: true, run: (db, a) => setEnquiryStatus(db, a, ID, 'contacted') },
+  { name: 'refunds.request', permission: 'finance', mutates: true, run: (db, a) => requestRefund(db, a, ID, { reason: 'admin_goodwill' }) },
+  { name: 'payouts.verify_account', permission: 'finance', mutates: true, run: (db, a) => verifyPayoutAccount(db, a, ID, true) },
+  { name: 'catalog.list', permission: 'verification', mutates: false, run: (db, a) => listAdminTracks(db, a) },
+  { name: 'catalog.approve', permission: 'verification', mutates: true, run: (db, a) => approveTrack(db, a, { trackId: ID, clearanceClass: 'A', priceLevel: 'L1' }) },
+  { name: 'catalog.reject', permission: 'verification', mutates: true, run: (db, a) => rejectTrack(db, a, { trackId: ID, reason: 'not suitable' }) },
+  { name: 'catalog.availability', permission: 'verification', mutates: true, run: (db, a) => setTrackAvailability(db, a, { trackId: ID, action: 'suspend', reason: 'complaint' }) },
+  { name: 'catalog.reclassify', permission: 'verification', mutates: true, run: (db, a) => reclassifyTrack(db, a, { trackId: ID, to: 'C', reason: 'claim found' }) },
+  { name: 'catalog.rights_document', permission: 'verification', mutates: true, run: (db, a) => rightsDocumentDownloadUrl(db, a, ID) },
+  { name: 'catalog.probe', permission: 'verification', mutates: true, run: (db, a) => recordClaimProbe(db, a, { versionId: ID, platform: 'youtube', claims: [] }) },
+  { name: 'taxonomy.list', permission: 'verification', mutates: false, run: (db, a) => listTaxonomyAdmin(db, a) },
+  { name: 'taxonomy.create', permission: 'verification', mutates: true, run: (db, a) => rolledBack(db, (tx) => createTaxonomyItem(tx, a, { kind: 'genre', name: 'Matrix probe genre' })) },
+  { name: 'taxonomy.set_active', permission: 'verification', mutates: true, run: (db, a) => setTaxonomyActive(db, a, { kind: 'genre', id: ID, active: false }) },
+  { name: 'pricing.list', permission: 'verification', mutates: false, run: (db, a) => listPriceBooks(db, a) },
+  // An empty grid: past the permission check the schema refuses it, so no draft book is written.
+  { name: 'pricing.create', permission: 'verification', mutates: true, run: (db, a) => createPriceBook(db, a, []) },
+  { name: 'pricing.activate', permission: 'verification', mutates: true, run: (db, a) => activatePriceBook(db, a, ID) },
+  { name: 'kyc.set_status', permission: 'verification', mutates: true, run: (db, a) => setKycStatus(db, a, ID, 'pending', 'documents re-requested') },
+  { name: 'kyc.document', permission: 'verification', mutates: true, run: (db, a) => sellerDocumentDownloadUrl(db, a, ID) },
+  { name: 'channels.confirm', permission: 'clearance', mutates: true, run: (db, a) => adminConfirmChannel(db, a, ID) },
+  { name: 'licenses.revoke', permission: 'disputes', mutates: true, run: (db, a) => adminRevokeLicense(db, a, ID, { reason: 'fraud', note: 'chargeback ring' }) },
+  { name: 'legal.list', permission: 'superadmin', mutates: false, run: (db, a) => listLegalDocuments(db, a) },
+  { name: 'legal.publish', permission: 'superadmin', mutates: true, run: (db, a) => rolledBack(db, (tx) => publishLegalDocument(tx, a, { kind: 'tos', bodyMarkdown: 'Matrix probe terms of service text.' })) },
+  { name: 'terms.publish', permission: 'superadmin', mutates: true, run: (db, a) => publishTermsVersion(db, a, { tier: 'creator', termKind: 'perpetual', termMonths: null, videoCap: null, maxChannels: 1, allowedPlatforms: ['youtube'], organicOnly: true, licenseTextDocumentId: ID }) },
+  { name: 'audit.list', permission: 'superadmin', mutates: false, run: (db, a) => listAuditLog(db, a) },
 ];

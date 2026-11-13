@@ -29,6 +29,16 @@ export type Guard<T> = { ok: true; value: T } | { ok: false; reason: GuardFailur
 /** Thrown when an admin lacks the permission for an action. superadmin implies every permission. */
 export class PermissionError extends Error {}
 
+/** A signed-in user acting for one of their organisations (the org id is checked against memberships, not trusted). */
+export type OrgActor = { userId: string; orgId: string };
+
+/** The caller is not a member of the org. Slices' seller-facing read sides throw it. */
+export class OrgAccessError extends Error {
+  constructor() {
+    super('forbidden');
+  }
+}
+
 export function requirePermission(admin: AdminContext, permission: AdminPermission): void {
   if (!admin.permissions.includes('superadmin') && !admin.permissions.includes(permission)) {
     throw new PermissionError(`This action requires the ${permission} permission`);

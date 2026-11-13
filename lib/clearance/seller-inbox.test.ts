@@ -45,6 +45,14 @@ describe('the seller’s clearance inbox', () => {
     expect(await err(listSellerClearance(db, { userId: (await makeUser(db)).userId, orgId: mine.orgId }))).toBeInstanceOf(ClearanceInboxError);
   });
 
+  it('keeps open requests first even when the limit would otherwise cut them off', async () => {
+    const seller = await makeSeller(db);
+    const open = await sentRequest(seller); // oldest
+    const answered = [await sentRequest(seller), await sentRequest(seller)];
+    for (const id of answered) await respondAsSeller(db, actorOf(seller), id, { outcome: 'released' });
+    expect((await listSellerClearance(db, actorOf(seller), { limit: 1 })).map((r) => r.id)).toEqual([open]);
+  });
+
   it('the owner answers: released or declined, recorded once, audited by user, link cleared', async () => {
     const seller = await makeSeller(db);
     const released = await sentRequest(seller);

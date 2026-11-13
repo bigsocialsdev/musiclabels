@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm';
 import { payoutBatches, payouts } from '@/db/schema';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { makeSeller, makeUser } from '@/tests/factories';
-import { PayoutReadError, listSellerPayouts, sellerStatementUrl } from './server';
+import { OrgAccessError } from '@/lib/identity';
+import { listSellerPayouts, sellerStatementUrl } from './server';
 
 // The signed-URL call needs a live Supabase Storage; everything else here is real Postgres.
 vi.mock('@/lib/platform/storage', async (orig) => ({
@@ -47,7 +48,7 @@ describe('what a seller sees of their payouts', () => {
     expect(rows.find((r) => r.id === paid)).toMatchObject({ status: 'paid', utr: 'UTR123', hasStatement: true, royaltyBasePaise: 70_000, netPaise: 70_000 });
     expect(rows.find((r) => r.id === failed)).toMatchObject({ status: 'failed', utr: null, hasStatement: false });
     expect(JSON.stringify(rows)).not.toMatch(/internal\/ref\.csv|bank rejected|statements\//);
-    expect(await err(listSellerPayouts(db, { userId: (await makeUser(db)).userId, orgId: mine.orgId }))).toBeInstanceOf(PayoutReadError);
+    expect(await err(listSellerPayouts(db, { userId: (await makeUser(db)).userId, orgId: mine.orgId }))).toBeInstanceOf(OrgAccessError);
   });
 
   it('gives the statement link only to the org that owns the paid payout', async () => {
@@ -56,9 +57,11 @@ describe('what a seller sees of their payouts', () => {
     const id = await payoutFor(mine.orgId, '1971-01');
     expect(await sellerStatementUrl(db, actorOf(mine), id)).toBe('https://storage.test/pdfs/statements/1971-01/x.pdf?download=payout-statement-1971-01.pdf');
     expect(await sellerStatementUrl(db, actorOf(other), id)).toBeNull(); // someone else's payout looks missing
-    expect(await err(sellerStatementUrl(db, { userId: other.owner.userId, orgId: mine.orgId }, id))).toBeInstanceOf(PayoutReadError);
+    expect(await err(sellerStatementUrl(db, { userId: other.owner.userId, orgId: mine.orgId }, id))).toBeInstanceOf(OrgAccessError);
 
     expect(await sellerStatementUrl(db, actorOf(mine), await payoutFor(mine.orgId, '1971-02', { statementPdfKey: null }))).toBeNull(); // not generated yet
-    expect(await sellerStatementUrl(db, actorOf(mine), await payoutFor(mine.orgId, '1971-03', { status: 'failed', utr: null, paidAt: null }))).toBeNull(); // only paid payouts
+    const failedWithKey = await payoutFor(mine.orgId, '1971-03', { status: 'failed', utr: null, paidAt: null });
+    expect(await sellerStatementUrl(db, actorOf(mine), failedWithKey)).toBeNull(); // only paid payouts
+    expect((await listSellerPayouts(db, actorOf(mine))).find((r) => r.id === failedWithKey)!.hasStatement).toBe(false); // the list never offers a link that would 404
   });
 });

@@ -5,9 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { ZodError } from 'zod';
 import { CatalogError } from '@/lib/catalog/server';
 import { ClearanceInboxError } from '@/lib/clearance/server';
-import type { Session } from '@/lib/identity/server';
-import { LedgerReadError } from '@/lib/ledger/server';
-import { PayoutReadError } from '@/lib/payouts/server';
+import { OrgAccessError, type Session } from '@/lib/identity/server';
 import { sealFlash } from '@/lib/platform/flash';
 import { clientIp } from '@/lib/platform/request';
 import { OnboardingError, PayoutAccountError } from '@/lib/sellers/server';
@@ -28,7 +26,7 @@ export function friendly(e: unknown): string | null {
     const field = issue.path.join('.'); // names the field the form should fix
     return field ? `${field}: ${issue.message}` : issue.message;
   }
-  if (e instanceof OnboardingError || e instanceof PayoutAccountError || e instanceof CatalogError || e instanceof ClearanceInboxError || e instanceof LedgerReadError || e instanceof PayoutReadError) return MESSAGES[e.message] ?? e.message;
+  if (e instanceof OnboardingError || e instanceof PayoutAccountError || e instanceof CatalogError || e instanceof ClearanceInboxError || e instanceof OrgAccessError) return MESSAGES[e.message] ?? e.message;
   return null;
 }
 

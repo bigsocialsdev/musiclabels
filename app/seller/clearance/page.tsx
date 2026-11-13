@@ -13,14 +13,14 @@ import { respondClearanceAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-const STATUS_LABELS: Record<SellerClearanceRow['status'], string> = {
-  not_required: 'Not needed',
-  pending: 'Waiting to be sent',
-  sent: 'Waiting for you',
-  overdue: 'Overdue',
-  escalated: 'Escalated to our team',
-  completed: 'Released',
-  failed: 'Declined',
+const STATUS: Record<SellerClearanceRow['status'], { label: string; variant: 'default' | 'outline' | 'destructive' }> = {
+  not_required: { label: 'Not needed', variant: 'outline' },
+  pending: { label: 'Waiting to be sent', variant: 'outline' },
+  sent: { label: 'Waiting for you', variant: 'outline' },
+  overdue: { label: 'Overdue', variant: 'destructive' },
+  escalated: { label: 'Escalated to our team', variant: 'outline' },
+  completed: { label: 'Released', variant: 'default' },
+  failed: { label: 'Declined', variant: 'destructive' },
 };
 
 export default async function SellerClearancePage({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
@@ -42,7 +42,7 @@ export default async function SellerClearancePage({ searchParams }: { searchPara
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center gap-2 text-base">
               {r.trackTitle}
-              <Badge variant={r.status === 'completed' ? 'default' : r.status === 'failed' || r.status === 'overdue' ? 'destructive' : 'outline'}>{STATUS_LABELS[r.status]}</Badge>
+              <Badge variant={STATUS[r.status].variant}>{STATUS[r.status].label}</Badge>
             </CardTitle>
             <CardDescription>
               {r.licenseeName} registered {r.what}.{r.dueAt && r.awaitingSeller && ` Please answer by ${fmtDate(r.dueAt)}${r.dueAt < now ? ' (past due)' : ''}.`}

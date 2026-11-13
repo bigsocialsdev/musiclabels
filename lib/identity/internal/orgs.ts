@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { memberships, organizations, users } from '@/db/schema';
 import type { DbOrTx } from '@/lib/platform/db';
+import { OrgAccessError, type OrgActor } from '../index';
 
 export type NewOrganization = {
   kind: 'seller' | 'buyer';
@@ -47,6 +48,13 @@ export async function getMembershipRole(db: DbOrTx, userId: string, orgId: strin
     .from(memberships)
     .where(and(eq(memberships.userId, userId), eq(memberships.orgId, orgId)));
   return (row?.role as 'owner' | 'member' | undefined) ?? null;
+}
+
+/** Throws `OrgAccessError` unless the actor belongs to their org; returns their role. */
+export async function requireOrgMember(db: DbOrTx, actor: OrgActor): Promise<'owner' | 'member'> {
+  const role = await getMembershipRole(db, actor.userId, actor.orgId);
+  if (!role) throw new OrgAccessError();
+  return role;
 }
 
 /** Owner emails of an org: where notices for the org go. */

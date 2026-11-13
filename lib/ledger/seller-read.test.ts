@@ -1,9 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { payoutBatches, payouts } from '@/db/schema';
+import { OrgAccessError } from '@/lib/identity';
+import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { setupCommerce, sale } from '@/tests/commerce';
 import { makeSeller, makeUser } from '@/tests/factories';
 import { FakeGateway, MemoryStore } from '@/tests/fakes';
-import { LedgerReadError, getSellerBalances, listSellerLedger } from './server';
+import { getSellerBalances, listSellerLedger } from './server';
 
 afterAll(closeDb);
 const db = getDb();
@@ -25,7 +28,7 @@ describe('what a seller sees of their money', () => {
 
     const rows = await listSellerLedger(db, actorOf(mine));
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ kind: 'sale_royalty', amountPaise: 70_000, trackTitle: 'Test Track', tier: 'creator', taxablePaise: 100_000 });
+    expect(rows[0]).toMatchObject({ kind: 'sale_royalty', amountPaise: 70_000, status: 'on_hold', trackTitle: 'Test Track', tier: 'creator', taxablePaise: 100_000 });
     expect(rows[0]!.availableAt.getTime() - rows[0]!.at.getTime()).toBeGreaterThan(29 * DAY); // 30-day hold
     const json = JSON.stringify(rows);
     expect(json).not.toContain('Buyer Media LLP'); // who bought is not part of the seller's view
@@ -37,15 +40,27 @@ describe('what a seller sees of their money', () => {
   it('refuses someone who is not a member of the org they name', async () => {
     const seller = await makeSeller(db);
     const stranger = await makeUser(db);
-    expect(await err(listSellerLedger(db, { userId: stranger.userId, orgId: seller.orgId }))).toBeInstanceOf(LedgerReadError);
-    expect(await err(getSellerBalances(db, { userId: stranger.userId, orgId: seller.orgId }))).toBeInstanceOf(LedgerReadError);
+    expect(await err(listSellerLedger(db, { userId: stranger.userId, orgId: seller.orgId }))).toBeInstanceOf(OrgAccessError);
+    expect(await err(getSellerBalances(db, { userId: stranger.userId, orgId: seller.orgId }))).toBeInstanceOf(OrgAccessError);
   });
 
   it('splits what is on hold from what has matured', async () => {
     const seller = await makeSeller(db);
     await sale(db, gw, store, { sellerOrgId: seller.orgId }); // today: on hold
     await sale(db, gw, store, { sellerOrgId: seller.orgId, paidAt: new Date(Date.now() - 40 * DAY) }); // matured
-    expect(await getSellerBalances(db, actorOf(seller))).toEqual({ availablePaise: 70_000, heldPaise: 70_000 });
-    expect(await getSellerBalances(db, actorOf(await makeSeller(db)))).toEqual({ availablePaise: 0, heldPaise: 0 });
+    expect(await getSellerBalances(db, actorOf(seller))).toEqual({ availablePaise: 70_000, inPayoutPaise: 0, heldPaise: 70_000 });
+    expect(await getSellerBalances(db, actorOf(await makeSeller(db)))).toEqual({ availablePaise: 0, inPayoutPaise: 0, heldPaise: 0 });
+    expect((await listSellerLedger(db, actorOf(seller))).map((r) => r.status).sort()).toEqual(['matured', 'on_hold']);
+  });
+
+  it('moves matured money out of "available" while a payout run holds it, and back if the payout fails', async () => {
+    const seller = await makeSeller(db);
+    await sale(db, gw, store, { sellerOrgId: seller.orgId, paidAt: new Date(Date.now() - 40 * DAY) });
+    const [batch] = await db.insert(payoutBatches).values({ period: '1972-01', cutoffAt: new Date('1972-01-28T18:30:00Z'), status: 'completed' }).onConflictDoNothing().returning({ id: payoutBatches.id });
+    const batchId = batch?.id ?? (await db.select({ id: payoutBatches.id }).from(payoutBatches).where(eq(payoutBatches.period, '1972-01')))[0]!.id;
+    const [p] = await db.insert(payouts).values({ batchId, sellerOrgId: seller.orgId, royaltyBasePaise: 70_000, tdsPaise: 0, sellerGstPaise: 0, rcmGstPaise: 0, netPaise: 70_000, rail: 'bank_file', status: 'processing' }).returning({ id: payouts.id });
+    expect(await getSellerBalances(db, actorOf(seller))).toEqual({ availablePaise: 0, inPayoutPaise: 70_000, heldPaise: 0 });
+    await db.update(payouts).set({ status: 'failed' }).where(eq(payouts.id, p!.id)); // failures write no ledger entry (PLAN 5.6)
+    expect(await getSellerBalances(db, actorOf(seller))).toEqual({ availablePaise: 70_000, inPayoutPaise: 0, heldPaise: 0 });
   });
 });

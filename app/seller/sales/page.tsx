@@ -7,7 +7,7 @@ import { getSellerBalances, listSellerLedger } from '@/lib/ledger/server';
 import { getDb } from '@/lib/platform/db';
 import { fmtDate } from '../format';
 import { requireSellerSession } from '../session';
-import { KIND_LABELS } from './labels';
+import { KIND_LABELS, STATUS_LABELS } from './labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,6 @@ export default async function SellerSalesPage() {
   const db = getDb();
   const actor = { userId: session.userId, orgId };
   const [rows, balances] = await Promise.all([listSellerLedger(db, actor, { limit: 200 }), getSellerBalances(db, actor)]);
-  const now = new Date();
   return (
     <main className="mx-auto max-w-4xl space-y-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -26,12 +25,18 @@ export default async function SellerSalesPage() {
           Download CSV
         </Link>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Ready for the next payout run</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Past the hold, not yet in a payout</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">{formatInr(balances.availablePaise)}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">In a payout being paid</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">{formatInr(balances.inPayoutPaise)}</CardContent>
         </Card>
         <Card>
           <CardHeader>
@@ -41,7 +46,7 @@ export default async function SellerSalesPage() {
         </Card>
       </div>
       <p className="text-sm text-muted-foreground">
-        Royalties are paid once a month to your verified bank account, after the 30-day hold. They cannot be withdrawn earlier. Amounts exclude GST. See <Link href="/seller/payouts" className="underline">payouts</Link> for what has been paid.
+        Royalties are paid once a month to your verified bank account, after the 30-day hold, once your KYC is verified and the total reaches the minimum. They cannot be withdrawn earlier. Amounts exclude GST. See <Link href="/seller/payouts" className="underline">payouts</Link> for what has been paid.
       </p>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No sales yet.</p>
@@ -67,7 +72,7 @@ export default async function SellerSalesPage() {
                   <td className="p-2 text-right">{r.taxablePaise === null ? '—' : formatInr(r.taxablePaise)}</td>
                   <td className="p-2 text-right font-medium">{formatInr(r.amountPaise)}</td>
                   <td className="p-2 whitespace-nowrap text-muted-foreground">
-                    {r.kind === 'payout' ? 'Paid out' : r.availableAt > now ? `On hold until ${fmtDate(r.availableAt)}` : 'Matured'}
+                    {STATUS_LABELS[r.status]}{r.status === 'on_hold' && ` until ${fmtDate(r.availableAt)}`}
                   </td>
                 </tr>
               ))}

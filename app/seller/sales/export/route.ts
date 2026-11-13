@@ -2,11 +2,11 @@ import { listSellerLedger } from '@/lib/ledger/server';
 import { csvCell } from '@/lib/payouts/server';
 import { getDb } from '@/lib/platform/db';
 import { requireSellerSession } from '../../session';
-import { KIND_LABELS } from '../labels';
+import { rupees } from '../../format';
+import { KIND_LABELS, STATUS_LABELS } from '../labels';
 
 export const dynamic = 'force-dynamic';
 
-const inr = (paise: number) => (paise / 100).toFixed(2);
 const day = (d: Date) => d.toISOString().slice(0, 10);
 const BOM = String.fromCharCode(0xfeff);
 
@@ -24,10 +24,10 @@ export async function GET() {
       csvCell(KIND_LABELS[r.kind]),
       csvCell(r.trackTitle ?? ''),
       csvCell(r.tier ?? ''),
-      r.taxablePaise === null ? '' : inr(r.taxablePaise),
-      inr(r.amountPaise),
+      r.taxablePaise === null ? '' : rupees(r.taxablePaise),
+      rupees(r.amountPaise),
       day(r.availableAt),
-      csvCell(r.kind === 'payout' ? 'paid out' : r.availableAt > now ? 'on hold' : 'matured'),
+      csvCell(STATUS_LABELS[r.status].toLowerCase()),
     ].join(','),
   );
   const body = BOM + [header.map(csvCell).join(','), ...lines].join('\r\n') + '\r\n'; // BOM so Excel reads UTF-8 titles

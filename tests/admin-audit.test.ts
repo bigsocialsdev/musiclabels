@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { TransactionRollbackError, eq, sql } from 'drizzle-orm';
-import { auditLog, clearanceRequests, licensedChannels, payoutBatches, payouts, reconciliationItems, rightsDocuments, screenings, sellerDocuments } from '@/db/schema';
+import { acceptances, auditLog, clearanceRequests, licensedChannels, payoutBatches, payouts, reconciliationItems, rightsDocuments, screenings, sellerDocuments } from '@/db/schema';
 import { createPriceBook, activatePriceBook } from '@/lib/pricing/server';
 import { adminRevokeLicense, publishTermsVersion } from '@/lib/licensing/server';
 import { getCurrentDocument, publishLegalDocument } from '@/lib/legal/server';
@@ -302,22 +302,105 @@ async function rolledBack(body: (tx: Db) => Promise<void>) {
     });
 }
 
+/** The audit action each call writes: a row with this action, naming the admin and an entity, must appear. */
+const EXPECTED_ACTION: Record<string, string> = {
+  'clearance.escalate': 'clearance.escalate',
+  'clearance.resolve': 'clearance.complete',
+  'clearance.resend': 'clearance.resend',
+  'channels.confirm': 'channel.verify',
+  'disputes.first_action': 'dispute.first_action',
+  'disputes.resolve': 'dispute.release',
+  'disputes.claimant_cataloged': 'dispute.claimant_cataloged',
+  'disputes.request_refund': 'refund.requested',
+  'complaints.investigate': 'complaint.investigate',
+  'complaints.resolve': 'complaint.rejected',
+  'licenses.revoke': 'license.revoke',
+  'refunds.request': 'refund.requested',
+  'refunds.retry': 'refund.retry',
+  'refunds.credit_note': 'refund.download_credit_note',
+  'payouts.compute': 'payout_batch.compute',
+  'payouts.approve': 'payout_batch.approve',
+  'payouts.submit': 'payout_batch.submit',
+  'payouts.bank_file': 'payout_batch.download_bank_file',
+  'payouts.record_paid': 'payout.paid',
+  'payouts.record_failed': 'payout.failed',
+  'payouts.statement': 'payout.download_statement',
+  'payouts.verify_account': 'payout_account.verify',
+  'reconciliation.resolve': 'reconciliation.resolve',
+  'enquiries.set_status': 'enquiry.status',
+  'catalog.approve': 'track.approve',
+  'catalog.reject': 'track.reject',
+  'catalog.probe': 'claim_probe.record',
+  'catalog.availability': 'track.suspend',
+  'catalog.reclassify': 'track.reclassify',
+  'catalog.rights_document': 'rights_document.download',
+  'taxonomy.create': 'genre.create',
+  'taxonomy.set_active': 'mood.set_active',
+  'pricing.create': 'price_book.create',
+  'pricing.activate': 'price_book.activate',
+  'kyc.set_status': 'seller.kyc_rejected',
+  'kyc.document': 'seller_document.download',
+  'legal.publish': 'legal_document.publish',
+  'terms.publish': 'license_terms.publish',
+};
+
+/** Other branches of a call that write a differently named row (the base scenario covers one branch only). */
+const VARIANTS: { label: string; action: string; scenario: Scenario }[] = [
+  {
+    label: 'catalog.availability reinstate',
+    action: 'track.reinstate',
+    scenario: async (tx, as) => {
+      const t = await makeSellableTrack(tx, { status: 'suspended' });
+      const admin = await as('verification');
+      return { admin, act: () => setTrackAvailability(tx, admin, { trackId: t.trackId, action: 'reinstate', reason: 'claim withdrawn' }) };
+    },
+  },
+  {
+    label: 'catalog.availability delist',
+    action: 'track.delist',
+    scenario: async (tx, as) => {
+      const t = await makeSellableTrack(tx);
+      const admin = await as('verification');
+      return { admin, act: () => setTrackAvailability(tx, admin, { trackId: t.trackId, action: 'delist', reason: 'label request' }) };
+    },
+  },
+  {
+    label: 'catalog.reclassify A to B',
+    action: 'track.reclassify',
+    scenario: async (tx, as) => {
+      const t = await makeSellableTrack(tx);
+      const doc = (await getCurrentDocument(tx, 'release_commitment')) ?? (await publishLegalDocument(tx, await as('superadmin'), { kind: 'release_commitment', bodyMarkdown: 'Release commitment, test version.' }));
+      await tx.insert(acceptances).values({ userId: (await makeSeller(tx)).owner.userId, orgId: t.sellerOrgId, legalDocumentId: doc.id });
+      const admin = await as('verification');
+      return { admin, act: () => reclassifyTrack(tx, admin, { trackId: t.trackId, to: 'B', reason: 'registered with a rights manager' }) };
+    },
+  },
+];
+
 const mutating = ADMIN_CALLS.filter((c) => c.mutates).map((c) => c.name);
 
+/** Runs a scenario and asserts the new audit rows include `action`, written by the admin, with an entity id. */
+async function expectAudit(label: string, action: string, scenario: Scenario) {
+  await rolledBack(async (tx) => {
+    const { admin, act } = await scenario(tx, async (...permissions) => adminCtx(tx, permissions));
+    const before = await tx.select().from(auditLog).where(eq(auditLog.actorUserId, admin.userId));
+    await act();
+    const added = (await tx.select().from(auditLog).where(eq(auditLog.actorUserId, admin.userId))).slice(before.length);
+    const row = added.find((r) => r.action === action);
+    expect(row, `${label}: expected an audit row "${action}" for the admin, got [${added.map((r) => r.action).join(', ')}]`).toBeDefined();
+    expect(row!.entityType).toBeTruthy();
+    expect(row!.entityId).toBeTruthy();
+  });
+}
+
 describe('every admin mutation writes an audit entry (PLAN §12, S4-M10)', () => {
-  it('has a scenario for each mutating admin call and none for a call that no longer exists', () => {
+  it('has a scenario and an expected action for each mutating admin call and none for a call that no longer exists', () => {
     expect(mutating.filter((n) => !(n in SCENARIOS)), 'mutating calls without an audit scenario').toEqual([]);
+    expect(mutating.filter((n) => !(n in EXPECTED_ACTION)), 'mutating calls without an expected audit action').toEqual([]);
     expect(Object.keys(SCENARIOS).filter((n) => !mutating.includes(n)), 'scenarios for calls that are not in ADMIN_CALLS as mutating').toEqual([]);
   });
 
-  it.each(mutating.map((n) => [n] as const))('%s writes an audit_log row naming the admin', async (name) => {
-    const scenario = SCENARIOS[name]!;
-    await rolledBack(async (tx) => {
-      const { admin, act } = await scenario(tx, async (...permissions) => adminCtx(tx, permissions));
-      const before = await tx.select().from(auditLog).where(eq(auditLog.actorUserId, admin.userId));
-      await act();
-      const after = await tx.select().from(auditLog).where(eq(auditLog.actorUserId, admin.userId));
-      expect(after.length, `${name} wrote no audit row for the admin`).toBeGreaterThan(before.length);
-    });
-  });
+  it.each(mutating.map((n) => [n] as const))('%s writes its audit_log row naming the admin', (name) => expectAudit(name, EXPECTED_ACTION[name]!, SCENARIOS[name]!));
+
+  it.each(VARIANTS.map((v) => [v.label, v] as const))('%s writes its audit_log row naming the admin', (label, v) => expectAudit(label, v.action, v.scenario));
 });

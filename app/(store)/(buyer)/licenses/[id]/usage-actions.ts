@@ -10,8 +10,10 @@ import {
   replaceChannelWithClearance,
   startBioCodeVerification,
 } from '@/lib/clearance/server';
+import { refreshStaleCertificates } from '@/lib/certificates/server';
 import { openDispute, disputeInputSchema } from '@/lib/disputes/server';
-import { addVideoUrl, channelInputSchema, resolveBuyerActor, videoInputSchema, videoUrlSchema } from '@/lib/licensing/server';
+import { addVideoUrl, channelInputSchema, getChannelForBuyer, resolveBuyerActor, videoInputSchema, videoUrlSchema } from '@/lib/licensing/server';
+import { productionDeps } from '@/lib/orders/server';
 import { getDb } from '@/lib/platform/db';
 import { kick } from '@/lib/platform/tasks';
 
@@ -30,6 +32,8 @@ async function actorFor(licenseId: string) {
 
 const back = (id: string, query: string, hash = '') => redirect(`/licenses/${id}?${query}${hash}`);
 const sendClearance = (licenseId: string) => kick('dispatchClearance', () => dispatchClearance(getDb(), { licenseId }));
+/** The certificate lists the channels, so a channel change owes a new revision (PLAN §5.3). */
+const refreshCertificate = (licenseId: string) => kick('certificate', () => refreshStaleCertificates(getDb(), productionDeps().store, { licenseId }));
 
 export async function addChannelAction(licenseId: string, form: FormData) {
   const { db, actor, id } = await actorFor(licenseId);
@@ -38,12 +42,13 @@ export async function addChannelAction(licenseId: string, form: FormData) {
   const r = await addChannelWithClearance(db, actor, id, input.data!);
   if (!r.ok) back(id, `error=${r.issues[0]}`, '#channels');
   sendClearance(id);
+  refreshCertificate(id);
   back(id, 'done=channel_added', '#channels');
 }
 
 export async function registerVideoAction(licenseId: string, form: FormData) {
   const { db, actor, id } = await actorFor(licenseId);
-  const input = videoInputSchema.safeParse({ label: text(form, 'label'), urls: text(form, 'urls').split(/[\s,]+/).filter(Boolean) });
+  const input = videoInputSchema.safeParse({ label: text(form, 'label'), urls: text(form, 'urls').split(/\s+/).filter(Boolean) });
   if (!input.success) back(id, 'error=invalid_video', '#videos');
   const r = await registerVideoWithClearance(db, actor, id, input.data!);
   if (!r.ok) back(id, `error=${r.issues[0]}`, '#videos');
@@ -62,18 +67,28 @@ export async function addVideoUrlAction(licenseId: string, videoId: string, form
 
 const channelPage = (id: string, channelId: string, query = '') => `/licenses/${id}/channels/${channelId}${query}`;
 
+/** The channel must be on this license (not just the buyer's org), else the page is a 404. */
+async function channelOnLicense(actor: Awaited<ReturnType<typeof actorFor>>, channelId: string) {
+  const cid = uuid.parse(channelId);
+  const channel = await getChannelForBuyer(actor.db, actor.actor, cid);
+  if (!channel || channel.licenseId !== actor.id) notFound();
+  return cid;
+}
+
 /** Asks for (or re-reads) the channel's open code, then shows it. */
 export async function startVerifyAction(licenseId: string, channelId: string) {
-  const { db, actor, id } = await actorFor(licenseId);
-  const cid = uuid.parse(channelId);
+  const ctx = await actorFor(licenseId);
+  const { db, actor, id } = ctx;
+  const cid = await channelOnLicense(ctx, channelId);
   const r = await startBioCodeVerification(db, actor, cid);
   if (!r.ok && r.reason === 'not_found') notFound();
   redirect(channelPage(id, cid));
 }
 
 export async function checkVerifyAction(licenseId: string, channelId: string) {
-  const { db, actor, id } = await actorFor(licenseId);
-  const cid = uuid.parse(channelId);
+  const ctx = await actorFor(licenseId);
+  const { db, actor, id } = ctx;
+  const cid = await channelOnLicense(ctx, channelId);
   const r = await checkBioCode(db, actor, cid);
   if (!r.ok) notFound();
   redirect(channelPage(id, cid, `?result=${r.value}`));
@@ -88,6 +103,7 @@ export async function replaceChannelAction(licenseId: string, channelId: string,
   const r = await replaceChannelWithClearance(db, actor, id, cid, input.data!);
   if (!r.ok) redirect(channelPage(id, cid, `?error=${r.issues[0]}`));
   sendClearance(id);
+  refreshCertificate(id);
   back(id, 'done=channel_corrected', '#channels');
 }
 

@@ -5,4 +5,7 @@ export const PLATFORM_LABELS: Record<string, string> = { youtube: 'YouTube', ins
 
 /** A due time, to the minute: the 48-hour dispute target needs more than a date. */
 export const istDateTime = (d: Date) =>
-  d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) + ' IST';
+  d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) + ' IST';
+
+/** Looks up a message by a query-string key: only the map's own keys count, so `?error=constructor` finds nothing. */
+export const own = <T>(map: Record<string, T>, key: string | undefined): T | undefined => (key !== undefined && Object.hasOwn(map, key) ? map[key] : undefined);

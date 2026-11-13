@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Notice, Page, PageHeader, selectClass } from "@/app/seller/ui";
 import { requireBuyerSession } from "@/app/buyer-session";
 import { DocRow, docActionClass } from "@/components/store/doc-row";
-import { PLATFORM_LABELS, istDate } from "@/components/store/format";
+import { PLATFORM_LABELS, istDate, own } from "@/components/store/format";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusLabel, type StatusTone } from "@/components/ui/status";
 import { CLEARANCE_NOTICE, TIER_LABELS } from "@/lib/certificates";
@@ -149,12 +149,12 @@ export default async function LicensePage({
           <Notice tone="attention" role="alert">
             {error === "video_cap_reached" && view.caps.videoCap !== null
               ? videoCapMessage(view.caps.videoCap)
-              : (ERRORS[error] ?? "Something went wrong.")}
+              : (own(ERRORS, error) ?? "Something went wrong.")}
           </Notice>
         )}
-        {done && DONE[done] && (
+        {own(DONE, done) && (
           <Notice tone="ok" role="status">
-            {DONE[done]}
+            {own(DONE, done)}
           </Notice>
         )}
 

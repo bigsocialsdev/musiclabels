@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
-import { desc, eq, max } from 'drizzle-orm';
+import { desc, eq, max, sql } from 'drizzle-orm';
 import { certificates } from '@/db/schema';
 import { getOrganization } from '@/lib/identity/server';
 import { getCreditNoteByOrder, getInvoiceByOrder } from '@/lib/invoicing/server';
 import { getLegalDocument } from '@/lib/legal/server';
 import {
+  getLicenseById,
   getLicenseByPublicId,
   getLicenseForBuyer,
   getTermsVersion,
@@ -16,6 +17,7 @@ import {
 import { enqueueOpsAlert } from '@/lib/notifications/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import { getEnv } from '@/lib/platform/env';
+import { errorMessage, log } from '@/lib/platform/log';
 import { uuidv7 } from '@/lib/platform/ids';
 import { consume } from '@/lib/platform/ratelimit';
 import { BUCKETS, createSignedDownloadUrl, type ObjectStore } from '@/lib/platform/storage';
@@ -68,6 +70,46 @@ export async function issueCertificateRevision(db: DbOrTx, license: License, sto
 export async function ensureFirstCertificate(db: DbOrTx, license: License, store: ObjectStore): Promise<void> {
   const [existing] = await db.select({ id: certificates.id }).from(certificates).where(eq(certificates.licenseId, license.id)).limit(1);
   if (!existing) await issueCertificateRevision(db, license, store);
+}
+
+/**
+ * Licenses whose newest certificate is older than their newest channel change (PLAN §5.3, §7: "new revision
+ * when channels change"). The state is the work item: nothing is queued, and a license with no certificate yet
+ * is left to fulfilment.
+ */
+async function staleCertificateIds(db: DbOrTx, opts: { licenseId?: string; limit: number }): Promise<string[]> {
+  const rows = await db.execute<{ id: string }>(sql`
+    SELECT l.id FROM licenses l
+    WHERE (SELECT max(c.generated_at) FROM certificates c WHERE c.license_id = l.id)
+        < (SELECT max(greatest(ch.added_at, coalesce(ch.removed_at, ch.added_at))) FROM licensed_channels ch WHERE ch.license_id = l.id)
+      ${opts.licenseId ? sql`AND l.id = ${opts.licenseId}` : sql``}
+    ORDER BY l.id LIMIT ${opts.limit}`);
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Renders the owed certificate revisions. Each license is claimed (`FOR UPDATE SKIP LOCKED`) and re-checked, so
+ * two runs never render the same revision twice; a failure on one license leaves it stale for the next run.
+ * Returns how many revisions were issued.
+ */
+export async function refreshStaleCertificates(db: DbOrTx, store: ObjectStore, opts: { licenseId?: string; limit?: number } = {}): Promise<number> {
+  let issued = 0;
+  for (const id of await staleCertificateIds(db, { licenseId: opts.licenseId, limit: opts.limit ?? 20 })) {
+    try {
+      const done = await db.transaction(async (tx) => {
+        const [claimed] = await tx.execute<{ id: string }>(sql`SELECT id FROM licenses WHERE id = ${id} FOR UPDATE SKIP LOCKED`);
+        if (!claimed || (await staleCertificateIds(tx, { licenseId: id, limit: 1 })).length === 0) return false;
+        const license = await getLicenseById(tx, id);
+        if (!license) return false;
+        await issueCertificateRevision(tx, license, store);
+        return true;
+      });
+      if (done) issued++;
+    } catch (e) {
+      log.error('certificate refresh failed', { licenseId: id, error: errorMessage(e) });
+    }
+  }
+  return issued;
 }
 
 export type VerifyView = {

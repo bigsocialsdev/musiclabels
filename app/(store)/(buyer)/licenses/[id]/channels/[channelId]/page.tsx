@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Notice, Page, PageHeader, selectClass } from '@/app/seller/ui';
 import { requireBuyerSession } from '@/app/buyer-session';
 import { CopyButton } from '@/components/store/copy-button';
-import { PLATFORM_LABELS } from '@/components/store/format';
+import { PLATFORM_LABELS, own } from '@/components/store/format';
 import { Button } from '@/components/ui/button';
 import { getBioChallenge } from '@/lib/clearance/server';
 import { getLicenseForBuyer, resolveBuyerActor } from '@/lib/licensing/server';
@@ -47,7 +47,7 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
   const { channel, code, autoCheck } = view;
   const platform = PLATFORM_LABELS[channel.platform] ?? channel.platform;
   const verified = channel.verificationStatus === 'verified';
-  const outcome = result ? RESULTS[result] : undefined;
+  const outcome = own(RESULTS, result);
 
   return (
     <Page>
@@ -61,7 +61,7 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
       )}
       {error && (
         <Notice tone="attention" role="alert">
-          {ERRORS[error] ?? 'Something went wrong.'}
+          {own(ERRORS, error) ?? 'Something went wrong.'}
         </Notice>
       )}
 

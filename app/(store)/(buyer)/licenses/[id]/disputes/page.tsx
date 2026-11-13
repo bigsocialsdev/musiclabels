@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Notice, Page, PageHeader, selectClass } from '@/app/seller/ui';
 import { Table, Td, Th } from '@/app/seller/table';
 import { requireBuyerSession } from '@/app/buyer-session';
-import { PLATFORM_LABELS, istDateTime } from '@/components/store/format';
+import { PLATFORM_LABELS, istDateTime, own } from '@/components/store/format';
 import { Button } from '@/components/ui/button';
 import { StatusLabel, type StatusTone } from '@/components/ui/status';
 import { DISPUTE_TYPES, getBuyerDisputeEvents, isDisputeOverdue, listBuyerDisputes, type DisputeStatus } from '@/lib/disputes/server';
@@ -73,7 +73,7 @@ export default async function DisputesPage({ params, searchParams }: { params: P
       </PageHeader>
       {error && (
         <Notice tone="attention" role="alert">
-          {ERRORS[error] ?? 'Something went wrong.'}
+          {own(ERRORS, error) ?? 'Something went wrong.'}
         </Notice>
       )}
       {done === 'opened' && (
@@ -169,6 +169,7 @@ export default async function DisputesPage({ params, searchParams }: { params: P
                     <Td>
                       <StatusLabel tone={s.tone}>{s.label}</StatusLabel>
                       {overdue && <div className="mt-1 text-[13px] text-muted-foreground">Past its target date</div>}
+                      {d.resolution && <div className="mt-1 max-w-56 text-[13px] text-muted-foreground">Note from our team: {d.resolution}</div>}
                     </Td>
                     <Td className="whitespace-nowrap text-fg-2">{d.status === 'open' ? istDateTime(d.firstActionDueAt) : '—'}</Td>
                     <Td className="whitespace-nowrap text-fg-2">{!live ? '—' : d.resolutionDueAt ? istDateTime(d.resolutionDueAt) : 'No target'}</Td>

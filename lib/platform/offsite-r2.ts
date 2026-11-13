@@ -13,7 +13,7 @@ export function r2OffsiteStore(env: Pick<Env, 'BACKUP_S3_ENDPOINT' | 'BACKUP_S3_
   const urlFor = (key: string) => `${endpoint.replace(/\/$/, '')}/${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`;
   return {
     async put(key, body, contentType) {
-      const res = await client.fetch(urlFor(key), { method: 'PUT', body: new Uint8Array(body), headers: { 'content-type': contentType ?? 'application/octet-stream' } });
+      const res = await client.fetch(urlFor(key), { method: 'PUT', body: body as unknown as BodyInit, headers: { 'content-type': contentType ?? 'application/octet-stream' } });
       if (!res.ok) throw new Error(`Off-site upload failed (${res.status})`);
       // For a single-part upload the ETag is the MD5 of the stored bytes.
       return { md5: (res.headers.get('etag') ?? '').replaceAll('"', '').toLowerCase() };

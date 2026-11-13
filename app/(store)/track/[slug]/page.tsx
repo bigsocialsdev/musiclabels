@@ -1,14 +1,12 @@
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { TIER_LABELS } from '@/lib/certificates';
 import { suggestTracks, trackCardBySlug } from '@/lib/catalog/server';
 import { previewReceipt } from '@/lib/orders/server';
 import { getEnv } from '@/lib/platform/env';
-import { RateLimited } from '@/components/store/rate-limited';
+import { RateLimited, storefrontLimited } from '@/components/store/rate-limited';
 import { getDb } from '@/lib/platform/db';
-import { allowByIp, LIMITS } from '@/lib/platform/ratelimit';
 import { Discovery } from '../../discovery';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TrackPage({ params }: Props) {
   const { slug } = await params;
   const db = getDb();
-  if (!(await allowByIp('storefront', await headers(), LIMITS.storefront, db))) return <RateLimited />;
+  if (await storefrontLimited(db)) return <RateLimited />;
   const track = await load(slug);
   if (!track) notFound();
   const [similar, receipt] = await Promise.all([suggestTracks(db, track.id, { limit: 8 }), previewReceipt(db, track.id)]);

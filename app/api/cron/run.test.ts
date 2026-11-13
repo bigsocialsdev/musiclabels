@@ -24,6 +24,16 @@ it('returns every part result with 200 and raises no alert when all parts succee
   expect(await cronAlerts()).toBe(before);
 });
 
+it('a different failure of the same cron on the same day still raises its own alert', async () => {
+  const name = `run-test-two-${Date.now()}`;
+  const before = await cronAlerts();
+  const fails = (part: string) => ({ [part]: async () => { throw new Error(part); } });
+  await runCron(authed(), name, fails('first'));
+  await runCron(authed(), name, fails('second'));
+  await runCron(authed(), name, fails('second'));
+  expect(await cronAlerts()).toBe(before + 2);
+});
+
 it('a failing part does not stop the later parts, answers 500, and alerts ops once per cron per day', async () => {
   const name = `run-test-fail-${Date.now()}`;
   const before = await cronAlerts();

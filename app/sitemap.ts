@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
-import { listSellableSlugs } from '@/lib/catalog/server';
 import { headers } from 'next/headers';
+import { listSellableSlugs } from '@/lib/catalog/server';
 import { getEnv } from '@/lib/platform/env';
 import { getDb } from '@/lib/platform/db';
 import { allowByIp, LIMITS } from '@/lib/platform/ratelimit';

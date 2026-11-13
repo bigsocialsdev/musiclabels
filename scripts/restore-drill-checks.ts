@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm';
 import { getLicenseByPublicId } from '@/lib/licensing/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import type { Bucket, ObjectStore } from '@/lib/platform/storage';
-import { BACKED_UP_BUCKETS, md5Hex, offsiteKey, type OffsiteStore } from '@/lib/platform/storage-backup';
+import { countUnsynced, md5Hex, offsiteKey, type OffsiteStore } from '@/lib/platform/storage-backup';
 
 /**
  * Read-only checks for the restore drill (docs/restore-drill.md). Run against a database restored from a Supabase
@@ -62,6 +62,9 @@ export async function checkDatabase(db: DbOrTx, opts: { expectedMigrations: numb
   return checks;
 }
 
+/** The backup manifest, all of it or a random sample. */
+const manifestRows = (db: DbOrTx, sample?: number) => rows(db, sql`SELECT bucket, path, md5 FROM storage_backups ${sample ? sql`ORDER BY random() LIMIT ${sample}` : sql`ORDER BY bucket, path`}`);
+
 export type StorageCheck = { objects: number; bytes: number; missing: string[]; corrupt: string[]; masterMismatch: string[]; notBackedUp: number | null };
 
 /**
@@ -70,7 +73,7 @@ export type StorageCheck = { objects: number; bytes: number; missing: string[]; 
  * Storage that no backup has covered yet, when the Storage table is readable.
  */
 export async function checkStorageRestore(db: DbOrTx, offsite: OffsiteStore, opts: { sample?: number } = {}): Promise<StorageCheck> {
-  const manifest = await rows(db, sql`SELECT bucket, path, md5 FROM storage_backups ${opts.sample ? sql`ORDER BY random() LIMIT ${opts.sample}` : sql`ORDER BY bucket, path`}`);
+  const manifest = await manifestRows(db, opts.sample);
   const out: StorageCheck = { objects: 0, bytes: 0, missing: [], corrupt: [], masterMismatch: [], notBackedUp: null };
   for (const m of manifest) {
     const key = offsiteKey(String(m.bucket), String(m.path));
@@ -91,11 +94,7 @@ export async function checkStorageRestore(db: DbOrTx, offsite: OffsiteStore, opt
     }
   }
   const [reachable] = await rows(db, sql`SELECT to_regclass('storage.objects') IS NOT NULL AS ok`);
-  if (reachable?.ok) {
-    const buckets = sql.join(BACKED_UP_BUCKETS.map((b) => sql`${b}`), sql`, `);
-    const [n] = await rows(db, sql`SELECT count(*)::int AS n FROM storage.objects o LEFT JOIN storage_backups b ON b.bucket = o.bucket_id AND b.path = o.name WHERE o.bucket_id IN (${buckets}) AND o.name NOT LIKE '%.emptyFolderPlaceholder' AND (b.path IS NULL OR o.updated_at > b.source_updated_at)`);
-    out.notBackedUp = Number(n!.n);
-  }
+  if (reachable?.ok) out.notBackedUp = await countUnsynced(db);
   return out;
 }
 
@@ -118,7 +117,7 @@ export type StorageRestore = { restored: number; bytes: number; missing: string[
  * back to confirm its MD5 against the manifest. Idempotent: uploading replaces. This is the Storage half of a real recovery.
  */
 export async function restoreStorage(db: DbOrTx, offsite: OffsiteStore, target: ObjectStore, opts: { sample?: number } = {}): Promise<StorageRestore> {
-  const manifest = await rows(db, sql`SELECT bucket, path, md5 FROM storage_backups ${opts.sample ? sql`ORDER BY random() LIMIT ${opts.sample}` : sql`ORDER BY bucket, path`}`);
+  const manifest = await manifestRows(db, opts.sample);
   const out: StorageRestore = { restored: 0, bytes: 0, missing: [], failed: [] };
   const scratch = await mkdtemp(path.join(tmpdir(), 'restore-drill-'));
   try {

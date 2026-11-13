@@ -29,20 +29,34 @@ export const md5Hex = (body: Buffer) => createHash('md5').update(body).digest('h
 
 const MAX_PER_RUN = 500;
 /** The cron's function limit is 300 s; stop starting new objects well before it. The rest waits for the next run. */
-const DEFAULT_BUDGET_MS = 240_000;
+const DEFAULT_BUDGET_MS = 200_000;
 
 type Pending = { bucket: string; path: string; updatedAt: Date; mime: string | null };
 
-/** Objects with no manifest row yet, or changed since their copy (ordered oldest first, so a backlog drains in order). */
-async function pendingObjects(db: DbOrTx, limit: number): Promise<{ rows: Pending[]; total: number }> {
+/**
+ * Storage objects with no manifest row yet, or changed since their copy (FROM and WHERE, alias `o`). Postgres keeps
+ * microseconds but the manifest holds the JavaScript millisecond value, so the comparison is made at milliseconds:
+ * otherwise an unchanged object would look changed on every run.
+ */
+export const UNSYNCED_OBJECTS = (() => {
   const buckets = sql.join(BACKED_UP_BUCKETS.map((b) => sql`${b}`), sql`, `);
-  const unsynced = sql`FROM storage.objects o
+  return sql`FROM storage.objects o
     LEFT JOIN ${storageBackups} b ON b.bucket = o.bucket_id AND b.path = o.name
     WHERE o.bucket_id IN (${buckets}) AND o.name NOT LIKE '%.emptyFolderPlaceholder'
-      AND (b.path IS NULL OR o.updated_at > b.source_updated_at)`;
+      AND (b.path IS NULL OR date_trunc('milliseconds', o.updated_at) > b.source_updated_at)`;
+})();
+
+/** How many Storage objects have no up-to-date copy. */
+export async function countUnsynced(db: DbOrTx): Promise<number> {
+  const [count] = await db.execute<{ n: number }>(sql`SELECT count(*)::int AS n ${UNSYNCED_OBJECTS}`);
+  return count!.n;
+}
+
+/** The oldest unsynced objects first, so a backlog drains in order. */
+async function pendingObjects(db: DbOrTx, limit: number): Promise<{ rows: Pending[]; total: number }> {
+  const unsynced = UNSYNCED_OBJECTS;
   const rows = await db.execute<Pending>(sql`SELECT o.bucket_id AS bucket, o.name AS path, o.updated_at AS "updatedAt", o.metadata->>'mimetype' AS mime ${unsynced} ORDER BY o.updated_at, o.name LIMIT ${limit}`);
-  const [count] = await db.execute<{ n: number }>(sql`SELECT count(*)::int AS n ${unsynced}`);
-  return { rows: [...rows], total: count!.n };
+  return { rows: [...rows], total: await countUnsynced(db) };
 }
 
 export type BackupRun = { copied: number; bytes: number; failed: number; remaining: number };

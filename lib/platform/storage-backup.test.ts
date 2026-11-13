@@ -5,7 +5,7 @@ import { storageBackups } from '@/db/schema';
 import { closeDb, getDb } from './db';
 import { r2OffsiteStore } from './offsite-r2';
 import { ObjectNotFoundError, type ObjectStore } from './storage';
-import { backupStorage, md5Hex, offsiteKey, type OffsiteStore } from './storage-backup';
+import { backupStorage, countUnsynced, md5Hex, offsiteKey, type OffsiteStore } from './storage-backup';
 
 afterAll(closeDb);
 afterEach(() => vi.unstubAllGlobals());
@@ -75,6 +75,15 @@ describe('backupStorage', () => {
     expect(off.stored.get('masters/a.wav')!.toString()).toBe('two!');
     const [m] = await db.select().from(storageBackups).where(eq(storageBackups.path, 'a.wav'));
     expect(m).toMatchObject({ sizeBytes: 4, md5: md5Hex(Buffer.from('two!')) });
+  });
+
+  it('does not copy an unchanged object again when Storage keeps microseconds that the manifest cannot', async () => {
+    await put('masters', 'micro.wav', 'abc');
+    await db.execute(sql`UPDATE storage.objects SET updated_at = timestamptz '2026-01-02 03:04:05.123456+00' WHERE name = 'micro.wav'`);
+    const off = offsite();
+    expect(await backupStorage(db, { store: source, offsite: off.store })).toMatchObject({ copied: 1, remaining: 0 });
+    expect(await backupStorage(db, { store: source, offsite: off.store })).toMatchObject({ copied: 0, remaining: 0 });
+    expect(await countUnsynced(db)).toBe(0);
   });
 
   it('records nothing for an object whose off-site MD5 differs, still copies the others, and fails the run', async () => {

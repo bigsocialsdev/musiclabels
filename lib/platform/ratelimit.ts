@@ -9,7 +9,7 @@ export type Limit = { capacity: number; refillPerSecond: number };
 export const LIMITS = {
   /** Browse, search and track pages (full-text search and facet counts). A person clicking around stays well under it. */
   storefront: { capacity: 120, refillPerSecond: 2 },
-  /** Sitemap and robots: crawlers read them rarely. */
+  /** The sitemap queries the catalogue; crawlers read it rarely. */
   crawl: { capacity: 20, refillPerSecond: 20 / 60 },
   /** OAuth return and other sign-in hand-offs. */
   authReturn: { capacity: 30, refillPerSecond: 0.5 },
@@ -18,6 +18,9 @@ export const LIMITS = {
   /** Signed upload links per signed-in user: a seller loading a catalogue stays under it. */
   upload: { capacity: 60, refillPerSecond: 1 / 60 },
 } as const satisfies Record<string, Limit>;
+
+/** One allowance of signed upload links per user, shared by every kind of upload. */
+export const allowUpload = (userId: string, db: DbOrTx = getDb()) => consume(`upload:${userId}`, LIMITS.upload, db);
 
 /** Per-client-address throttle for public routes and pages: true when the request may proceed. */
 export function allowByIp(name: string, h: Pick<Headers, 'get'>, limit: Limit, db: DbOrTx = getDb()): Promise<boolean> {

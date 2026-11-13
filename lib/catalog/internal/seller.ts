@@ -6,7 +6,7 @@ import type { DbOrTx } from '@/lib/platform/db';
 import type { DocumentMime } from '@/lib/platform/document-validation';
 import { DOC_EXTENSIONS, validateStoredDocument } from '@/lib/platform/stored-document';
 import { uuidv7 } from '@/lib/platform/ids';
-import { consume, LIMITS } from '@/lib/platform/ratelimit';
+import { allowUpload } from '@/lib/platform/ratelimit';
 import { BUCKETS, createSignedUploadUrl, supabaseObjectStore, type ObjectStore } from '@/lib/platform/storage';
 import { getSellerStanding } from '@/lib/sellers/server';
 import {
@@ -24,7 +24,7 @@ export class CatalogError extends Error {}
 
 /** Signed upload links are throttled per user (PLAN §10), shared with seller onboarding uploads. */
 async function throttleUploads(db: DbOrTx, userId: string) {
-  if (!(await consume(`upload:${userId}`, LIMITS.upload, db))) throw new CatalogError('Too many uploads in a short time. Wait a few minutes and try again.');
+  if (!(await allowUpload(userId, db))) throw new CatalogError('Too many uploads in a short time. Wait a few minutes and try again.');
 }
 
 const AUDIO_EXTENSIONS = ['wav', 'mp3'] as const;

@@ -74,12 +74,15 @@ const videoUrl = z
   .max(2000)
   .transform((u) => u.trim());
 
+/** Links one registered video can carry (cross-posts and cut-downs). */
+export const MAX_VIDEO_URLS = 10;
+
 export const videoInputSchema = z.object({
   label: z.string().trim().min(1).max(200),
   urls: z
     .array(videoUrl)
     .min(1)
-    .max(10)
+    .max(MAX_VIDEO_URLS)
     .transform((us) => [...new Set(us)]),
 });
 export type VideoInput = z.input<typeof videoInputSchema>;

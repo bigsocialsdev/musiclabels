@@ -6,6 +6,7 @@ import { BUCKETS, createSignedDownloadUrl } from '@/lib/platform/storage';
 import { effectiveStatus, normalizePublicId, type LicenseStatus, type Result } from '../index';
 import type { License } from './issue';
 import { isRecordIntact } from './record-hash';
+import { getTermsVersion } from './terms';
 import type { BuyerActor } from './usage';
 
 export type ResolvedLicense = License & { effectiveStatus: LicenseStatus; recordIntact: boolean };
@@ -51,12 +52,15 @@ export async function getLicenseForBuyer(db: DbOrTx, actor: BuyerActor, licenseI
     .from(licenses)
     .where(and(eq(licenses.id, licenseId), eq(licenses.purchaserOrgId, actor.orgId)));
   if (!row) return null;
-  const [channels, videos, [downloads]] = await Promise.all([
+  const [channels, videos, [downloads], terms] = await Promise.all([
     listActiveChannels(db, row.id),
     db.select().from(licensedVideos).where(eq(licensedVideos.licenseId, row.id)).orderBy(asc(licensedVideos.registeredAt)),
     db.select({ n: count() }).from(licenseDownloads).where(eq(licenseDownloads.licenseId, row.id)),
+    getTermsVersion(db, row.termsVersionId),
   ]);
-  return { license: resolve(row, new Date()), channels, videos, downloadsUsed: downloads!.n, downloadsCap: MAX_DOWNLOADS };
+  // The caps the license pinned at purchase (null video cap = unlimited), never the current terms.
+  const caps = { videoCap: terms!.videoCap, maxChannels: terms!.maxChannels, allowedPlatforms: terms!.allowedPlatforms };
+  return { license: resolve(row, new Date()), channels, videos, caps, downloadsUsed: downloads!.n, downloadsCap: MAX_DOWNLOADS };
 }
 
 /** PLAN §13.13: 20 clean-file downloads per license, 15-minute signed URLs. */

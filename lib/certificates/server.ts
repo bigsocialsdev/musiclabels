@@ -4,6 +4,7 @@ export {
   verifyUrl,
   issueCertificateRevision,
   ensureFirstCertificate,
+  refreshStaleCertificates,
   getVerifyView,
   buyerDocumentUrl,
   renderDisputeKitForBuyer,

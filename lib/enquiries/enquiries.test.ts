@@ -1,13 +1,15 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, sql } from 'drizzle-orm';
 import { auditLog, enquiries, outbox } from '@/db/schema';
 import { closeDb, getDb } from '@/lib/platform/db';
-import { adminCtx } from '@/tests/commerce';
+import { adminCtx, setupCommerce } from '@/tests/commerce';
 import { makeBuyer, makeSellableTrack } from '@/tests/factories';
 import { listEnquiries, setEnquiryStatus, submitEnquiry } from './server';
 
 afterAll(closeDb);
 const db = getDb();
+// A track is only sellable (and so only takes an enquiry) while an active price book offers its level.
+beforeAll(() => setupCommerce(db, { L1: 100_000, L2: 200_000, L3: 300_000, L4: 400_000, L5: 5_000_000 }));
 const rndIp = () => `192.0.2.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
 const submit = (raw: Parameters<typeof submitEnquiry>[1], extra: { ip?: string | null; orgId?: string | null } = {}) => submitEnquiry(db, raw, { ip: rndIp(), ...extra });
 

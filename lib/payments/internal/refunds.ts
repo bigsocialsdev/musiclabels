@@ -1,6 +1,7 @@
-import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
-import { refunds } from '@/db/schema';
+import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { licenses, refunds } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
+import { requirePermission, type AdminContext } from '@/lib/identity';
 import type { DbOrTx } from '@/lib/platform/db';
 
 export type Refund = typeof refunds.$inferSelect;
@@ -102,4 +103,16 @@ export async function listRefundsToSweep(db: DbOrTx, limit = 50): Promise<string
     )
     .limit(limit);
   return rows.map((r) => r.id);
+}
+
+/** Refunds for the finance screen, newest first, with the license each one reverses (none for an order that never reached a license). */
+export async function listRefunds(db: DbOrTx, admin: AdminContext, status?: Refund['status']) {
+  requirePermission(admin, 'finance');
+  return db
+    .select({ refund: refunds, licensePublicId: licenses.publicId, trackTitle: licenses.trackTitle })
+    .from(refunds)
+    .leftJoin(licenses, eq(licenses.orderId, refunds.orderId))
+    .where(status ? eq(refunds.status, status) : undefined)
+    .orderBy(desc(refunds.createdAt))
+    .limit(500);
 }

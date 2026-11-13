@@ -383,6 +383,21 @@ Assumptions / flags (flag if wrong):
 - Theme switch is not on the console bar yet; the console is light, as the seller portal is.
 - Not verified: Playwright (needs the Auth stack), a real admin sign-in with TOTP.
 
+### S4-M10b Admin console: refunds, payouts, reconciliation, enquiries, 2026-11-13
+Built on the M10a shell. New areas in `app/admin/areas.ts` (a tab appears only for an admin who holds its permission; `'any'` = any admin):
+- **Refunds** `/admin/refunds` (`finance`): disputes waiting in `refund_eligible` with an "Approve full refund" button (`requestDisputeRefund`, then `executeRefund` after the response through `kick`), and every refund with its status and last error; a failed or never-sent refund has "Send again" (the claim is a compare-and-set, so a double click sends once). Refunds stay full-order only.
+- **Payouts** `/admin/payouts` and `/admin/payouts/[id]` (`finance`): batches with line count and net total; compute a period (idempotent, refuses a period that has not ended or is out of order); per-seller lines (royalty, TDS, GST, RCM, net) to review; approve, submit (bank file), download the bank file (short-lived signed link, **audited** as `payout_batch.download_bank_file` because it carries account numbers), record the bank UTR per line, mark a line failed with a reason.
+- **Reconciliation** `/admin/reconciliation` (`finance`): the daily job's mismatches, open first; closing one needs a note and writes `reconciliation.resolve`. It records what finance did; it moves no money.
+- **Enquiries** `/admin/enquiries` (any admin, PLAN §9): the pipeline filtered by status, with forward-only moves (`enquiry.status` audited). `requireAnyAdminArea` / `requireAnyAdmin`: admin role, at least one permission, AAL2.
+- New slice reads: `listPayoutBatches`, `getPayoutBatchDetail`, `payoutBankFileUrl` (payouts); `listReconciliationItems`, `resolveReconciliationItem`, `listRefunds` (payments); `listRefundEligibleDisputes` (disputes). Each needs `finance` and is in `tests/admin-calls.ts`, so the permission matrix covers it (an `'any'` entry is allowed for every single permission, refused for none). `payouts.compute` runs with a far-future period so the shared test database gains no batch.
+- Enquiries now throw `PermissionError` (was a plain Error with the same message) so the matrix can tell a refusal from a run.
+Tests: `lib/payments/finance-admin.test.ts` (reconciliation list order and one-time resolve with audit, refund list, batch detail, no bank file before submit), `requireAnyAdmin` in `lib/identity/identity.test.ts`. `lib/enquiries/enquiries.test.ts` now sets up its own price book: it used to rely on another test file having activated one, and failed when scheduled alone or earlier. A reconciliation list ordering bug (resolved before open) was caught by the new test and fixed.
+Assumptions / flags (flag if wrong):
+- **Catalog admin (suspend, reinstate, delist, reclassify, price book list) is not in this part**; it moves to M10c with legal documents, users and orgs, the audit log and concierge import. The functions exist (`setTrackAvailability`, `createPriceBook`, `activatePriceBook`); only the screens are missing. Say so if it should ship earlier.
+- Recording the UTR and failing a line are two separate forms per line; there is no bulk "paid" import from a bank statement.
+- Queue counts in the tabs are still not built.
+- Not verified: Playwright with a real admin sign-in (needs the Auth stack); the screens were checked in a browser against the test database with the guard stubbed (read-only: no mutation was clicked, because the stub user is not a row in `users`). Real Razorpay refunds and Supabase Storage downloads are untested here.
+
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.
 - docs/PRD-analysis.md written by Phase 1 "PRD analyst" sub-agent (sonnet/medium): covers actors, module breakdown w/ ambiguities, 16 proposed data entities, 6 user flows, integration risk table, non-functional needs, 9 explicit assumptions, 15 open questions.

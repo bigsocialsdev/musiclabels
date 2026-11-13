@@ -114,3 +114,16 @@ export async function requestDisputeRefund(db: DbOrTx, admin: AdminContext, disp
   if (!refund.ok) return { ok: false as const, reason: refund.reason };
   return { ok: true as const, refundId: refund.refundId };
 }
+
+/** Disputes waiting for finance to approve their refund (PLAN §9: Refunds, "refund-eligible items"). */
+export async function listRefundEligibleDisputes(db: DbOrTx, admin: AdminContext) {
+  requirePermission(admin, 'finance');
+  const rows = await db
+    .select({ d: disputes, licensePublicId: licenses.publicId, trackTitle: licenses.trackTitle })
+    .from(disputes)
+    .innerJoin(licenses, eq(licenses.id, disputes.licenseId))
+    .where(eq(disputes.status, 'refund_eligible'))
+    .orderBy(asc(disputes.refundEligibleAt))
+    .limit(200);
+  return rows.map((r) => ({ ...r.d, licensePublicId: r.licensePublicId, trackTitle: r.trackTitle }));
+}

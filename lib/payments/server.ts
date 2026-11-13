@@ -12,9 +12,11 @@ export {
   markRefundProcessed,
   markRefundFailed,
   listRefundsToSweep,
+  listRefunds,
   type Refund,
   type RefundReason,
 } from './internal/refunds';
+export { listReconciliationItems, resolveReconciliationItem, type ReconciliationStatus } from './internal/reconciliation-admin';
 export { recordChargeback, decideChargeback } from './internal/chargebacks';
 export {
   recordPaymentEvent,

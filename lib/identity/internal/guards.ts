@@ -46,3 +46,13 @@ export async function adminPermissionsOf(session: Session | null, db: DbOrTx = g
   const [row] = await db.select({ role: users.platformRole, perms: users.adminPermissions }).from(users).where(eq(users.id, session.userId));
   return row?.role === 'admin' ? ((row.perms ?? []) as AdminPermission[]) : null;
 }
+
+/** Any admin (PLAN §9 "any admin" areas): verified, `platform_role = admin` whatever the permission set, session at AAL2. */
+export async function requireAnyAdmin(session: Session | null, db: DbOrTx = getDb()): Promise<Guard<AdminContext>> {
+  const g = requireVerified(session);
+  if (!g.ok) return g;
+  const perms = await adminPermissionsOf(g.value, db);
+  if (!perms || perms.length === 0) return { ok: false, reason: 'forbidden' }; // an admin with no permission opens nothing
+  if (g.value.aal !== 'aal2') return { ok: false, reason: 'mfa_required' };
+  return { ok: true, value: { userId: g.value.userId, permissions: perms } };
+}

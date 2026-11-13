@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { users } from '@/db/schema';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { makeUser } from '@/tests/factories';
-import { createOrganization, ensureUser, getMembershipRole, requireAal2, requireAdmin, requireVerified } from './server';
+import { createOrganization, ensureUser, getMembershipRole, requireAal2, requireAdmin, requireAnyAdmin, requireVerified } from './server';
 
 afterAll(closeDb);
 const db = getDb();
@@ -101,5 +101,16 @@ describe('organizations', () => {
     await expect(
       createOrganization(db, crypto.randomUUID(), { kind: 'seller', legalName: 'X', displayName: 'X' }),
     ).rejects.toThrow();
+  });
+});
+
+describe('requireAnyAdmin', () => {
+  it('opens for any admin permission at AAL2 and nothing else', async () => {
+    const clearance = await makeUser(db, { admin: ['clearance'], aal: 'aal2' });
+    expect(await requireAnyAdmin(clearance)).toMatchObject({ ok: true, value: { userId: clearance.userId, permissions: ['clearance'] } });
+    expect(await requireAnyAdmin({ ...clearance, aal: 'aal1' })).toEqual({ ok: false, reason: 'mfa_required' });
+    expect(await requireAnyAdmin(await makeUser(db, { aal: 'aal2' }))).toEqual({ ok: false, reason: 'forbidden' });
+    expect(await requireAnyAdmin(await makeUser(db, { admin: [], aal: 'aal2' }))).toEqual({ ok: false, reason: 'forbidden' });
+    expect(await requireAnyAdmin(null)).toEqual({ ok: false, reason: 'unauthenticated' });
   });
 });

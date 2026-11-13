@@ -20,7 +20,7 @@ describe('admin permission matrix (PLAN §9)', () => {
     for (const p of ADMIN_PERMISSIONS) {
       if (p === 'superadmin') continue;
       const refused = (await outcome(call, [p])) instanceof PermissionError;
-      expect(refused, `${call.name} with only "${p}"`).toBe(p !== call.permission);
+      expect(refused, `${call.name} with only "${p}"`).toBe(call.permission !== 'any' && p !== call.permission);
     }
     expect(await outcome(call, ['superadmin'])).not.toBeInstanceOf(PermissionError);
   });

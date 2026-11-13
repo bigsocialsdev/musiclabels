@@ -11,6 +11,7 @@ export const AREAS: readonly { href: string; label: string; permission: AreaPerm
   { href: '/admin/refunds', label: 'Refunds', permission: 'finance' },
   { href: '/admin/payouts', label: 'Payouts', permission: 'finance' },
   { href: '/admin/reconciliation', label: 'Reconciliation', permission: 'finance' },
+  { href: '/admin/alerts', label: 'Alerts', permission: 'any' },
   { href: '/admin/enquiries', label: 'Enquiries', permission: 'any' },
   { href: '/admin/catalog', label: 'Catalog', permission: 'verification' },
   { href: '/admin/kyc', label: 'KYC', permission: 'verification' },

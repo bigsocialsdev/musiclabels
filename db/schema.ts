@@ -31,6 +31,23 @@ export const rateLimits = pgTable('rate_limits', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
+/**
+ * platform: what the daily storage-backup cron has copied off-site (PLAN F11). One row per Storage object, replaced
+ * when the object changes; `md5` is what the off-site store confirmed, so a restore can be checked against it.
+ */
+export const storageBackups = pgTable(
+  'storage_backups',
+  {
+    bucket: text('bucket').notNull(),
+    path: text('path').notNull(),
+    sourceUpdatedAt: timestamp('source_updated_at', { withTimezone: true }).notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    md5: text('md5').notNull(),
+    backedUpAt: timestamp('backed_up_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.bucket, t.path] }), check('storage_backups_md5_check', sql`${t.md5} ~ '^[0-9a-f]{32}$'`)],
+).enableRLS();
+
 /** audit: append-only (DB trigger, see migrations). */
 export const auditLog = pgTable('audit_log', {
   id: id(),

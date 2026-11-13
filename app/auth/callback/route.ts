@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { loadSession, requireVerified } from '@/lib/identity/server';
+import { allowByIp, LIMITS } from '@/lib/platform/ratelimit';
 import { createSupabaseServerClient } from '@/lib/platform/supabase';
 import { completeSignIn } from '../post-sign-in';
 
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get('code');
-  if (code) {
+  if (code && (await allowByIp('auth-callback', req.headers, LIMITS.authReturn))) {
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {

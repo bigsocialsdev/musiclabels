@@ -116,6 +116,17 @@ describe('PAN', () => {
   });
 });
 
+describe('upload throttle', () => {
+  it('refuses a new signed upload link once the user has used their allowance, and counts per user', async () => {
+    const s = await makeSeller(db);
+    await db.execute(sql`INSERT INTO rate_limits (key, tokens, updated_at) VALUES (${'upload:' + s.owner.userId}, 0, now())`);
+    expect(await err(requestSellerDocumentUpload(db, s.owner, s.orgId, { kind: 'id_proof', mime: 'application/pdf' }))).toMatchObject({ message: expect.stringContaining('Too many uploads in a short time') });
+    expect(await db.select().from(sellerDocuments).where(eq(sellerDocuments.sellerOrgId, s.orgId))).toHaveLength(0); // no row for a refused link
+    const other = await makeSeller(db);
+    await expect(requestSellerDocumentUpload(db, other.owner, other.orgId, { kind: 'id_proof', mime: 'application/pdf' })).resolves.toBeTruthy();
+  });
+});
+
 describe('KYC documents', () => {
   it('are checked on confirm (valid / rejected), listed without storage keys, and invisible to other orgs', async () => {
     const s = await makeSeller(db);

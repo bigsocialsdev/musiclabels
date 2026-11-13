@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { copyFile, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { acceptances, auditLog, rightsDeclarations, rightsDocuments, screenings, trackEvents, trackVersions, tracks } from '@/db/schema';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { runFfmpeg } from '@/lib/platform/ffmpeg';
@@ -20,6 +20,8 @@ import {
   editTrack,
   processVersion,
   rejectTrack,
+  requestMasterUpload,
+  requestRightsDocumentUpload,
   saveRightsDeclaration,
   setTrackAvailability,
   submitTrack,
@@ -108,6 +110,18 @@ async function inReview(status: 'clean' | 'match' = 'clean') {
   return d;
 }
 const trackRow = async (id: string) => (await db.select().from(tracks).where(eq(tracks.id, id)))[0]!;
+
+describe('upload throttle', () => {
+  it('refuses new signed upload links for audio and documents once the user has used their allowance', async () => {
+    const { owner, orgId } = await makeSeller(db);
+    const actor: SellerActor = { userId: owner.userId, orgId };
+    const trackId = await createTrack(db, actor, trackInput);
+    await db.execute(sql`INSERT INTO rate_limits (key, tokens, updated_at) VALUES (${'upload:' + owner.userId}, 0, now())`);
+    await expect(requestMasterUpload(db, actor, trackId, 'wav')).rejects.toThrow(/Too many uploads in a short time/);
+    await expect(requestRightsDocumentUpload(db, actor, trackId, { docType: 'self_declaration', mime: 'application/pdf' })).rejects.toThrow(/Too many uploads in a short time/);
+    expect(await db.select().from(rightsDocuments).where(eq(rightsDocuments.trackId, trackId))).toHaveLength(0);
+  });
+});
 
 describe('seller side', () => {
   it('creates and edits drafts only for the caller’s own org', async () => {

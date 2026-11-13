@@ -2,7 +2,7 @@ import { afterAll, beforeEach, expect, it } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
 import { outbox } from '@/db/schema';
 import { closeDb, getDb } from '@/lib/platform/db';
-import { enqueueEmail, processOutbox, type EmailSender } from './server';
+import { enqueueEmail, enqueueOpsAlert, listOpsAlerts, processOutbox, type EmailSender } from './server';
 
 afterAll(closeDb);
 
@@ -67,4 +67,19 @@ it('reclaims a row stuck in sending after a crash', async () => {
   const { sender, sent } = fakeSender();
   expect(await processOutbox({}, sender)).toBe(1);
   expect(sent).toHaveLength(1);
+});
+
+it('lists ops alerts newest first with their delivery status, for any admin and nobody else', async () => {
+  const db = getDb();
+  await enqueueOpsAlert(db, 'first_kind', 'First problem', { orderId: 'o1' });
+  await enqueueOpsAlert(db, 'second_kind', 'Second problem', { orderId: 'o2' });
+  await enqueueEmail(db, { kind: 'license.issued', to: 'buyer@example.com', template: 'system_alert', payload: { title: 'not an alert', message: '' } });
+  await db.update(outbox).set({ status: 'failed', lastError: 'provider down' }).where(sql`payload->>'title' = 'Second problem'`);
+  const rows = await listOpsAlerts(db, { userId: '00000000-0000-7000-8000-000000000001', permissions: ['disputes'] });
+  expect(rows.map((r) => [r.kind, r.title, r.emailStatus])).toEqual([
+    ['second_kind', 'Second problem', 'failed'],
+    ['first_kind', 'First problem', 'pending'],
+  ]);
+  expect(rows[0]).toMatchObject({ details: '{"orderId":"o2"}', lastError: 'provider down' });
+  await expect(listOpsAlerts(db, { userId: '00000000-0000-7000-8000-000000000001', permissions: [] })).rejects.toThrow(/Admins only/);
 });

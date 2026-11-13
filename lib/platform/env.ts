@@ -51,6 +51,11 @@ const schema = z.object({
   // Clearance and disputes (PLAN §4.5/§4.6). Defaults apply when unset: 1 business day, 7 days. [Lawyer] confirms the refund window.
   CLEARANCE_TURNAROUND_BUSINESS_DAYS: z.coerce.number().int().min(1).max(10).default(1),
   CLAIM_RELEASE_REFUND_WINDOW_DAYS: z.coerce.number().int().min(1).max(90).default(7),
+  // Off-site Storage backup (PLAN F11, Cloudflare R2: endpoint is https://<account>.r2.cloudflarestorage.com). Checked at use by the storage-backup cron, which fails and alerts until all four are set.
+  BACKUP_S3_ENDPOINT: z.url().optional(),
+  BACKUP_S3_BUCKET: z.string().min(1).optional(),
+  BACKUP_S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+  BACKUP_S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   // YouTube Data API key for bio-code channel checks (PLAN §11). Unset = channels are confirmed by an admin.
   YOUTUBE_API_KEY: z.string().optional(),
 });

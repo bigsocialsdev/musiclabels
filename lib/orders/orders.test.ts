@@ -321,6 +321,21 @@ describe('payment and fulfilment (exit criteria)', () => {
     expect(await db.select().from(reconciliationItems).where(eq(reconciliationItems.gatewayRef, p.id))).toMatchObject([{ kind: 'captured_not_paid' }]);
     await reconcilePayments(db, deps, new Date(now.getTime() - 60_000), new Date(now.getTime() + 60_000)); // idempotent
     expect(await counts(c.orderId)).toEqual(ONE_EACH);
+    // ops hears about it once (PLAN §10), not once per reconciliation run
+    const alertsFor = async (kind: string, ref: string) => (await db.select().from(outbox).where(and(eq(outbox.kind, kind), sql`${outbox.payload}::text LIKE ${'%' + ref + '%'}`))).length;
+    expect(await alertsFor('alert.captured_not_paid', p.id)).toBe(1);
+  });
+
+  it('reconciliation alerts ops once for a captured payment that matches no order and for a paid order the gateway never captured', async () => {
+    const stray = gw.pay('order_never_created_here', { amountPaise: 1_000 });
+    const c = await checkout();
+    const paidAt = new Date(Date.now() - 5 * 60_000);
+    await db.update(orders).set({ status: 'paid', gatewayPaymentId: `pay_ghost_${c.orderId}`, paidAt }).where(eq(orders.id, c.orderId));
+    const now = new Date();
+    for (let i = 0; i < 2; i++) await reconcilePayments(db, deps, new Date(now.getTime() - 3_600_000), new Date(now.getTime() + 60_000));
+    const alertsFor = async (kind: string, ref: string) => (await db.select().from(outbox).where(and(eq(outbox.kind, kind), sql`${outbox.payload}::text LIKE ${'%' + ref + '%'}`))).length;
+    expect(await alertsFor('alert.unknown_payment', stray.id)).toBe(1);
+    expect(await alertsFor('alert.paid_without_capture', c.orderId)).toBe(1);
   });
 });
 

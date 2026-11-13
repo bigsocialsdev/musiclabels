@@ -17,6 +17,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "seed:dev": "tsx --conditions=react-server --env-file=.env.local scripts/seed-dev.ts",
+    "restore:drill": "tsx --conditions=react-server --env-file=.env.local scripts/restore-drill.ts",
     "import:catalog": "tsx --conditions=react-server --env-file=.env.local scripts/import-catalog.ts",
     "supabase:start": "npx supabase start",
     "supabase:stop": "npx supabase stop"
@@ -25,6 +26,7 @@
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
+    "aws4fetch": "1.0.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",

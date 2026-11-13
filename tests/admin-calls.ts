@@ -4,6 +4,7 @@ import { approveTrack, createTaxonomyItem, listAdminTracks, listTaxonomyAdmin, r
 import { adminConfirmChannel, escalateClearance, listClearanceQueue, resendClearance, resolveClearance } from '@/lib/clearance/server';
 import { getDisputeDetail, listComplaints, listRefundEligibleDisputes, listDisputes, recordFirstAction, requestDisputeRefund, resolveComplaint, resolveDispute, setClaimantCataloged, startInvestigation } from '@/lib/disputes/server';
 import { listEnquiries, setEnquiryStatus } from '@/lib/enquiries/server';
+import { listOpsAlerts } from '@/lib/notifications/server';
 import { listLegalDocuments, publishLegalDocument } from '@/lib/legal/server';
 import { adminRevokeLicense, publishTermsVersion } from '@/lib/licensing/server';
 import { requestRefund } from '@/lib/orders/server';
@@ -61,6 +62,7 @@ export const ADMIN_CALLS: readonly AdminCall[] = [
   { name: 'payouts.record_failed', permission: 'finance', mutates: true, run: (db, a) => recordPayoutFailed(db, a, ID, 'bank rejected') },
   { name: 'reconciliation.list', permission: 'finance', mutates: false, run: (db, a) => listReconciliationItems(db, a) },
   { name: 'reconciliation.resolve', permission: 'finance', mutates: true, run: (db, a) => resolveReconciliationItem(db, a, ID, 'refunded the buyer') },
+  { name: 'alerts.list', permission: 'any', mutates: false, run: (db, a) => listOpsAlerts(db, a) },
   { name: 'enquiries.list', permission: 'any', mutates: false, run: (db, a) => listEnquiries(db, a) },
   { name: 'enquiries.set_status', permission: 'any', mutates: true, run: (db, a) => setEnquiryStatus(db, a, ID, 'contacted') },
   { name: 'refunds.request', permission: 'finance', mutates: true, run: (db, a) => requestRefund(db, a, ID, { reason: 'admin_goodwill' }) },

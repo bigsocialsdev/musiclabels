@@ -1,8 +1,28 @@
 import 'server-only';
 import { sql } from 'drizzle-orm';
 import { getDb, type DbOrTx } from './db';
+import { clientIp } from './request';
 
 export type Limit = { capacity: number; refillPerSecond: number };
+
+/** Public limits, one place so the numbers can be tuned together. Each is a burst (capacity) that refills per second. */
+export const LIMITS = {
+  /** Browse, search and track pages (full-text search and facet counts). A person clicking around stays well under it. */
+  storefront: { capacity: 120, refillPerSecond: 2 },
+  /** Sitemap and robots: crawlers read them rarely. */
+  crawl: { capacity: 20, refillPerSecond: 20 / 60 },
+  /** OAuth return and other sign-in hand-offs. */
+  authReturn: { capacity: 30, refillPerSecond: 0.5 },
+  /** Razorpay webhooks per address, checked before the signature. Far above real delivery rates; it caps floods only. */
+  webhook: { capacity: 300, refillPerSecond: 5 },
+  /** Signed upload links per signed-in user: a seller loading a catalogue stays under it. */
+  upload: { capacity: 60, refillPerSecond: 1 / 60 },
+} as const satisfies Record<string, Limit>;
+
+/** Per-client-address throttle for public routes and pages: true when the request may proceed. */
+export function allowByIp(name: string, h: Pick<Headers, 'get'>, limit: Limit, db: DbOrTx = getDb()): Promise<boolean> {
+  return consume(`${name}:${clientIp(h) ?? 'unknown'}`, limit, db);
+}
 
 /**
  * Token bucket in one atomic upsert. Returns true if a token was taken, false if limited.

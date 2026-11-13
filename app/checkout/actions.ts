@@ -2,7 +2,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { createOrganization, safeNext } from '@/lib/identity/server';
+import { createOrganization, OrgSuspendedError, safeNext } from '@/lib/identity/server';
 import { createOrder, fulfilOrder, productionDeps, verifyCheckoutCallback, type CallbackResult, type CheckoutParams } from '@/lib/orders/server';
 import type { Result } from '@/lib/licensing';
 import { getDb } from '@/lib/platform/db';
@@ -21,7 +21,12 @@ export async function createBuyerOrgAction(rawReturnTo: string, formData: FormDa
   const session = await requireBuyerSession(returnTo);
   const input = orgInput.safeParse(Object.fromEntries(formData));
   if (!input.success) redirect(`${returnTo}${returnTo.includes('?') ? '&' : '?'}error=${encodeURIComponent('Enter a name and buyer type')}`);
-  await createOrganization(getDb(), session.userId, { kind: 'buyer', legalName: input.data.legalName, displayName: input.data.legalName, buyerType: input.data.buyerType });
+  try {
+    await createOrganization(getDb(), session.userId, { kind: 'buyer', legalName: input.data.legalName, displayName: input.data.legalName, buyerType: input.data.buyerType });
+  } catch (e) {
+    if (!(e instanceof OrgSuspendedError)) throw e;
+    redirect(`${returnTo}${returnTo.includes('?') ? '&' : '?'}error=${encodeURIComponent('Your organisation is suspended. Contact the platform team.')}`);
+  }
   redirect(returnTo);
 }
 

@@ -1,14 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, desc, eq } from 'drizzle-orm';
-import { auditLog, licenses, sellerProfiles, tracks } from '@/db/schema';
+import { auditLog, licenses, orders, sellerProfiles, tracks } from '@/db/schema';
 import { setupCommerce, adminCtx, readyBuyer, sale } from '@/tests/commerce';
 import { FakeGateway, MemoryStore } from '@/tests/fakes';
 import { makeBuyer, makeSellableTrack, makeSeller, makeTrack, makeUser } from '@/tests/factories';
 import { setTrackAvailability } from '@/lib/catalog/server';
+import { createOrganization, OrgSuspendedError } from '@/lib/identity/server';
 import { getMembershipRole, PermissionError } from '@/lib/identity/server';
 import { listBuyerBilling } from '@/lib/invoicing/server';
 import { listBuyerLicenses } from '@/lib/licensing/server';
-import { createOrder } from '@/lib/orders/server';
+import { createOrder, fulfilOrder } from '@/lib/orders/server';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { reinstateOrg, listKycQueue, searchAccounts, suspendOrg, viewOrgSummary } from './server';
 
@@ -48,6 +49,13 @@ describe('suspending a seller organisation (S4-M10c)', () => {
     expect(audit).toMatchObject({ actorUserId: admin.userId, ip: '10.0.0.1' });
     expect((audit!.after as { pausedTrackIds: string[] }).pausedTrackIds.sort()).toEqual([s.trackId, published2.trackId].sort());
 
+    // each paused track has its own audit row, and a single track cannot be put back on sale while the org is suspended
+    const [trackAudit] = await auditRows('track.suspend', s.trackId);
+    expect(trackAudit).toMatchObject({ actorUserId: admin.userId, ip: '10.0.0.1' });
+    expect(trackAudit!.after).toMatchObject({ status: 'suspended', viaOrg: orgId });
+    expect(await setTrackAvailability(db, admin, { trackId: adminSuspended.trackId, action: 'reinstate', reason: 'claim withdrawn' })).toEqual({ ok: false, reason: 'org_suspended' });
+    expect(await trackStatus(adminSuspended.trackId)).toBe('suspended');
+
     expect(await suspendOrg(db, admin, { orgId, reason: 'again' })).toEqual({ ok: false, reason: 'already_suspended' });
     expect(await auditRows('org.suspend', orgId)).toHaveLength(1);
 
@@ -57,6 +65,7 @@ describe('suspending a seller organisation (S4-M10c)', () => {
     expect((await db.select().from(sellerProfiles).where(eq(sellerProfiles.orgId, orgId)))[0]!.status).toBe('active');
     expect(await trackStatus(s.trackId)).toBe('published');
     expect(await trackStatus(published2.trackId)).toBe('published');
+    expect((await auditRows('track.reinstate', s.trackId))[0]!.after).toMatchObject({ status: 'published', viaOrg: orgId });
     expect(await trackStatus(adminSuspended.trackId)).toBe('suspended'); // suspended earlier by an admin, for another reason
     expect(await trackStatus(classC.trackId)).toBe('suspended'); // class C is never put back on sale
     expect(await reinstateOrg(db, admin, { orgId, reason: 'again' })).toEqual({ ok: false, reason: 'not_suspended' });
@@ -95,6 +104,27 @@ describe('suspending a seller organisation (S4-M10c)', () => {
     expect(await listBuyerBilling(db, userId)).toHaveLength(0);
     await reinstateOrg(db, admin, { orgId: s.buyer.orgId, reason: 'cleared' });
     expect((await listBuyerLicenses(db, userId)).total).toBe(1);
+  });
+
+  it('stops a member of a suspended organisation starting a new one of the same kind', async () => {
+    const admin = await adminCtx(db, ['superadmin']);
+    const b = await makeBuyer(db);
+    const input = { kind: 'buyer' as const, legalName: 'Fresh Start LLP', displayName: 'Fresh Start LLP', buyerType: 'business' as const };
+    await suspendOrg(db, admin, { orgId: b.orgId, reason: 'payment fraud' });
+    await expect(createOrganization(db, b.owner.userId, input)).rejects.toBeInstanceOf(OrgSuspendedError);
+    expect(await createOrganization(db, (await makeUser(db)).userId, input)).toBeTruthy(); // anyone else is unaffected
+    await reinstateOrg(db, admin, { orgId: b.orgId, reason: 'cleared' });
+    expect(await createOrganization(db, b.owner.userId, input)).toBeTruthy();
+  });
+
+  it('refunds an order that was paid but not yet fulfilled when its seller is suspended', async () => {
+    const admin = await adminCtx(db, ['superadmin']);
+    const s = await sale(db, gw, store, { fulfil: false });
+    await suspendOrg(db, admin, { orgId: s.sellerOrgId, reason: 'chargeback ring' });
+    await fulfilOrder(db, s.orderId, store);
+    const [o] = await db.select({ status: orders.status }).from(orders).where(eq(orders.id, s.orderId));
+    expect(o!.status).toBe('refund_pending'); // PLAN 5.2(a): not sellable at fulfilment
+    expect((await db.select().from(licenses).where(eq(licenses.orderId, s.orderId))).length).toBe(0);
   });
 
   it('needs superadmin and a reason, and reports an unknown organisation', async () => {

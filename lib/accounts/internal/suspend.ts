@@ -27,7 +27,7 @@ export async function suspendOrg(db: DbOrTx, admin: AdminContext, input: { orgId
     if (!org) return { ok: false, reason: 'not_found' } as const;
     if (!(await setOrgSuspension(tx, input.orgId, { suspend: true, reason }))) return { ok: false, reason: 'already_suspended' } as const;
     const sellerSuspended = org.kind === 'seller' && (await setSellerStatus(tx, input.orgId, 'suspended')) !== null;
-    const paused = org.kind === 'seller' ? await pauseOrgTracks(tx, input.orgId, admin.userId) : [];
+    const paused = org.kind === 'seller' ? await pauseOrgTracks(tx, input.orgId, admin.userId, ip) : [];
     await writeAudit(tx, { actorUserId: admin.userId, action: 'org.suspend', entityType: 'organization', entityId: input.orgId, before: { suspended: false }, after: { suspended: true, reason, kind: org.kind, sellerSuspended, pausedTrackIds: paused }, ip });
     return { ok: true, pausedTracks: paused.length, sellerSuspended } as const;
   });
@@ -45,7 +45,7 @@ export async function reinstateOrg(db: DbOrTx, admin: AdminContext, input: { org
     if (!org) return { ok: false, reason: 'not_found' } as const;
     if (!(await setOrgSuspension(tx, input.orgId, { suspend: false }))) return { ok: false, reason: 'not_suspended' } as const;
     const sellerReinstated = org.kind === 'seller' && (await setSellerStatus(tx, input.orgId, 'active')) !== null;
-    const resumed = org.kind === 'seller' ? await resumeOrgTracks(tx, input.orgId, admin.userId) : [];
+    const resumed = org.kind === 'seller' ? await resumeOrgTracks(tx, input.orgId, admin.userId, ip) : [];
     await writeAudit(tx, { actorUserId: admin.userId, action: 'org.reinstate', entityType: 'organization', entityId: input.orgId, before: { suspended: true }, after: { suspended: false, reason, kind: org.kind, sellerReinstated, resumedTrackIds: resumed }, ip });
     return { ok: true, resumedTracks: resumed.length, sellerReinstated } as const;
   });

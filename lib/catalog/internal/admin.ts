@@ -2,6 +2,7 @@ import { asc, desc, eq, sql } from 'drizzle-orm';
 import { rightsDeclarations, rightsDocuments, trackVersions, tracks } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
 import { requirePermission, type AdminContext } from '@/lib/identity';
+import { getOrganization } from '@/lib/identity/server';
 import { hasOrgAccepted } from '@/lib/legal/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import { BUCKETS, createSignedDownloadUrl } from '@/lib/platform/storage';
@@ -126,8 +127,10 @@ export async function setTrackAvailability(
   return db.transaction(async (tx) => {
     if (input.action === 'reinstate') {
       // Class C has no release path (PLAN 4.2): such a track is never put back on sale.
-      const [t] = await tx.select({ clearanceClass: tracks.clearanceClass }).from(tracks).where(eq(tracks.id, input.trackId));
+      const [t] = await tx.select({ clearanceClass: tracks.clearanceClass, sellerOrgId: tracks.sellerOrgId }).from(tracks).where(eq(tracks.id, input.trackId));
       if (t?.clearanceClass === 'C') return { ok: false, reason: 'invalid', status: 'suspended' } as const;
+      // While the org is suspended nothing of theirs goes back on sale; reinstating the org resumes the tracks it paused.
+      if (t && (await getOrganization(tx, t.sellerOrgId))?.suspendedAt) return { ok: false, reason: 'org_suspended' } as const;
     }
     const result = await applyTransition(tx, input.trackId, input.action, admin.userId, { reason });
     if (result.ok) {

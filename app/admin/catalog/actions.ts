@@ -22,7 +22,7 @@ export async function availabilityAction(trackId: string, form: FormData) {
   const input = z.object({ action: z.enum(['suspend', 'reinstate', 'delist']), reason }).safeParse(Object.fromEntries(form));
   if (!input.success) tracksPage({ error: 'need_reason' });
   const r = await setTrackAvailability(getDb(), admin, { trackId: id.parse(trackId), ...input.data }, clientIp(await headers()));
-  tracksPage(r.ok ? { done: input.data.action } : { error: 'cannot_move' });
+  tracksPage(r.ok ? { done: input.data.action } : { error: r.reason === 'org_suspended' ? 'org_suspended' : 'cannot_move' });
 }
 
 export async function reclassifyAction(trackId: string, form: FormData) {

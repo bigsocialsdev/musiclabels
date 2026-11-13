@@ -195,6 +195,28 @@ describe('payout runs (PLAN 5.6)', () => {
     expect((await computePayoutBatch(db, fin, later)).created).toBe(false); // the same period is still idempotent
   });
 
+  it('a seller suspended after compute is held back at submit; the line waits until reinstatement or is failed', async () => {
+    const period = pastPeriod();
+    const paidAt = new Date(periodCutoff(period).getTime() - 40 * DAY);
+    const ok = await payableSeller();
+    const suspended = await payableSeller();
+    for (const seller of [ok, suspended]) await sale(db, gw, store, { sellerOrgId: seller, paidAt });
+    const fin = await finance();
+    const c = await computePayoutBatch(db, fin, period);
+    await approvePayoutBatch(db, fin, c.batch.id);
+    await db.update(sellerProfiles).set({ status: 'suspended' }).where(eq(sellerProfiles.orgId, suspended)); // after approval, before the bank file
+    const sub = await submitPayoutBatch(db, fin, c.batch.id, rail);
+    const heldLine = (await lineFor(c.batch.id, suspended))!;
+    expect(sub.held).toEqual([heldLine.id]);
+    expect(heldLine.status).toBe('pending');
+    expect((await lineFor(c.batch.id, ok))!.status).toBe('processing');
+    // Reinstated: the same line goes out on a second submit.
+    await db.update(sellerProfiles).set({ status: 'active' }).where(eq(sellerProfiles.orgId, suspended));
+    const again = await submitPayoutBatch(db, fin, c.batch.id, rail);
+    expect(again).toMatchObject({ submitted: 1, held: [] });
+    expect((await lineFor(c.batch.id, suspended))!.status).toBe('processing');
+  });
+
   it('a line whose bank account lost verification is held back; finance can fail a pending line to drop it', async () => {
     const period = pastPeriod();
     const paidAt = new Date(periodCutoff(period).getTime() - 40 * DAY);

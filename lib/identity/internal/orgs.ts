@@ -1,7 +1,7 @@
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { memberships, organizations, users } from '@/db/schema';
 import type { DbOrTx } from '@/lib/platform/db';
-import { OrgAccessError, type OrgActor } from '../index';
+import { OrgAccessError, OrgSuspendedError, type OrgActor } from '../index';
 
 export type NewOrganization = {
   kind: 'seller' | 'buyer';
@@ -10,9 +10,16 @@ export type NewOrganization = {
   buyerType?: 'individual' | 'business' | 'agency';
 };
 
-/** Creates the org and makes the caller its owner, atomically. An individual creator is a one-member org. */
+/** Creates the org and makes the caller its owner, atomically. An individual creator is a one-member org. Refused (`OrgSuspendedError`) for a member of a suspended org of the same kind. */
 export async function createOrganization(db: DbOrTx, userId: string, input: NewOrganization) {
   return db.transaction(async (tx) => {
+    const [suspended] = await tx
+      .select({ id: organizations.id })
+      .from(memberships)
+      .innerJoin(organizations, eq(organizations.id, memberships.orgId))
+      .where(and(eq(memberships.userId, userId), eq(organizations.kind, input.kind), isNotNull(organizations.suspendedAt)))
+      .limit(1);
+    if (suspended) throw new OrgSuspendedError();
     const [org] = await tx
       .insert(organizations)
       .values({

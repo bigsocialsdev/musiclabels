@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm';
 import { getLicenseByPublicId } from '@/lib/licensing/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import type { Bucket, ObjectStore } from '@/lib/platform/storage';
-import { countUnsynced, md5Hex, offsiteKey, type OffsiteStore } from '@/lib/platform/storage-backup';
+import { STORAGE_OBJECTS, countUnsynced, md5Hex, offsiteKey, type OffsiteStore } from '@/lib/platform/storage-backup';
 
 /**
  * Read-only checks for the restore drill (docs/restore-drill.md). Run against a database restored from a Supabase
@@ -72,7 +72,7 @@ export type StorageCheck = { objects: number; bytes: number; missing: string[]; 
  * present, MD5 as recorded, and for masters the SHA-256 the database holds for that file. Also counts objects in
  * Storage that no backup has covered yet, when the Storage table is readable.
  */
-export async function checkStorageRestore(db: DbOrTx, offsite: OffsiteStore, opts: { sample?: number } = {}): Promise<StorageCheck> {
+export async function checkStorageRestore(db: DbOrTx, offsite: OffsiteStore, opts: { sample?: number; objectsTable?: string } = {}): Promise<StorageCheck> {
   const manifest = await manifestRows(db, opts.sample);
   const out: StorageCheck = { objects: 0, bytes: 0, missing: [], corrupt: [], masterMismatch: [], notBackedUp: null };
   for (const m of manifest) {
@@ -93,8 +93,9 @@ export async function checkStorageRestore(db: DbOrTx, offsite: OffsiteStore, opt
       if (v?.sha && createHash('sha256').update(body).digest('hex') !== v.sha) out.masterMismatch.push(key);
     }
   }
-  const [reachable] = await rows(db, sql`SELECT to_regclass('storage.objects') IS NOT NULL AS ok`);
-  if (reachable?.ok) out.notBackedUp = await countUnsynced(db);
+  const objectsTable = opts.objectsTable ?? STORAGE_OBJECTS;
+  const [reachable] = await rows(db, sql`SELECT to_regclass(${objectsTable}) IS NOT NULL AS ok`);
+  if (reachable?.ok) out.notBackedUp = await countUnsynced(db, objectsTable);
   return out;
 }
 

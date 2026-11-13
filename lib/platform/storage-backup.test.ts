@@ -10,12 +10,14 @@ import { backupStorage, countUnsynced, md5Hex, offsiteKey, type OffsiteStore } f
 afterAll(closeDb);
 afterEach(() => vi.unstubAllGlobals());
 const db = getDb();
+const OBJECTS = 'backup_test.objects';
+const backup = (deps: Omit<Parameters<typeof backupStorage>[1], 'objectsTable'>) => backupStorage(db, { ...deps, objectsTable: OBJECTS });
 
 // Supabase's storage schema comes from the Storage service, which the test database does not run: stand in for the one table we read.
 beforeEach(async () => {
-  await db.execute(sql`CREATE SCHEMA IF NOT EXISTS storage`);
-  await db.execute(sql`CREATE TABLE IF NOT EXISTS storage.objects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text NOT NULL, name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), metadata jsonb)`);
-  await db.execute(sql`TRUNCATE storage.objects`);
+  await db.execute(sql`CREATE SCHEMA IF NOT EXISTS backup_test`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS backup_test.objects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text NOT NULL, name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), metadata jsonb)`);
+  await db.execute(sql`TRUNCATE backup_test.objects`);
   await db.execute(sql`TRUNCATE storage_backups`);
 });
 
@@ -44,7 +46,7 @@ function offsite(opts: { lieAbout?: string; failOn?: string } = {}) {
 }
 async function put(bucket: string, path: string, content: string, updatedAt = new Date()) {
   objects.set(offsiteKey(bucket, path), Buffer.from(content));
-  await db.execute(sql`INSERT INTO storage.objects (bucket_id, name, updated_at, metadata) VALUES (${bucket}, ${path}, ${updatedAt.toISOString()}::timestamptz, ${JSON.stringify({ mimetype: 'application/octet-stream' })}::jsonb)`);
+  await db.execute(sql`INSERT INTO backup_test.objects (bucket_id, name, updated_at, metadata) VALUES (${bucket}, ${path}, ${updatedAt.toISOString()}::timestamptz, ${JSON.stringify({ mimetype: 'application/octet-stream' })}::jsonb)`);
 }
 
 describe('backupStorage', () => {
@@ -56,7 +58,7 @@ describe('backupStorage', () => {
     await put('pdfs', 'orders/.emptyFolderPlaceholder', '');
     const off = offsite();
 
-    expect(await backupStorage(db, { store: source, offsite: off.store })).toEqual({ copied: 3, bytes: 'master-bytes'.length + 'rights-doc'.length + 'invoice'.length, failed: 0, remaining: 0 });
+    expect(await backup({ store: source, offsite: off.store })).toEqual({ copied: 3, bytes: 'master-bytes'.length + 'rights-doc'.length + 'invoice'.length, failed: 0, remaining: 0 });
     expect([...off.stored.keys()].sort()).toEqual(['documents/org/track/docs/a.pdf', 'masters/org/track/v1.wav', 'pdfs/orders/o1/invoice.pdf']);
     const [m] = await db.select().from(storageBackups).where(eq(storageBackups.path, 'org/track/v1.wav'));
     expect(m).toMatchObject({ bucket: 'masters', sizeBytes: 12, md5: md5Hex(Buffer.from('master-bytes')) });
@@ -66,12 +68,12 @@ describe('backupStorage', () => {
     const t0 = new Date(Date.now() - 60_000);
     await put('masters', 'a.wav', 'one', t0);
     const off = offsite();
-    await backupStorage(db, { store: source, offsite: off.store });
-    expect(await backupStorage(db, { store: source, offsite: off.store })).toMatchObject({ copied: 0, remaining: 0 });
+    await backup({ store: source, offsite: off.store });
+    expect(await backup({ store: source, offsite: off.store })).toMatchObject({ copied: 0, remaining: 0 });
 
     objects.set('masters/a.wav', Buffer.from('two!'));
-    await db.execute(sql`UPDATE storage.objects SET updated_at = now() WHERE name = 'a.wav'`);
-    expect(await backupStorage(db, { store: source, offsite: off.store })).toMatchObject({ copied: 1 });
+    await db.execute(sql`UPDATE backup_test.objects SET updated_at = now() WHERE name = 'a.wav'`);
+    expect(await backup({ store: source, offsite: off.store })).toMatchObject({ copied: 1 });
     expect(off.stored.get('masters/a.wav')!.toString()).toBe('two!');
     const [m] = await db.select().from(storageBackups).where(eq(storageBackups.path, 'a.wav'));
     expect(m).toMatchObject({ sizeBytes: 4, md5: md5Hex(Buffer.from('two!')) });
@@ -79,36 +81,36 @@ describe('backupStorage', () => {
 
   it('does not copy an unchanged object again when Storage keeps microseconds that the manifest cannot', async () => {
     await put('masters', 'micro.wav', 'abc');
-    await db.execute(sql`UPDATE storage.objects SET updated_at = timestamptz '2026-01-02 03:04:05.123456+00' WHERE name = 'micro.wav'`);
+    await db.execute(sql`UPDATE backup_test.objects SET updated_at = timestamptz '2026-01-02 03:04:05.123456+00' WHERE name = 'micro.wav'`);
     const off = offsite();
-    expect(await backupStorage(db, { store: source, offsite: off.store })).toMatchObject({ copied: 1, remaining: 0 });
-    expect(await backupStorage(db, { store: source, offsite: off.store })).toMatchObject({ copied: 0, remaining: 0 });
-    expect(await countUnsynced(db)).toBe(0);
+    expect(await backup({ store: source, offsite: off.store })).toMatchObject({ copied: 1, remaining: 0 });
+    expect(await backup({ store: source, offsite: off.store })).toMatchObject({ copied: 0, remaining: 0 });
+    expect(await countUnsynced(db, OBJECTS)).toBe(0);
   });
 
   it('records nothing for an object whose off-site MD5 differs, still copies the others, and fails the run', async () => {
     await put('masters', 'good.wav', 'good');
     await put('masters', 'bad.wav', 'bad');
     const off = offsite({ lieAbout: 'bad.wav' });
-    await expect(backupStorage(db, { store: source, offsite: off.store })).rejects.toThrow(/1 of 2 objects failed \(1 copied, 1 still pending\).*bad\.wav.*differs/);
+    await expect(backup({ store: source, offsite: off.store })).rejects.toThrow(/1 of 2 objects failed \(1 copied, 1 still pending\).*bad\.wav.*differs/);
     expect((await db.select().from(storageBackups)).map((r) => r.path)).toEqual(['good.wav']);
     // the failed object stays pending and is retried
-    expect(await backupStorage(db, { store: source, offsite: offsite().store })).toMatchObject({ copied: 1, remaining: 0 });
+    expect(await backup({ store: source, offsite: offsite().store })).toMatchObject({ copied: 1, remaining: 0 });
   });
 
   it('fails the run when the off-site store or the source cannot be reached', async () => {
     await put('pdfs', 'x.pdf', 'x');
-    await expect(backupStorage(db, { store: source, offsite: offsite({ failOn: 'x.pdf' }).store })).rejects.toThrow(/bucket unreachable/);
+    await expect(backup({ store: source, offsite: offsite({ failOn: 'x.pdf' }).store })).rejects.toThrow(/bucket unreachable/);
     objects.delete('pdfs/x.pdf');
-    await expect(backupStorage(db, { store: source, offsite: offsite().store })).rejects.toThrow(/Object not found/);
+    await expect(backup({ store: source, offsite: offsite().store })).rejects.toThrow(/Object not found/);
     expect(await db.select().from(storageBackups)).toHaveLength(0);
   });
 
   it('stops starting new objects once its time budget is spent and reports what is left', async () => {
     await put('masters', 'one.wav', '1');
     await put('masters', 'two.wav', '2');
-    expect(await backupStorage(db, { store: source, offsite: offsite().store, budgetMs: -1 })).toEqual({ copied: 0, bytes: 0, failed: 0, remaining: 2 });
-    expect(await backupStorage(db, { store: source, offsite: offsite().store, maxObjects: 1 })).toMatchObject({ copied: 1, remaining: 1 });
+    expect(await backup({ store: source, offsite: offsite().store, budgetMs: -1 })).toEqual({ copied: 0, bytes: 0, failed: 0, remaining: 2 });
+    expect(await backup({ store: source, offsite: offsite().store, maxObjects: 1 })).toMatchObject({ copied: 1, remaining: 1 });
   });
 });
 

@@ -12,11 +12,12 @@ import { APPEND_ONLY_TABLES, checkDatabase, checkStorageRestore, journalEntryCou
 
 afterAll(closeDb);
 const db = getDb();
+const OBJECTS = 'backup_test.objects';
 beforeAll(() => setupCommerce(db, { L1: 100_000, L2: 100_000, L3: 100_000, L4: 100_000, L5: 100_000 }));
 beforeEach(async () => {
-  await db.execute(sql`CREATE SCHEMA IF NOT EXISTS storage`);
-  await db.execute(sql`CREATE TABLE IF NOT EXISTS storage.objects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text NOT NULL, name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), metadata jsonb)`);
-  await db.execute(sql`TRUNCATE storage.objects`);
+  await db.execute(sql`CREATE SCHEMA IF NOT EXISTS backup_test`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS backup_test.objects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text NOT NULL, name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), metadata jsonb)`);
+  await db.execute(sql`TRUNCATE backup_test.objects`);
   await db.execute(sql`TRUNCATE storage_backups`);
 });
 
@@ -67,7 +68,7 @@ describe('checkStorageRestore', () => {
     await db.update(trackVersions).set({ masterKey: path, masterSha256: createHash('sha256').update(master).digest('hex') }).where(eq(trackVersions.id, t.trackVersionId));
     await manifest('masters', path, master);
     await manifest('pdfs', 'o/invoice.pdf', Buffer.from('pdf'));
-    const result = await checkStorageRestore(db, offsiteWith({ [offsiteKey('masters', path)]: master, [offsiteKey('pdfs', 'o/invoice.pdf')]: Buffer.from('pdf') }));
+    const result = await checkStorageRestore(db, offsiteWith({ [offsiteKey('masters', path)]: master, [offsiteKey('pdfs', 'o/invoice.pdf')]: Buffer.from('pdf') }), { objectsTable: OBJECTS });
     expect(result).toMatchObject({ objects: 2, missing: [], corrupt: [], masterMismatch: [], notBackedUp: 0 });
     expect(storageChecks(result).every((c) => c.ok)).toBe(true);
   });
@@ -79,15 +80,15 @@ describe('checkStorageRestore', () => {
     await manifest('masters', path, master);
     await manifest('documents', 'gone.pdf', Buffer.from('x'));
     await manifest('pdfs', 'rot.pdf', Buffer.from('good'));
-    await db.execute(sql`INSERT INTO storage.objects (bucket_id, name) VALUES ('masters', 'uncovered.wav')`);
-    const result = await checkStorageRestore(db, offsiteWith({ [offsiteKey('masters', path)]: master, [offsiteKey('pdfs', 'rot.pdf')]: Buffer.from('bad!') }));
+    await db.execute(sql`INSERT INTO backup_test.objects (bucket_id, name) VALUES ('masters', 'uncovered.wav')`);
+    const result = await checkStorageRestore(db, offsiteWith({ [offsiteKey('masters', path)]: master, [offsiteKey('pdfs', 'rot.pdf')]: Buffer.from('bad!') }), { objectsTable: OBJECTS });
     expect(result).toMatchObject({ objects: 2, missing: ['documents/gone.pdf'], corrupt: ['pdfs/rot.pdf'], masterMismatch: [`masters/${path}`], notBackedUp: 1 });
     expect(storageChecks(result).filter((c) => !c.ok).map((c) => c.name)).toEqual(['off-site objects present', 'off-site objects intact', 'masters match the database', 'backup is current']);
   });
 
   it('can check a random sample instead of everything', async () => {
     for (const n of [1, 2, 3, 4]) await manifest('pdfs', `s/${n}.pdf`, Buffer.from(String(n)));
-    const result = await checkStorageRestore(db, offsiteWith({}), { sample: 2 });
+    const result = await checkStorageRestore(db, offsiteWith({}), { sample: 2, objectsTable: OBJECTS });
     expect(result.missing).toHaveLength(2);
   });
 });

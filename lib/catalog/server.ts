@@ -29,4 +29,4 @@ export { processVersion, sweepCatalog, moveToReviewIfDone } from './internal/pip
 export { applyTransition, type TransitionResult } from './internal/transition';
 export { getPublishedTrack, getTrackFacts } from './internal/public';
 export { searchTracks, facetCounts, suggestTracks } from './internal/search';
-export { previewUrl, trackPeaks, downsamplePeaks } from './internal/playback';
+export { previewUrl, trackPeaks } from './internal/playback';

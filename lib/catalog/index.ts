@@ -144,3 +144,14 @@ export type DiscoveryFacets = {
   priceLevels: FacetOption[];
   bpm: { min: number; max: number } | null;
 };
+
+/** Maximum of each group, so a thin strip still shows the loudest moment of every slice. */
+export function downsamplePeaks(peaks: number[], n: number): number[] {
+  if (peaks.length <= n) return peaks;
+  const out = new Array<number>(n).fill(0);
+  for (let i = 0; i < peaks.length; i++) {
+    const b = Math.min(n - 1, Math.floor((i * n) / peaks.length));
+    if (peaks[i]! > out[b]!) out[b] = peaks[i]!;
+  }
+  return out;
+}

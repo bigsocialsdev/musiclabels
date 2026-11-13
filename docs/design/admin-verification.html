@@ -13,35 +13,35 @@
 html{background:var(--background);color:var(--foreground);font:500 14px/1.4 var(--font-sans);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
 html,body{height:100%}
 body{display:flex;flex-direction:column;overflow:hidden}
-::selection{background:var(--primary);color:var(--primary-foreground)}
+::selection{background:var(--foreground);color:var(--background)}
 *{scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent}
 button,input,select,textarea{font:inherit;color:inherit}
 button{background:none;border:0;cursor:pointer}
 :focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius-xs)}
-.mono{font-family:var(--font-mono);font-weight:400}
 svg.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sample{display:inline-flex;align-items:center;height:20px;font:600 11px var(--font-sans);color:var(--attention);border:1px solid color-mix(in srgb,var(--attention) 40%,transparent);border-radius:6px;padding:0 6px;white-space:nowrap}
 
 .top{display:flex;align-items:center;gap:20px;height:52px;padding:0 20px;border-bottom:1px solid var(--border);background:var(--card)}
 .mark{font-weight:700;font-size:17px;letter-spacing:-.03em;display:flex;align-items:center;gap:7px}
-.mark .dot{width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.mark .dot{width:8px;height:8px;border-radius:50%;background:var(--signal)}
 .mark small{font-weight:600;font-size:13px;color:var(--muted-foreground);letter-spacing:0}
 .areas{display:flex;gap:2px;height:100%}
 .areas a{display:flex;align-items:center;gap:6px;padding:0 10px;color:var(--muted-foreground);text-decoration:none;font-weight:600;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-1px}
 .areas a:hover{color:var(--foreground)}
 .areas a[aria-current]{color:var(--foreground);border-bottom-color:var(--foreground)}
-.areas .c{font:400 11px var(--font-mono);color:var(--muted-foreground)}
-.areas .c.hot{color:var(--blocked)}
+.areas .c{font:400 12px var(--font-mono);color:var(--muted-foreground)}
+.areas .c.hot{color:var(--blocked);font-weight:600}
 .who{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--fg-2)}
-.mfa{display:inline-flex;align-items:center;gap:5px;font:500 11px var(--font-mono);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent);border-radius:5px;padding:2px 6px}
+.mfa{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent);border-radius:6px;padding:1px 6px}
 .icon-btn{width:32px;height:32px;display:grid;place-items:center;border-radius:var(--radius-xs);color:var(--fg-2)}
 .icon-btn:hover{background:var(--secondary)}
 
-.bar{display:flex;align-items:center;gap:16px;padding:16px 20px 12px}
+.bar{display:flex;align-items:center;gap:14px;padding:14px 20px 12px}
 .bar h1{font-size:22px;letter-spacing:-.025em;font-weight:700}
 .seg{display:flex;gap:2px;background:var(--secondary);padding:3px;border-radius:var(--radius-sm)}
-.seg button{height:28px;padding:0 10px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted-foreground);display:flex;gap:6px;align-items:center}
-.seg button[aria-pressed=true]{background:var(--card);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.seg .n{font:400 11px var(--font-mono)}
+.seg button{height:28px;padding:0 10px;border-radius:6px;font-size:13px;font-weight:600;color:var(--muted-foreground);display:flex;gap:6px;align-items:center}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--foreground);box-shadow:0 1px 2px rgba(26,24,21,.1)}
+.seg .n{font:400 12px var(--font-mono)}
 .qsearch{margin-left:auto;display:flex;align-items:center;gap:8px;height:34px;width:280px;padding:0 10px;border-radius:var(--radius-sm);border:1px solid var(--input);background:var(--card);color:var(--muted-foreground)}
 .qsearch input{flex:1;border:0;outline:0;background:none;font-size:13px;color:var(--foreground)}
 .qsearch input::placeholder{color:var(--muted-foreground)}
@@ -51,70 +51,81 @@ svg.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-widt
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 thead th{position:sticky;top:0;background:var(--card);text-align:left;font-size:12px;font-weight:600;color:var(--muted-foreground);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
 tbody td{padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;vertical-align:middle}
+th:first-child,td:first-child{padding-left:20px}
 tbody tr{cursor:pointer;transition:background var(--dur-fast)}
 tbody tr:hover{background:var(--background)}
 tbody tr[aria-selected=true]{background:var(--secondary)}
-tbody tr[aria-selected=true] td:first-child b{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-color:var(--primary)}
 td b{font-weight:600}
+tbody tr[aria-selected=true] td b{font-weight:700}
 td .sub{display:block;font-size:12px;color:var(--muted-foreground)}
 td.num{font-family:var(--font-mono);font-size:12.5px}
 .age.over{color:var(--blocked);font-weight:500}
 .st{display:inline-flex;align-items:center;gap:6px;font-size:13px}
-.st::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.st::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
 .st span{color:var(--foreground)}
 .ok{color:var(--ok)}.att{color:var(--attention)}.blk{color:var(--blocked)}.inf{color:var(--info)}.mut{color:var(--muted-foreground)}
 
-.detail{border-left:1px solid var(--border);overflow:auto;background:var(--background);display:flex;flex-direction:column}
-.dh{padding:18px 20px 14px;background:var(--card);border-bottom:1px solid var(--border)}
-.dh .k{font:400 11.5px var(--font-mono);color:var(--muted-foreground);display:flex;gap:10px}
-.dh h2{font-size:24px;letter-spacing:-.03em;font-weight:700;margin:6px 0 2px}
-.dh p{color:var(--fg-2);font-size:13px}
-.player{display:flex;align-items:center;gap:12px;margin-top:14px}
-.pp{width:36px;height:36px;border-radius:50%;background:var(--foreground);color:var(--background);display:grid;place-items:center;flex:none}
+.detail{border-left:1px solid var(--border);background:var(--background);display:flex;flex-direction:column;min-height:0}
+.dscroll{flex:1;overflow:auto}
+.dh{padding:16px 20px 14px;background:var(--card);border-bottom:1px solid var(--border)}
+.dh h2{font-size:24px;letter-spacing:-.03em;font-weight:700}
+.dh p{color:var(--fg-2);font-size:13px;margin-top:2px}
+.dh p .id{font:400 12px var(--font-mono);color:var(--muted-foreground)}
+.player{display:flex;align-items:center;gap:12px;margin-top:12px}
+.pp{width:36px;height:36px;border-radius:50%;background:var(--secondary);color:var(--foreground);display:grid;place-items:center;flex:none}
+.pp.on{background:var(--signal);color:var(--signal-foreground)}
 .pp svg{width:12px;height:12px;fill:currentColor;stroke:none}
 .wave{flex:1;display:flex;align-items:center;gap:2px;height:34px;overflow:hidden;cursor:pointer}
 .wave i{flex:1 1 0;min-width:1px;border-radius:1px;background:var(--wave-idle)}
 .wave i.on{background:var(--wave-played)}
 .player .tc{font:400 12px var(--font-mono);color:var(--muted-foreground);min-width:86px;text-align:right}
-.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
-.facts dt{font-size:11.5px;color:var(--muted-foreground);font-weight:600}
+.facts{display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between;gap:12px;margin-top:12px}
+.facts dt{font-size:12px;color:var(--muted-foreground);font-weight:600}
 .facts dd{font-size:13px;font-weight:600;margin-top:1px}
-.sec{padding:16px 20px;border-bottom:1px solid var(--border)}
+.facts dd.m{font:500 13px var(--font-mono)}
+.sec{padding:14px 20px;border-bottom:1px solid var(--border)}
 .sec h3{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .sec h3 .st{margin-left:auto;font-weight:600}
 .match{background:var(--card);border:1px solid color-mix(in srgb,var(--blocked) 30%,var(--border));border-radius:var(--radius-sm);padding:12px}
 .match b{font-weight:600}
 .match p{font-size:13px;color:var(--fg-2);margin-top:2px}
-.match .mono{font-size:12px;color:var(--muted-foreground);margin-top:6px;display:block}
+.match .ref{font:400 12px var(--font-mono);color:var(--muted-foreground);margin-top:6px;display:block}
+.sec p.note{font-size:13px;color:var(--fg-2)}
 .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 12px;font-size:13px}
 .kv dt{color:var(--muted-foreground)}
+.kv .mono{font:400 12.5px var(--font-mono)}
 .docs{display:flex;flex-direction:column;gap:6px;margin-top:12px}
 .doc{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);background:var(--card);border:1px solid var(--border);font-size:13px}
-.doc .mono{font-size:11.5px;color:var(--muted-foreground);margin-left:auto}
+.doc .size{font:400 12px var(--font-mono);color:var(--muted-foreground);margin-left:auto}
 .doc button{display:inline-flex;gap:6px;align-items:center;font-weight:600;font-size:12.5px;padding:4px 8px;border-radius:6px}
 .doc button:hover{background:var(--secondary)}
-.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.f{display:flex;flex-direction:column;gap:5px}
-.f.full{grid-column:1/3}
+.f{display:flex;flex-direction:column;gap:5px;margin-top:10px}
+.f[hidden]{display:none}
 .f label{font-size:12px;font-weight:600;color:var(--muted-foreground)}
-.f select,.f textarea{border:1px solid var(--input);border-radius:var(--radius-sm);background:var(--card);padding:8px 10px;font-size:13.5px;outline:0}
-.f select{height:36px}
-.f textarea{min-height:64px;resize:vertical}
-.f select:focus,.f textarea:focus{border-color:var(--ring)}
-.f .hint{font-size:12px;color:var(--muted-foreground)}
-.actions{position:sticky;bottom:0;margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px 20px;background:var(--card);border-top:1px solid var(--border)}
-.actions .keys{font:400 11.5px var(--font-mono);color:var(--muted-foreground)}
+.f textarea,.decide select{border:1px solid var(--input);border-radius:var(--radius-sm);background:var(--card);padding:8px 10px;font-size:13.5px;outline:0}
+.f textarea{min-height:60px;resize:vertical}
+.f textarea:focus,.decide select:focus{border-color:var(--fg-2)}
+.f textarea::placeholder{color:var(--muted-foreground)}
+
+.decide{border-top:1px solid var(--border);background:var(--card);padding:12px 20px 14px}
+.decide .sel{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.decide label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--muted-foreground)}
+.decide select{height:36px;color:var(--foreground);font-weight:500}
+.decide .row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.decide .hint{font-size:12.5px;color:var(--fg-2);display:flex;align-items:center;gap:6px}
+.decide .hint button{font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.decide .keys{font:400 12px var(--font-mono);color:var(--muted-foreground)}
 .btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:var(--radius-sm);font-weight:600;font-size:13.5px;transition:background var(--dur-fast),opacity var(--dur-fast)}
 .btn-primary{background:var(--primary);color:var(--primary-foreground)}
-.btn-primary:hover{background:#FF7D45}
-.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary:hover{background:color-mix(in srgb,var(--primary) 88%,var(--background))}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
 .btn-outline{border:1px solid var(--input);background:var(--card)}
 .btn-outline:hover{background:var(--secondary)}
 .btn-danger{color:var(--blocked)}
 .ml{margin-left:auto}
-.toast{position:fixed;left:50%;bottom:72px;transform:translate(-50%,20px);opacity:0;background:var(--foreground);color:var(--background);padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;transition:all var(--dur-slow) var(--ease-out);pointer-events:none}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;background:var(--foreground);color:var(--background);padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;transition:all var(--dur-slow) var(--ease-out);pointer-events:none}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -127,7 +138,7 @@ td.num{font-family:var(--font-mono);font-size:12.5px}
     <a href="#">Refunds</a><a href="#">Payouts</a><a href="#">Reconciliation</a><a href="#">Catalog</a><a href="#">Users &amp; orgs</a>
   </nav>
   <div class="who"><span>Asha Menon</span><span class="mfa"><svg class="i" viewBox="0 0 24 24" style="width:11px;height:11px"><path d="m5 12 5 5 9-10"/></svg>MFA</span>
-    <button class="icon-btn" id="theme" aria-label="Toggle theme"><svg class="i" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg></button></div>
+    <button class="icon-btn" id="theme" aria-label="Switch theme"><svg class="i" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg></button></div>
 </header>
 
 <div class="bar">
@@ -138,7 +149,8 @@ td.num{font-family:var(--font-mono);font-size:12.5px}
     <button aria-pressed="false">Overdue <span class="n">5</span></button>
     <button aria-pressed="false">Screening unavailable <span class="n">2</span></button>
   </div>
-  <label class="qsearch"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input placeholder="Track, seller or ID"></label>
+  <span class="sample">Sample data</span>
+  <label class="qsearch"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input placeholder="Track, seller or ID" aria-label="Search submissions"></label>
 </div>
 
 <div class="split">
@@ -148,16 +160,18 @@ td.num{font-family:var(--font-mono);font-size:12.5px}
       <tbody id="rows"></tbody>
     </table>
   </div>
-
-  <aside class="detail" id="detail" aria-label="Submission detail"></aside>
+  <aside class="detail" aria-label="Submission detail">
+    <div class="dscroll" id="detail"></div>
+    <div class="decide" id="decide"></div>
+  </aside>
 </div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
 
 <script>
 const Q=[
  {id:"SUB-7Q2K",t:"Barsaat Ki Dhun",s:"Meera Kapoor",kind:"Artist",age:"4d 2h",over:1,ing:["ok","Ready"],scr:["blk","1 possible match"],docs:2,lvl:"Level 2",bpm:92,d:168,lang:"Hindi",mood:"Romantic",genre:"Bollywood pop"},
  {id:"SUB-7Q0M",t:"Aarti Dawn",s:"S. Anand",kind:"Artist",age:"3d 19h",over:1,ing:["ok","Ready"],scr:["ok","Clear"],docs:1,lvl:"Level 1",bpm:72,d:151,lang:"Instrumental",mood:"Devotional",genre:"Devotional"},
- {id:"SUB-7PZD",t:"Lassi Break",s:"Patiala Records",kind:"Label",age:"3d 6h",over:1,ing:["ok","Ready"],scr:["att","Unavailable"],docs:3,lvl:"Level 3",bpm:118,d:185,lang:"Punjabi",mood:"Upbeat",genre:"Bhangra"},
+ {id:"SUB-7PZD",t:"Lassi Break",s:"Doaba Sound Co.",kind:"Label",age:"3d 6h",over:1,ing:["ok","Ready"],scr:["att","Unavailable"],docs:3,lvl:"Level 3",bpm:118,d:185,lang:"Punjabi",mood:"Upbeat",genre:"Bhangra"},
  {id:"SUB-7PX1",t:"Kaveri Morning",s:"S. Anand",kind:"Artist",age:"2d 22h",over:0,ing:["ok","Ready"],scr:["ok","Clear"],docs:2,lvl:"Level 1",bpm:76,d:151,lang:"Tamil",mood:"Chill",genre:"Carnatic fusion"},
  {id:"SUB-7PV8",t:"Night Market",s:"Arjun Rao",kind:"Artist",age:"2d 4h",over:0,ing:["blk","Failed: unreadable WAV"],scr:["mut","Not run"],docs:1,lvl:"Level 2",bpm:104,d:192,lang:"Instrumental",mood:"Chill",genre:"Lo-fi"},
  {id:"SUB-7PT3",t:"Rang De",s:"Ira & Dev",kind:"Artist",age:"1d 18h",over:0,ing:["ok","Ready"],scr:["ok","Clear"],docs:2,lvl:"Level 2",bpm:102,d:160,lang:"Hindi",mood:"Festive",genre:"Pop"},
@@ -171,6 +185,7 @@ let sel=0,playing=false,t=12,lastT=performance.now();
 const $=id=>document.getElementById(id);
 const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
 const st=([c,l])=>`<span class="st ${c}"><span>${l}</span></span>`;
+const DOC='<svg class="i" viewBox="0 0 24 24"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>',DL='<svg class="i" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>';
 function peaks(id,n){let s=[...id].reduce((a,c)=>a*31+c.charCodeAt(0),7)%2147483647||1;const r=()=>(s=(s*16807)%2147483647)/2147483647;return Array.from({length:n},(_,k)=>{const x=k/n;return Math.max(.15,(.4+.6*Math.sin(Math.PI*Math.min(1,x*1.1)))*(.55+.45*Math.abs(Math.sin(k*.8)))*(.8+r()*.3))})}
 function rows(){
   $("rows").innerHTML=Q.map((q,i)=>`<tr aria-selected="${i===sel}" data-i="${i}">
@@ -182,41 +197,40 @@ function rows(){
 function pick(i){sel=Math.max(0,Math.min(Q.length-1,i));t=0;playing=false;rows();detail();$("rows").children[sel].scrollIntoView({block:"nearest"})}
 function detail(){
   const q=Q[sel],matched=q.scr[0]==="blk",unavail=q.scr[0]==="att",failed=q.ing[0]==="blk";
-  const screening=matched?`<div class="match"><b>Possible match: “Barsaat” · Saregama</b><p>Fingerprint overlap 0:12–0:41 of this upload. Approving requires an override note.</p><span class="mono">acrcloud · score 0.87 · ref A3F9…C21</span></div>`
-   :unavail?`<p style="font-size:13px;color:var(--fg-2)">The screening service was unavailable for this upload. Run the claim probe manually before approving.</p>`
-   :failed?`<p style="font-size:13px;color:var(--fg-2)">Screening runs after ingest succeeds.</p>`
-   :`<p style="font-size:13px;color:var(--fg-2)">No matches in the public catalog or our own approved tracks.</p>`;
+  const screening=matched?`<div class="match"><b>Possible match: “Barsaat” · Kesar Tunes</b><p>Fingerprint overlap 0:12–0:41 of this upload.</p><span class="ref">acrcloud · score 0.87 · ref A3F9…C21</span></div>
+      <div class="f"><label for="note">Override note (needed to approve with a match)</label><textarea id="note" placeholder="Why this match does not block listing, and what evidence you checked"></textarea></div>`
+   :unavail?`<p class="note">The screening service was unavailable for this upload. Run the claim probe manually before approving.</p>`
+   :failed?`<p class="note">Screening runs after ingest succeeds.</p>`
+   :`<p class="note">No matches in the public catalog or our own approved tracks.</p>`;
   $("detail").innerHTML=`
-  <div class="dh"><div class="k"><span>${q.id}</span><span>v1</span><span>waiting ${q.age}</span></div>
-    <h2>${q.t}</h2><p>${q.s} · ${q.kind} · proposed ${q.lvl}</p>
+  <div class="dh"><h2>${q.t}</h2><p>${q.s} · ${q.kind} · <span class="id">${q.id} · v1 · waiting ${q.age}</span></p>
     <div class="player"><button class="pp" id="pp" aria-label="Play preview"></button><div class="wave" id="wv">${peaks(q.id,90).map(h=>`<i style="height:${(h*100).toFixed(0)}%"></i>`).join("")}</div><span class="tc" id="tc"></span></div>
-    <dl class="facts"><div><dt>Duration</dt><dd class="mono">${fmt(q.d)}</dd></div><div><dt>Tempo</dt><dd class="mono">${q.bpm} BPM</dd></div><div><dt>Language</dt><dd>${q.lang}</dd></div><div><dt>Mood · genre</dt><dd>${q.mood} · ${q.genre}</dd></div></dl></div>
-  <section class="sec"><h3>Ingest ${st(q.ing)}</h3><dl class="kv"><dt>Master</dt><dd class="mono">WAV · 48 kHz · 24-bit · 41.2 MB</dd><dt>SHA-256</dt><dd class="mono">9c1e4b…77d0a2</dd><dt>Preview</dt><dd>${failed?"Not generated":"Generated with audible tag"}</dd></dl></section>
+    <dl class="facts"><div><dt>Duration</dt><dd class="m">${fmt(q.d)}</dd></div><div><dt>Tempo</dt><dd class="m">${q.bpm} BPM</dd></div><div><dt>Language</dt><dd>${q.lang}</dd></div><div><dt>Mood · genre</dt><dd>${q.mood} · ${q.genre}</dd></div></dl></div>
   <section class="sec"><h3>Screening ${st(q.scr)}</h3>${screening}</section>
   <section class="sec"><h3>Rights declaration</h3>
     <dl class="kv"><dt>Declared role</dt><dd>Composer and producer, sole owner</dd><dt>Territory</dt><dd>Worldwide</dd><dt>Fingerprint registration</dt><dd>${matched?"Registered via distributor, release commitment signed":"Not registered anywhere"}</dd></dl>
     <div class="docs">
-      <div class="doc"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>PRO registration.pdf<span class="mono">412 KB</span><button><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>Download</button></div>
-      ${q.docs>1?`<div class="doc"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>Distribution agreement.pdf<span class="mono">1.8 MB</span><button><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>Download</button></div>`:""}
+      <div class="doc">${DOC}PRO registration.pdf<span class="size">412 KB</span><button>${DL}Download</button></div>
+      ${q.docs>1?`<div class="doc">${DOC}Distribution agreement.pdf<span class="size">1.8 MB</span><button>${DL}Download</button></div>`:""}
     </div></section>
-  <section class="sec"><h3>Decision</h3>
-    <div class="form">
-      <div class="f"><label for="cls">Clearance class</label><select id="cls"><option>Class A · unregistered</option><option ${matched?"selected":""}>Class B · seller-controlled</option></select></div>
-      <div class="f"><label for="lvl">Price level</label><select id="lvl"><option>Level 1</option><option ${q.lvl==="Level 2"?"selected":""}>Level 2</option><option ${q.lvl==="Level 3"?"selected":""}>Level 3</option><option>Level 4</option></select></div>
-      ${matched?`<div class="f full"><label for="note">Override note (required to approve with a match)</label><textarea id="note" placeholder="Why this match does not block listing, and what evidence you checked"></textarea></div>`:""}
-      <div class="f full" id="rj" hidden><label for="reason">Reason sent to the seller</label><textarea id="reason" placeholder="What the seller needs to fix before resubmitting"></textarea></div>
-    </div></section>
-  <div class="actions"><span class="keys">J/K move · Space play · audited</span>
-    <button class="btn btn-outline btn-danger ml" id="rej">Reject…</button>
-    <button class="btn btn-primary" id="ok" ${matched||failed?"disabled":""}>Approve and publish</button></div>`;
+  <section class="sec"><h3>Ingest ${st(q.ing)}</h3><dl class="kv"><dt>Master</dt><dd class="mono">WAV · 48 kHz · 24-bit · 41.2 MB</dd><dt>SHA-256</dt><dd class="mono">9c1e4b…77d0a2</dd><dt>Preview</dt><dd>${failed?"Not generated":"Generated with audible tag"}</dd></dl></section>
+  <section class="sec"><div class="f" id="rj" hidden><label for="reason">Reason sent to the seller</label><textarea id="reason" placeholder="What the seller needs to fix before resubmitting"></textarea></div></section>`;
+  const blockedWhy=failed?"Ingest failed: reject or wait for a re-upload":matched?`<button id="gonote">Add an override note</button> to approve`:"";
+  $("decide").innerHTML=`
+    <div class="sel"><label>Clearance class<select id="cls"><option>Class A · unregistered</option><option ${matched?"selected":""}>Class B · seller-controlled</option></select></label>
+      <label>Price level<select id="lvl"><option>Level 1</option><option ${q.lvl==="Level 2"?"selected":""}>Level 2</option><option ${q.lvl==="Level 3"?"selected":""}>Level 3</option><option>Level 4</option></select></label></div>
+    <div class="row">${blockedWhy?`<span class="hint">${blockedWhy}</span>`:`<span class="keys">J/K move · Space play · audited</span>`}
+      <button class="btn btn-outline btn-danger ml" id="rej">Reject…</button>
+      <button class="btn btn-primary" id="ok" ${matched||failed?"disabled":""}>Approve and publish</button></div>`;
   $("pp").onclick=()=>{playing=!playing;paintP()};
   $("wv").onclick=e=>{const r=e.currentTarget.getBoundingClientRect();t=(e.clientX-r.left)/r.width*q.d;paintP()};
+  if($("gonote"))$("gonote").onclick=()=>{$("note").focus();$("note").scrollIntoView({block:"center",behavior:"smooth"})};
   if(matched)$("note").oninput=e=>$("ok").disabled=e.target.value.trim().length<10;
   $("rej").onclick=()=>{const rj=$("rj");if(rj.hidden){rj.hidden=false;$("reason").focus();$("rej").textContent="Send rejection"}else if($("reason").value.trim()){toast(`Rejected ${q.t}. Seller notified.`);pick(sel+1)}};
   $("ok").onclick=()=>{toast(`Approved ${q.t}. Published at ${$("lvl").value}.`);pick(sel+1)};
   paintP();
 }
-function paintP(){const q=Q[sel],b=$("wv").children,on=Math.floor(t/q.d*b.length);for(let k=0;k<b.length;k++)b[k].classList.toggle("on",k<on);$("tc").textContent=`${fmt(t)} / ${fmt(q.d)}`;$("pp").innerHTML=playing?'<svg viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>':'<svg viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></svg>'}
+function paintP(){const q=Q[sel],b=$("wv").children,on=Math.floor(t/q.d*b.length);for(let k=0;k<b.length;k++)b[k].classList.toggle("on",k<on);$("tc").textContent=`${fmt(t)} / ${fmt(q.d)}`;$("pp").classList.toggle("on",playing);$("pp").setAttribute("aria-label",playing?"Pause preview":"Play preview");$("pp").innerHTML=playing?'<svg viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>':'<svg viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></svg>'}
 function toast(m){$("toast").textContent=m;$("toast").classList.add("show");clearTimeout(toast.h);toast.h=setTimeout(()=>$("toast").classList.remove("show"),2200)}
 function loop(now){const dt=(now-lastT)/1000;lastT=now;if(playing){t+=dt;if(t>=Q[sel].d){t=0;playing=false}paintP()}requestAnimationFrame(loop)}
 document.addEventListener("keydown",e=>{if(e.target.matches("input,textarea,select"))return;if(e.key==="j")pick(sel+1);if(e.key==="k")pick(sel-1);if(e.key===" "){e.preventDefault();playing=!playing;paintP()}});

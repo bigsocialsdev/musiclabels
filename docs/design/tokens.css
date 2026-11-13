@@ -1,65 +1,76 @@
-/* Night Session design tokens. Variable names follow shadcn/ui so this maps onto app/globals.css.
-   Storefront (discovery, track, checkout, buyer dashboard) defaults to dark; seller portal and admin default to light.
-   Both themes ship everywhere; next-themes switches the class. */
+/* Night Session design tokens. Names follow shadcn/ui so this block maps onto app/globals.css.
+   Storefront routes force .dark; seller portal and admin default to light (users may switch).
+   Orange (--signal) belongs to sound only: play, playhead, played waveform, beat. The one
+   sanctioned exception is the wordmark's on-air light (the dot beside "MRM"). Everything
+   shadcn colours by default (--primary, --ring, checked controls) is neutral ink. */
 
 :root,
 .light {
-  --background: #F5F5F3;
-  --foreground: #16161A;
+  --background: #F6F5F2;
+  --foreground: #1A1815;
   --card: #FFFFFF;
-  --card-foreground: #16161A;
+  --card-foreground: #1A1815;
   --popover: #FFFFFF;
-  --popover-foreground: #16161A;
-  --secondary: #EDECE9;
-  --secondary-foreground: #16161A;
-  --muted: #EDECE9;
-  --muted-foreground: #66666F;
-  --accent: #E7E6E2;
-  --accent-foreground: #16161A;
-  --border: #E2E1DD;
-  --input: #D6D5D1;
-  --primary: #FF6A2B;
-  --primary-foreground: #160A03;
-  --ring: #F05A1C;
-  --destructive: #C8322E;
+  --popover-foreground: #1A1815;
+  --primary: #1A1815;
+  --primary-foreground: #F6F5F2;
+  --secondary: #EDEBE7;
+  --secondary-foreground: #1A1815;
+  --muted: #EDEBE7;
+  --muted-foreground: #66615A;
+  --accent: #E6E3DE;
+  --accent-foreground: #1A1815;
+  --destructive: #B82B27;
+  --border: #E3E0DB;
+  --input: #D4D0CA;
+  --ring: #1A1815;
 
-  --fg-2: #3D3D45;
-  --surface-3: #E2E1DD;
-  --wave-idle: #CFCEC9;
+  /* ink ramp: foreground > fg-2 > muted-foreground > fg-4 (fg-4 is never body text) */
+  --fg-2: #403C36;
+  --fg-4: #A6A199;
+  --surface-3: #E3E0DB;
+
+  --signal: #FF6A2B;
+  --signal-foreground: #160A03;
+  --wave-idle: #D2CEC7;
   --wave-played: #F05A1C;
   --stage-glow: rgba(255, 106, 43, 0.14);
 
   --ok: #12804F;
   --attention: #9A5B00;
-  --blocked: #C8322E;
+  --blocked: #B82B27;
   --info: #2459C9;
 }
 
 .dark {
-  --background: #101014;
-  --foreground: #F2F1EE;
-  --card: #18181E;
-  --card-foreground: #F2F1EE;
-  --popover: #1D1D24;
-  --popover-foreground: #F2F1EE;
-  --secondary: #22222A;
-  --secondary-foreground: #F2F1EE;
-  --muted: #22222A;
-  --muted-foreground: #8F8F99;
-  --accent: #2B2B34;
-  --accent-foreground: #F2F1EE;
-  --border: #26262E;
-  --input: #32323C;
-  --primary: #FF6A2B;
-  --primary-foreground: #160A03;
-  --ring: #FF6A2B;
-  --destructive: #FF5A5A;
+  --background: #141311;
+  --foreground: #F2F0EB;
+  --card: #1C1A17;
+  --card-foreground: #F2F0EB;
+  --popover: #221F1C;
+  --popover-foreground: #F2F0EB;
+  --primary: #F2F0EB;
+  --primary-foreground: #141311;
+  --secondary: #262421;
+  --secondary-foreground: #F2F0EB;
+  --muted: #262421;
+  --muted-foreground: #9C968D;
+  --accent: #302D29;
+  --accent-foreground: #F2F0EB;
+  --destructive: #FF6B6B;
+  --border: #2B2825;
+  --input: #3A3631;
+  --ring: #F2F0EB;
 
-  --fg-2: #C6C5C1;
-  --surface-3: #2E2E38;
-  --wave-idle: #3A3A44;
+  --fg-2: #CDC8BF;
+  --fg-4: #6F6A62;
+  --surface-3: #3A3631;
+
+  --signal: #FF6A2B;
+  --signal-foreground: #160A03;
+  --wave-idle: #47423C;
   --wave-played: #FF6A2B;
-  --stage-glow: rgba(255, 106, 43, 0.22);
+  --stage-glow: rgba(255, 106, 43, 0.26);
 
   --ok: #3DD68C;
   --attention: #F5B83D;
@@ -71,6 +82,7 @@
   --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Red Hat Mono", ui-monospace, monospace;
 
+  --radius: 10px; /* shadcn base: rounded-sm/md/lg/xl derive from it */
   --radius-xs: 6px;
   --radius-sm: 10px;
   --radius-md: 14px;

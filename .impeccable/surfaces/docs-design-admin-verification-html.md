@@ -15,11 +15,11 @@ Task: an admin clears a queue all day: scan ageing, open a submission, check scr
 
 THESIS: The same session, house lights up. The console runs on the storefront's type, ramp and single accent, in a light daylight theme built for eight-hour queue work; it refuses the generic SaaS dashboard of cards, KPI tiles and coloured sidebars.
 
-OWN-WORLD: Night Session daylight theme: warm off-white ground, white work surfaces, charcoal ink, the same four-step grey ramp, tape orange only on the primary action of the open item; status uses a small semantic set (ok green, attention amber, blocked red, info blue) as dot plus label, never filled banners. Hanken Grotesk at 13–14px for tables, Geist Mono for IDs, ages, durations and amounts. Track waveforms appear here too, small, so admins hear what they approve.
+OWN-WORLD: Night Session daylight theme: warm off-white ground, white work surfaces, warm charcoal ink, the same four-step ink ramp, neutral ink primary for Approve; tape orange appears only on sound (the preview play state and played waveform), never on selection or actions. Status uses a small semantic set (ok green, attention amber, blocked red, info blue) as dot plus label, never filled banners. Hanken Grotesk at 13-14px for tables, Red Hat Mono for IDs, ages, sizes and amounts. Track waveforms appear here too, small, so admins hear what they approve. No eyebrow labels; sample data is marked and uses fictional rightsholders. The only non-sound use of tape orange is the wordmark on-air light (the dot beside MRM).
 
 STORY: The admin sees what is oldest and blocked first, opens it, hears it, checks evidence, decides, and the next item loads.
 
-FIRST VIEWPORT: Top bar with area tabs and the admin's identity with MFA state; left: queue table (track, seller, submitted age, ingest, screening, class) sorted by age with overdue rows marked; right: detail pane for the selected submission: waveform player, screening result, rights declaration and documents list, class and price-level selects, reject-with-reason and approve.
+FIRST VIEWPORT: Top bar with area tabs and the admin identity with MFA state; filter segments and a sample-data marker; left: queue table (track, seller, waiting age, ingest, screening, docs, proposed level) sorted by age with overdue ages in red; right: detail pane (title, then seller, ID, version and age, waveform player, facts, screening with the override note directly under a match, rights and documents, ingest) above a sticky decision bar holding clearance class, price level, the reason approve is blocked, Reject and Approve, all inside 1440x900.
 
 FORM: Night Session (daylight), inherited world; Operate surface built code-led. seed:c71607a50c192dcb
 

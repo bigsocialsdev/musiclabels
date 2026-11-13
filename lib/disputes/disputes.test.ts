@@ -226,21 +226,45 @@ describe('refund eligibility (PLAN 4.6, 5.4)', () => {
     expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, id), eq(auditLog.action, 'dispute.make_refund_eligible')))).toHaveLength(1);
   });
 
-  it('not before the window, and not for a Class B claim unless the claimant is a cataloged rightsholder', async () => {
+  it('not before the window, and not for a claim with no resolution deadline unless the claimant is a cataloged rightsholder', async () => {
     const early = await sale(db, gw, store, { clearanceClass: 'A' });
     const earlyId = await opened(early);
     await recordFirstAction(db, await dispatcher(), earlyId, { note: 'x' });
-    const b = await sale(db, gw, store, { clearanceClass: 'B' });
-    const bId = await opened(b, {}, old());
-    await recordFirstAction(db, await dispatcher(), bId, { note: 'x' });
+    const c = await sale(db, gw, store, { clearanceClass: 'B' });
+    await db.update(tracks).set({ clearanceClass: 'C' }).where(eq(tracks.id, c.trackId)); // Class C: no 48h deadline
+    const cId = await opened(c, {}, old());
+    expect((await row(cId)).resolutionDueAt).toBeNull();
+    await recordFirstAction(db, await dispatcher(), cId, { note: 'x' });
     await makeRefundEligible(db, 1000);
     expect((await row(earlyId)).status).toBe('in_progress');
-    expect((await row(bId)).status).toBe('in_progress');
+    expect((await row(cId)).status).toBe('in_progress');
 
-    expect(await setClaimantCataloged(db, await dispatcher(), bId, true)).toEqual({ ok: true });
-    expect((await db.select().from(auditLog).where(and(eq(auditLog.entityId, bId), eq(auditLog.action, 'dispute.claimant_cataloged')))).length).toBe(1);
+    expect(await setClaimantCataloged(db, await dispatcher(), cId, true)).toEqual({ ok: true });
+    expect((await db.select().from(auditLog).where(and(eq(auditLog.entityId, cId), eq(auditLog.action, 'dispute.claimant_cataloged')))).length).toBe(1);
     await makeRefundEligible(db, 1000);
-    expect((await row(bId)).status).toBe('refund_eligible');
+    expect((await row(cId)).status).toBe('refund_eligible');
+  });
+
+  it('an in-progress dispute whose 48h resolution deadline ops missed becomes refund_eligible, well before the window', async () => {
+    const missed = await sale(db, gw, store, { clearanceClass: 'B' });
+    const missedId = await opened(missed, {}, new Date(Date.now() - 3 * DAY)); // deadline passed, window (7 days) not
+    const inTime = await sale(db, gw, store, { clearanceClass: 'B' });
+    const inTimeId = await opened(inTime, {}, new Date(Date.now() - DAY)); // still inside 48h
+    const resolved = await sale(db, gw, store, { clearanceClass: 'B' });
+    const resolvedId = await opened(resolved, {}, new Date(Date.now() - 3 * DAY));
+    const open = await sale(db, gw, store, { clearanceClass: 'B' });
+    const openId = await opened(open, {}, new Date(Date.now() - 3 * DAY)); // no first action: not covered
+    const admin = await dispatcher();
+    for (const id of [missedId, inTimeId, resolvedId]) await recordFirstAction(db, admin, id, { note: 'x' });
+    await resolveDispute(db, admin, resolvedId, { resolution: 'denied', note: 'out of scope' });
+
+    await makeRefundEligible(db, 1000);
+    expect((await row(missedId)).status).toBe('refund_eligible');
+    expect((await row(inTimeId)).status).toBe('in_progress');
+    expect((await row(resolvedId)).status).toBe('resolved_denied');
+    expect((await row(openId)).status).toBe('open');
+    expect((await mailsTo(missed.buyer.owner.email!, 'dispute.refund_eligible'))).toHaveLength(1);
+    expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, missedId), eq(auditLog.action, 'dispute.make_refund_eligible')))).toHaveLength(1);
   });
 
   it('a kit-issued dispute becomes refund-eligible on its window too; a released one never does', async () => {

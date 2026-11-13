@@ -20,13 +20,22 @@ export async function previewUrl(db: DbOrTx, trackId: string): Promise<string | 
   return k ? createSignedDownloadUrl(BUCKETS.previews, k.previewKey!, 600) : null;
 }
 
+async function fetchPeaks(key: string): Promise<{ peaks?: unknown } | null> {
+  try {
+    const res = await fetch(await createSignedDownloadUrl(BUCKETS.previews, key, 60));
+    return res.ok ? ((await res.json()) as { peaks?: unknown }) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Waveform bars (0..1) for a published track, reduced to `n` bars. */
 export async function trackPeaks(db: DbOrTx, trackId: string, n: number): Promise<{ peaks: number[]; durationMs: number } | null> {
   const k = await playableKeys(db, trackId);
   if (!k?.waveformKey) return null;
-  const res = await fetch(await createSignedDownloadUrl(BUCKETS.previews, k.waveformKey, 60));
-  if (!res.ok) return null;
-  const body = (await res.json()) as { peaks?: unknown };
+  // A storage hiccup must not break the page: the strips fall back to a flat line.
+  const body = await fetchPeaks(k.waveformKey);
+  if (!body) return null;
   if (!Array.isArray(body.peaks) || !body.peaks.every((p) => typeof p === 'number')) return null;
   return { peaks: downsamplePeaks(body.peaks as number[], n), durationMs: k.durationMs ?? 0 };
 }

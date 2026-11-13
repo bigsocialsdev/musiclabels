@@ -3,7 +3,7 @@ import { and, desc, eq, lte, sql } from 'drizzle-orm';
 import { legalDocuments } from '@/db/schema';
 import type { DbOrTx } from '@/lib/platform/db';
 import { writeAudit } from '@/lib/audit/server';
-import type { AdminContext } from '@/lib/identity';
+import { requirePermission, type AdminContext } from '@/lib/identity';
 import type { LegalDocument, LegalKind } from '../index';
 
 export type NewLegalDocument = { kind: LegalKind; bodyMarkdown: string; effectiveAt?: Date };
@@ -22,7 +22,7 @@ const toDoc = (r: typeof legalDocuments.$inferSelect): LegalDocument => ({
  * Documents are immutable: fixing a typo is a new version.
  */
 export async function publishLegalDocument(db: DbOrTx, admin: AdminContext, input: NewLegalDocument, ip?: string | null) {
-  if (!admin.permissions.includes('superadmin')) throw new Error('Publishing legal documents requires superadmin');
+  requirePermission(admin, 'superadmin'); // a PermissionError, so the admin matrix can tell a refusal from a run
   return db.transaction(async (tx) => {
     // Serialise concurrent publishes of the same kind so version numbers stay consecutive
     // (FOR UPDATE alone would not lock when no version exists yet).

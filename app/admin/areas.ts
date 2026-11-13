@@ -12,6 +12,9 @@ export const AREAS: readonly { href: string; label: string; permission: AreaPerm
   { href: '/admin/payouts', label: 'Payouts', permission: 'finance' },
   { href: '/admin/reconciliation', label: 'Reconciliation', permission: 'finance' },
   { href: '/admin/enquiries', label: 'Enquiries', permission: 'any' },
+  { href: '/admin/catalog', label: 'Catalog', permission: 'verification' },
+  { href: '/admin/legal', label: 'Legal', permission: 'superadmin' },
+  { href: '/admin/audit', label: 'Audit log', permission: 'superadmin' },
 ];
 
 export const visibleAreas = (permissions: readonly AdminPermission[]) =>

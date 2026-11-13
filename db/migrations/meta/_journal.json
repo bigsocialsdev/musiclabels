@@ -120,6 +120,13 @@
       "when": 1794558802226,
       "tag": "0016_dispute_open_deadline",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794560192421,
+      "tag": "0017_seller_documents",
+      "breakpoints": true
     }
   ]
 }

@@ -1,11 +1,10 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { rightsDeclarations, rightsDocuments, trackVersions, tracks } from '@/db/schema';
 import { getMembershipRole } from '@/lib/identity/server';
 import { getCurrentDocument, hasOrgAccepted } from '@/lib/legal/server';
 import type { DbOrTx } from '@/lib/platform/db';
+import type { DocumentMime } from '@/lib/platform/document-validation';
+import { DOC_EXTENSIONS, validateStoredDocument } from '@/lib/platform/stored-document';
 import { uuidv7 } from '@/lib/platform/ids';
 import { BUCKETS, createSignedUploadUrl, supabaseObjectStore, type ObjectStore } from '@/lib/platform/storage';
 import { getSellerStanding } from '@/lib/sellers/server';
@@ -17,7 +16,6 @@ import {
   type RightsDeclarationInput,
   type TrackInput,
 } from '../index';
-import { MAX_DOCUMENT_BYTES, validateRightsDocument, type DocumentMime } from './document-validation';
 import { applyTransition } from './transition';
 
 /** The caller as established by the action: a signed-in user acting for one of their organisations. */
@@ -26,7 +24,6 @@ export type SellerActor = { userId: string; orgId: string };
 export class CatalogError extends Error {}
 
 const AUDIO_EXTENSIONS = ['wav', 'mp3'] as const;
-const DOC_EXTENSIONS: Record<DocumentMime, string> = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' };
 
 /** Membership check (org ids from the client are inputs to verify) plus the track belongs to that org. */
 async function ownTrack(db: DbOrTx, actor: SellerActor, trackId: string) {
@@ -147,27 +144,7 @@ export async function confirmRightsDocument(db: DbOrTx, actor: SellerActor, docu
   if (!doc) throw new CatalogError('Document not found');
   await ownTrack(db, actor, doc.trackId);
 
-  const work = await mkdtemp(path.join(tmpdir(), 'mrm-doc-'));
-  let status: 'valid' | 'rejected' = 'rejected';
-  let error: string | null = null;
-  let size: number | null = null;
-  try {
-    const file = path.join(work, 'doc');
-    try {
-      await store.downloadToFile(BUCKETS.documents, doc.fileKey, file);
-      size = (await stat(file)).size;
-      if (size > MAX_DOCUMENT_BYTES) error = 'The file is larger than 10 MB';
-      else {
-        const result = validateRightsDocument(await readFile(file), doc.declaredMime);
-        if (result.ok) status = 'valid';
-        else error = result.error;
-      }
-    } catch {
-      error = 'The uploaded file was not found. Please upload it again.';
-    }
-  } finally {
-    await rm(work, { recursive: true, force: true });
-  }
+  const { status, error, size } = await validateStoredDocument(store, doc.fileKey, doc.declaredMime);
   await db.update(rightsDocuments).set({ validationStatus: status, validationError: error, sizeBytes: size }).where(eq(rightsDocuments.id, documentId));
   return { status, error };
 }

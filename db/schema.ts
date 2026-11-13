@@ -1077,3 +1077,31 @@ export const enquiries = pgTable(
     index('enquiries_status_idx').on(t.status, t.createdAt),
   ],
 ).enableRLS();
+
+// ---- seller onboarding (S4-M7) ----
+
+/**
+ * KYC documents a seller uploads at onboarding (PAN card, ID, GST certificate, bank proof). Private bucket, checked
+ * like rights documents (PLAN F9), shown to admins only as attachment downloads. Rows are never deleted: a corrected
+ * document is a new row.
+ */
+export const sellerDocuments = pgTable(
+  'seller_documents',
+  {
+    id: id(),
+    sellerOrgId: uuid('seller_org_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
+    kind: text('kind').notNull(),
+    declaredMime: text('declared_mime').notNull(),
+    fileKey: text('file_key').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }),
+    validationStatus: text('validation_status').notNull().default('pending'),
+    validationError: text('validation_error'),
+    uploadedBy: uuid('uploaded_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('seller_documents_kind_check', sql`${t.kind} in ('pan_card','id_proof','gst_certificate','bank_proof')`),
+    check('seller_documents_validation_status_check', sql`${t.validationStatus} in ('pending','valid','rejected')`),
+    index('seller_documents_org_idx').on(t.sellerOrgId, t.uploadedAt),
+  ],
+).enableRLS();

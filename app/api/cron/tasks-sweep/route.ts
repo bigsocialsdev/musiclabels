@@ -1,3 +1,4 @@
+import { refreshStaleCertificates } from '@/lib/certificates/server';
 import { sweepCatalog } from '@/lib/catalog/server';
 import { backfillClearance, dispatchClearance } from '@/lib/clearance/server';
 import { productionDeps, sweepOrders } from '@/lib/orders/server';
@@ -21,5 +22,9 @@ export async function GET(req: Request) {
   const clearance = await Promise.resolve()
     .then(async () => ({ backfilled: await backfillClearance(getDb()), sent: await dispatchClearance(getDb()) }))
     .catch((e: unknown) => ({ error: errorMessage(e) }));
-  return Response.json({ orders, clearance, outboxSent: await processOutbox(), catalogProcessed: await sweepCatalog(3) });
+  // Certificate revisions owed after channel changes.
+  const certificates = await Promise.resolve()
+    .then(() => refreshStaleCertificates(getDb(), productionDeps().store))
+    .catch((e: unknown) => ({ error: errorMessage(e) }));
+  return Response.json({ orders, clearance, certificates, outboxSent: await processOutbox(), catalogProcessed: await sweepCatalog(3) });
 }

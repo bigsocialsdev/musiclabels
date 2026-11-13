@@ -2,7 +2,7 @@ import { asc, eq } from 'drizzle-orm';
 import { enquiries } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
 import { getSellableTrack } from '@/lib/catalog/server';
-import type { AdminContext } from '@/lib/identity';
+import { PermissionError, type AdminContext } from '@/lib/identity';
 import { enqueueEmail, enqueueOpsAlert } from '@/lib/notifications/server';
 import { allowPublicSubmission } from '@/lib/platform/ratelimit';
 import type { DbOrTx } from '@/lib/platform/db';
@@ -36,14 +36,14 @@ const isAdmin = (a: AdminContext) => a.permissions.length > 0;
 
 /** Pipeline view (PLAN §9: any admin). */
 export async function listEnquiries(db: DbOrTx, admin: AdminContext, status?: EnquiryStatus) {
-  if (!isAdmin(admin)) throw new Error('Admins only');
+  if (!isAdmin(admin)) throw new PermissionError('Admins only');
   if (status && !ENQUIRY_STATUSES.includes(status)) throw new Error('unknown status');
   return db.select().from(enquiries).where(status ? eq(enquiries.status, status) : undefined).orderBy(asc(enquiries.createdAt)).limit(500);
 }
 
 /** new → contacted → closed_won | closed_lost (new can close lost directly). Compare-and-set, audited. */
 export async function setEnquiryStatus(db: DbOrTx, admin: AdminContext, enquiryId: string, to: EnquiryStatus, ip?: string | null) {
-  if (!isAdmin(admin)) throw new Error('Admins only');
+  if (!isAdmin(admin)) throw new PermissionError('Admins only');
   return db.transaction(async (tx) => {
     const [e] = await tx.select({ status: enquiries.status }).from(enquiries).where(eq(enquiries.id, enquiryId)).for('update');
     if (!e) return { ok: false as const, reason: 'not_found' as const };

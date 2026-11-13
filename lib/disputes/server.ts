@@ -4,6 +4,7 @@ export { applyDisputeTransition, type DisputeTransitionResult, type DisputeRow }
 export { openDispute, listBuyerDisputes, getBuyerDisputeEvents } from './internal/open';
 export {
   listDisputes,
+  listRefundEligibleDisputes,
   getDisputeDetail,
   recordFirstAction,
   resolveDispute,

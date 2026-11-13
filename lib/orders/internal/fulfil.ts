@@ -6,6 +6,7 @@ import { creditSaleRoyalty } from '@/lib/ledger/server';
 import { TIER_LABELS } from '@/lib/certificates';
 import { getLicenseByOrder, issueLicense, sellabilityIssues, type Tier } from '@/lib/licensing/server';
 import { enqueueEmail, enqueueOpsAlert } from '@/lib/notifications/server';
+import { createRefundRequest } from '@/lib/payments/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import { errorMessage } from '@/lib/platform/log';
 import type { ObjectStore } from '@/lib/platform/storage';
@@ -51,7 +52,11 @@ export async function fulfilOrder(db: DbOrTx, orderId: string, store: ObjectStor
       if (issues.length) {
         await db.transaction(async (tx) => {
           const t = await applyOrderTransition(tx, o.id, 'unsellable', { actorUserId: null, reason: `unsellable_at_fulfilment: ${issues.join(', ')}`, set: { fulfilClaimedAt: null } });
-          if (t.ok) await enqueueOpsAlert(tx, 'unsellable_at_fulfilment', 'Paid order cannot be fulfilled: refund it', { orderId: o.id, issues });
+          if (t.ok) {
+            // The full refund is queued with the transition; the sweep sends it (PLAN §5.2 a).
+            await createRefundRequest(tx, { orderId: o.id, reason: 'unsellable_at_fulfilment', amountPaise: o.totalPaise, requestedBy: null });
+            await enqueueOpsAlert(tx, 'unsellable_at_fulfilment', 'Paid order could not be fulfilled; a full refund is queued', { orderId: o.id, issues });
+          }
         });
         return 'refund_pending';
       }

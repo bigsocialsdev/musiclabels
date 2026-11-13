@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto';
 import { z } from 'zod';
 import { safeEqual } from '@/lib/platform/crypto';
 import { getEnv } from '@/lib/platform/env';
-import type { GatewayPayment, PaymentGateway } from '../index';
+import type { GatewayPayment, GatewayRefund, PaymentGateway } from '../index';
 
 const API = 'https://api.razorpay.com/v1';
 
@@ -14,6 +14,20 @@ const paymentSchema = z.object({
   status: z.enum(['created', 'authorized', 'captured', 'refunded', 'failed']),
   created_at: z.number(),
 });
+
+const refundSchema = z.object({
+  id: z.string(),
+  payment_id: z.string(),
+  amount: z.number().int(),
+  receipt: z.string().nullable().optional(),
+  status: z.enum(['pending', 'processed', 'failed']),
+});
+
+/** Maps a Razorpay refund entity (API response or webhook payload). */
+export function toGatewayRefund(raw: unknown): GatewayRefund {
+  const r = refundSchema.parse(raw);
+  return { id: r.id, paymentId: r.payment_id, amountPaise: r.amount, receipt: r.receipt ?? null, status: r.status };
+}
 
 /** Maps a Razorpay payment entity (API response or webhook payload). */
 export function toGatewayPayment(raw: unknown): GatewayPayment {
@@ -74,6 +88,17 @@ export class RazorpayGateway implements PaymentGateway {
   async fetchOrderPayments(gatewayOrderId: string) {
     const r = z.object({ items: z.array(z.unknown()) }).parse(await this.call('GET', `/orders/${encodeURIComponent(gatewayOrderId)}/payments`));
     return r.items.map(toGatewayPayment);
+  }
+
+  async refund(input: { paymentId: string; amountPaise: number; receipt: string }) {
+    return toGatewayRefund(
+      await this.call('POST', `/payments/${encodeURIComponent(input.paymentId)}/refund`, { amount: input.amountPaise, speed: 'normal', receipt: input.receipt, notes: { refund_id: input.receipt } }),
+    );
+  }
+
+  async findRefund(paymentId: string, receipt: string) {
+    const r = z.object({ items: z.array(z.unknown()) }).parse(await this.call('GET', `/payments/${encodeURIComponent(paymentId)}/refunds?count=100`));
+    return r.items.map(toGatewayRefund).find((x) => x.receipt === receipt && x.status !== 'failed') ?? null;
   }
 
   async listPayments(from: Date, to: Date) {

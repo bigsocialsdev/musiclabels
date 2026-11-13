@@ -723,7 +723,10 @@ export const invoices = pgTable(
 
 // ---- ledger (S3-M4 writes sale royalties; S3-M5 adds the rest) ----
 
-/** Append-only, signed. One entry per (order, kind). payout_id gets its FK with the payouts table (S3-M5). */
+/**
+ * Append-only, signed. One entry per (order, kind) and one `payout` debit per payout. A seller's balance at a
+ * cutoff is the sum of entries available by then; payout debits are entries too, so nothing is ever updated.
+ */
 export const ledgerEntries = pgTable(
   'ledger_entries',
   {
@@ -732,7 +735,7 @@ export const ledgerEntries = pgTable(
     kind: text('kind').notNull(),
     amountPaise: bigint('amount_paise', { mode: 'number' }).notNull(),
     orderId: uuid('order_id').references(() => orders.id, { onDelete: 'restrict' }),
-    payoutId: uuid('payout_id'),
+    payoutId: uuid('payout_id').references((): AnyPgColumn => payouts.id, { onDelete: 'restrict' }),
     availableAt: timestamp('available_at', { withTimezone: true }).notNull(),
     createdAt: createdAt(),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'restrict' }),
@@ -743,6 +746,12 @@ export const ledgerEntries = pgTable(
       sql`${t.kind} in ('sale_royalty','refund_reversal','chargeback_reversal','clawback','payout','adjustment')`,
     ),
     uniqueIndex('ledger_entries_order_kind_key').on(t.orderId, t.kind).where(sql`${t.orderId} is not null`),
+    uniqueIndex('ledger_entries_payout_key').on(t.payoutId).where(sql`${t.kind} = 'payout'`),
+    check('ledger_entries_payout_check', sql`(${t.kind} = 'payout') = (${t.payoutId} is not null)`),
+    check(
+      'ledger_entries_sign_check',
+      sql`(${t.kind} = 'sale_royalty' and ${t.amountPaise} >= 0) or (${t.kind} in ('refund_reversal','chargeback_reversal','clawback','payout') and ${t.amountPaise} <= 0) or ${t.kind} = 'adjustment'`,
+    ),
     index('ledger_entries_seller_idx').on(t.sellerOrgId, t.availableAt),
   ],
 ).enableRLS();
@@ -761,4 +770,141 @@ export const certificates = pgTable(
     generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique('certificates_license_revision_key').on(t.licenseId, t.revision)],
+).enableRLS();
+
+// ---- refunds, credit notes, chargebacks (S3-M5) ----
+
+/**
+ * Full refunds only: one per order, amount equal to the order total (DB trigger). The row id is the Razorpay
+ * receipt, so a retried refund call cannot refund twice.
+ */
+export const refunds = pgTable(
+  'refunds',
+  {
+    id: id(),
+    orderId: uuid('order_id').notNull().unique().references(() => orders.id, { onDelete: 'restrict' }),
+    reason: text('reason').notNull(),
+    amountPaise: bigint('amount_paise', { mode: 'number' }).notNull(),
+    gatewayRefundId: text('gateway_refund_id').unique(),
+    status: text('status').notNull().default('requested'),
+    note: text('note'),
+    requestedBy: uuid('requested_by').references(() => users.id, { onDelete: 'restrict' }), // null = system
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    processedAt: timestamp('processed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('refunds_reason_check', sql`${t.reason} in ('claim_not_released','platform_error','invalid_rights','unsellable_at_fulfilment','admin_goodwill')`),
+    check('refunds_status_check', sql`${t.status} in ('requested','processing','processed','failed')`),
+    check('refunds_amount_check', sql`${t.amountPaise} > 0`),
+    index('refunds_status_idx').on(t.status),
+  ],
+).enableRLS();
+
+/** Reverses an invoice in full. Same immutability as invoices; pdf_key write-once. Own gap-free series (MCN). */
+export const creditNotes = pgTable(
+  'credit_notes',
+  {
+    id: id(),
+    invoiceId: uuid('invoice_id').notNull().unique().references(() => invoices.id, { onDelete: 'restrict' }),
+    refundId: uuid('refund_id').notNull().unique().references(() => refunds.id, { onDelete: 'restrict' }),
+    number: text('number').notNull().unique(),
+    fy: text('fy').notNull(),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull(),
+    reason: text('reason').notNull(),
+    taxablePaise: bigint('taxable_paise', { mode: 'number' }).notNull(),
+    cgstPaise: bigint('cgst_paise', { mode: 'number' }).notNull(),
+    sgstPaise: bigint('sgst_paise', { mode: 'number' }).notNull(),
+    igstPaise: bigint('igst_paise', { mode: 'number' }).notNull(),
+    totalPaise: bigint('total_paise', { mode: 'number' }).notNull(),
+    pdfKey: text('pdf_key'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check('credit_notes_number_length_check', sql`char_length(${t.number}) <= 16`),
+    check('credit_notes_total_check', sql`${t.totalPaise} = ${t.taxablePaise} + ${t.cgstPaise} + ${t.sgstPaise} + ${t.igstPaise}`),
+  ],
+).enableRLS();
+
+export const chargebacks = pgTable(
+  'chargebacks',
+  {
+    id: id(),
+    orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'restrict' }),
+    gatewayDisputeId: text('gateway_dispute_id').notNull().unique(),
+    status: text('status').notNull().default('open'),
+    amountPaise: bigint('amount_paise', { mode: 'number' }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check('chargebacks_status_check', sql`${t.status} in ('open','won','lost')`)],
+).enableRLS();
+
+// ---- sellers: payout accounts (S3-M5; the seller UI arrives with S4-M7) ----
+
+/** One account per seller org. Changing it needs AAL2 and clears verified_at; payouts wait until re-verified. */
+export const payoutAccounts = pgTable('payout_accounts', {
+  sellerOrgId: uuid('seller_org_id').primaryKey().references(() => organizations.id, { onDelete: 'restrict' }),
+  accountNumberEncrypted: text('account_number_encrypted').notNull(),
+  ifsc: text('ifsc').notNull(),
+  accountHolderName: text('account_holder_name').notNull(),
+  nameMatchStatus: text('name_match_status').notNull().default('unchecked'),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  verifiedBy: uuid('verified_by').references(() => users.id, { onDelete: 'restrict' }),
+  railRef: text('rail_ref'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+// ---- payouts (S3-M5) ----
+
+export const payoutBatches = pgTable(
+  'payout_batches',
+  {
+    id: id(),
+    period: text('period').notNull().unique(),
+    cutoffAt: timestamp('cutoff_at', { withTimezone: true }).notNull(),
+    status: text('status').notNull().default('draft'),
+    railFileKey: text('rail_file_key'),
+    approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'restrict' }),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('payout_batches_status_check', sql`${t.status} in ('draft','computed','approved','processing','completed')`),
+    check('payout_batches_period_check', sql`${t.period} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+  ],
+).enableRLS();
+
+/** One line per seller per batch. Amounts are fixed at compute; net = base − TDS + seller GST. */
+export const payouts = pgTable(
+  'payouts',
+  {
+    id: id(),
+    batchId: uuid('batch_id').notNull().references(() => payoutBatches.id, { onDelete: 'restrict' }),
+    sellerOrgId: uuid('seller_org_id').notNull().references(() => organizations.id, { onDelete: 'restrict' }),
+    royaltyBasePaise: bigint('royalty_base_paise', { mode: 'number' }).notNull(),
+    tdsPaise: bigint('tds_paise', { mode: 'number' }).notNull(),
+    sellerGstPaise: bigint('seller_gst_paise', { mode: 'number' }).notNull(),
+    rcmGstPaise: bigint('rcm_gst_paise', { mode: 'number' }).notNull(),
+    netPaise: bigint('net_paise', { mode: 'number' }).notNull(),
+    rail: text('rail').notNull(),
+    railRef: text('rail_ref'),
+    utr: text('utr'),
+    failureReason: text('failure_reason'),
+    status: text('status').notNull().default('pending'),
+    statementPdfKey: text('statement_pdf_key'),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('payouts_batch_seller_key').on(t.batchId, t.sellerOrgId),
+    check('payouts_status_check', sql`${t.status} in ('pending','processing','paid','failed')`),
+    check('payouts_rail_check', sql`${t.rail} in ('bank_file','razorpayx')`),
+    check('payouts_amounts_check', sql`${t.royaltyBasePaise} > 0 and ${t.tdsPaise} >= 0 and ${t.sellerGstPaise} >= 0 and ${t.rcmGstPaise} >= 0`),
+    check('payouts_net_check', sql`${t.netPaise} = ${t.royaltyBasePaise} - ${t.tdsPaise} + ${t.sellerGstPaise}`),
+  ],
 ).enableRLS();

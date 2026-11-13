@@ -6,7 +6,17 @@ import { getMembershipRole } from '@/lib/identity/server';
 import { enqueueOpsAlert } from '@/lib/notifications/server';
 import { HANDLED_EVENT_TYPES, type GatewayPayment, type PaymentGateway } from '@/lib/payments';
 import { consume } from '@/lib/platform/ratelimit';
-import { getPaymentEvent, markPaymentEventProcessed, recordPaymentEvent, recordReconciliationItem, toGatewayPayment } from '@/lib/payments/server';
+import {
+  findRefundByGateway,
+  getPaymentEvent,
+  markPaymentEventProcessed,
+  recordPaymentEvent,
+  recordReconciliationItem,
+  toGatewayPayment,
+  toGatewayRefund,
+} from '@/lib/payments/server';
+import { applyDisputeEvent } from './chargeback';
+import { completeRefund, failRefund } from './refund';
 import type { DbOrTx } from '@/lib/platform/db';
 import { errorMessage, log } from '@/lib/platform/log';
 import type { OrderStatus } from '../index';
@@ -53,9 +63,10 @@ export async function markPaid(db: DbOrTx, payment: GatewayPayment, source: stri
   });
 }
 
+const entityOf = z.object({ entity: z.unknown() }).optional();
 const webhookSchema = z.object({
   event: z.string(),
-  payload: z.object({ payment: z.object({ entity: z.unknown() }).optional() }).passthrough(),
+  payload: z.object({ payment: entityOf, refund: entityOf, dispute: entityOf }).passthrough(),
 });
 
 /**
@@ -65,10 +76,31 @@ const webhookSchema = z.object({
 export async function processPaymentEvent(db: DbOrTx, eventId: string): Promise<{ fulfilOrderId?: string }> {
   const ev = await getPaymentEvent(db, eventId);
   if (!ev || ev.processedAt) return {};
-  // Refund and dispute events stay unprocessed (stored, deduped) until S3-M5 handles them.
+  // Unhandled types stay stored and unprocessed, so a later handler can still pick them up.
   if (!(HANDLED_EVENT_TYPES as readonly string[]).includes(ev.eventType)) return {};
   const body = webhookSchema.parse(ev.payload);
   const entity = body.payload.payment?.entity;
+
+  if ((ev.eventType === 'refund.processed' || ev.eventType === 'refund.failed') && body.payload.refund?.entity) {
+    const r = toGatewayRefund(body.payload.refund.entity);
+    await db.transaction(async (tx) => {
+      const row = await findRefundByGateway(tx, r.id, r.receipt);
+      if (!row) await enqueueOpsAlert(tx, 'refund_unknown', 'Razorpay refund with no refund row (made outside the platform?)', { gatewayRefundId: r.id, paymentId: r.paymentId });
+      else if (ev.eventType === 'refund.processed') await completeRefund(tx, row.id); // credit-note PDF is rendered by the sweep
+      else await failRefund(tx, row.id, 'refund.failed webhook');
+      await markPaymentEventProcessed(tx, ev.id);
+    });
+    return {};
+  }
+  const disputeOutcome = z.enum(['created', 'won', 'lost']).safeParse(ev.eventType.replace(/^payment\.dispute\./, ''));
+  if (ev.eventType.startsWith('payment.dispute.') && disputeOutcome.success && body.payload.dispute?.entity) {
+    const outcome = disputeOutcome.data;
+    await db.transaction(async (tx) => {
+      await applyDisputeEvent(tx, outcome, body.payload.dispute!.entity);
+      await markPaymentEventProcessed(tx, ev.id);
+    });
+    return {};
+  }
 
   if ((ev.eventType === 'payment.captured' || ev.eventType === 'order.paid') && entity) {
     const payment = toGatewayPayment(entity);

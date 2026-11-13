@@ -12,14 +12,14 @@ type Patch = Partial<Pick<typeof orders.$inferInsert, 'gatewayOrderId' | 'gatewa
 
 /**
  * Compare-and-set `UPDATE orders … WHERE id = $1 AND status = $from` with its order_events row, and an
- * audit_log row when the actor is the system (actorUserId null), all in one transaction. Zero rows updated
+ * audit_log row for system (actorUserId null) and admin (`adminAction`) moves, all in one transaction. Zero rows updated
  * means another actor moved the order first: return its current status, do nothing.
  */
 export async function applyOrderTransition(
   db: DbOrTx,
   orderId: string,
   event: OrderEvent,
-  opts: { actorUserId: string | null; reason?: string | null; set?: Patch },
+  opts: { actorUserId: string | null; reason?: string | null; set?: Patch; adminAction?: boolean },
 ): Promise<OrderTransitionResult> {
   return db.transaction(async (tx) => {
     const [current] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId));
@@ -38,8 +38,8 @@ export async function applyOrderTransition(
       return { ok: false, reason: 'conflict', status: now?.status as OrderStatus | undefined } as const;
     }
     await tx.insert(orderEvents).values({ orderId, fromStatus: from, toStatus: to, event, actorUserId: opts.actorUserId, reason: opts.reason ?? null });
-    if (opts.actorUserId === null) {
-      await writeAudit(tx, { actorUserId: null, action: `order.${event}`, entityType: 'order', entityId: orderId, before: { status: from }, after: { status: to, reason: opts.reason ?? null } });
+    if (opts.actorUserId === null || opts.adminAction) {
+      await writeAudit(tx, { actorUserId: opts.actorUserId, action: `order.${event}`, entityType: 'order', entityId: orderId, before: { status: from }, after: { status: to, reason: opts.reason ?? null } });
     }
     return { ok: true, from, to } as const;
   });

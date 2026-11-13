@@ -21,5 +21,12 @@ const defaults: Record<string, string> = {
   SAC_CODE: 'TEST-SAC',
   GST_RATE_BPS: '1800',
   DEFAULT_ROYALTY_RATE_BPS: '7000',
+  // Test values only, not the [CA] figures.
+  TDS_RATE_BPS: '1000',
+  TDS_RATE_NO_PAN_BPS: '2000',
+  TDS_FY_THRESHOLD_PAISE: '3000000',
+  RCM_ON_UNREGISTERED_SELLERS: 'true',
+  PAYOUT_MIN_PAISE: '10000',
+  PAYOUT_DAY_OF_MONTH: '5',
 };
 for (const [k, v] of Object.entries(defaults)) process.env[k] ??= v;

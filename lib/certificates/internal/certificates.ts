@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { desc, eq, max } from 'drizzle-orm';
-import { certificates, creditNotes } from '@/db/schema';
+import { certificates } from '@/db/schema';
 import { getOrganization } from '@/lib/identity/server';
-import { getInvoiceByOrder } from '@/lib/invoicing/server';
+import { getCreditNoteByOrder, getInvoiceByOrder } from '@/lib/invoicing/server';
 import { getLegalDocument } from '@/lib/legal/server';
 import {
   getLicenseByPublicId,
@@ -127,8 +127,7 @@ export async function buyerDocumentUrl(db: DbOrTx, actor: BuyerActor, licenseId:
   if (!owned) return null;
   const l = owned.license;
   if (doc === 'credit-note') {
-    const inv = await getInvoiceByOrder(db, l.orderId);
-    const [note] = inv ? await db.select().from(creditNotes).where(eq(creditNotes.invoiceId, inv.id)) : [];
+    const note = await getCreditNoteByOrder(db, l.orderId);
     return note?.pdfKey ? sign(BUCKETS.pdfs, note.pdfKey, 900, `${note.number.replaceAll('/', '-')}.pdf`) : null;
   }
   if (doc === 'invoice') {

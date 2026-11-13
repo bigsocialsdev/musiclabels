@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Page, PageHeader } from '@/app/seller/ui';
 import { Table, Td, Th } from '@/app/seller/table';
 import { requireBuyerSession } from '@/app/buyer-session';
@@ -33,6 +34,8 @@ export default async function LicensesPage({ searchParams }: { searchParams: Pro
   const client = sp.client?.trim().slice(0, 100) || undefined;
   const page = Math.max(1, Number.parseInt(sp.page ?? '1', 10) || 1);
   const list = await listBuyerLicenses(getDb(), session.userId, { client, page });
+  // A bookmarked page past the end (licenses were removed, or the filter changed) goes to the last page, not an empty list.
+  if (list.total > 0 && page > list.pages) redirect(href(client, list.pages));
   const asAgency = list.clients.length > 0 || client;
 
   return (

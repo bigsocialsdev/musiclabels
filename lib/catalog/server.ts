@@ -27,4 +27,4 @@ export {
 export { processVersion, sweepCatalog, moveToReviewIfDone } from './internal/pipeline';
 export { applyTransition, type TransitionResult } from './internal/transition';
 export { validateRightsDocument } from './internal/document-validation';
-export { getPublishedTrack } from './internal/public';
+export { getPublishedTrack, getTrackFacts } from './internal/public';

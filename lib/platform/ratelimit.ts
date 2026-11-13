@@ -28,3 +28,15 @@ export async function cleanupRateLimits(db: DbOrTx = getDb()): Promise<number> {
   const rows = await db.execute(sql`DELETE FROM rate_limits WHERE updated_at < now() - interval '1 day' RETURNING key`);
   return rows.length;
 }
+
+/**
+ * Throttle for public forms that send an acknowledgement email to an address the visitor typed (so they cannot be
+ * used to mail a victim): 5 submissions an hour per client address and 2 per hour per target email. `ip` null
+ * (no address header) shares one bucket.
+ */
+export async function allowPublicSubmission(form: string, ip: string | null, email: string, db: DbOrTx = getDb()): Promise<boolean> {
+  const perHour = (n: number): Limit => ({ capacity: n, refillPerSecond: n / 3600 });
+  const byIp = await consume(`${form}:ip:${ip ?? 'unknown'}`, perHour(5), db);
+  const byEmail = await consume(`${form}:email:${email.toLowerCase()}`, perHour(2), db);
+  return byIp && byEmail;
+}

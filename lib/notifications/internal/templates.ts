@@ -26,6 +26,31 @@ const templates: Record<string, (p: Record<string, unknown>) => Rendered> = {
       `<p>Certificate, invoice, license text and downloads are on your license page. Anyone can check it at <a href="${esc(p.verifyUrl)}">${esc(p.verifyUrl)}</a>.</p>` +
       `<p>Clearance is a process: register each video on your license page before publishing.</p>`,
   }),
+  // Clearance (PLAN §4.5). Placeholder copy pending counsel [Lawyer]; never promises an outcome.
+  clearance_request: (p) => ({
+    subject: `${p.reminder ? 'Reminder: clearance' : 'Clearance'} requested for “${esc(p.trackTitle)}”`,
+    html:
+      `<p>${esc(p.licenseeName)} licensed “${esc(p.trackTitle)}” and will use it on ${esc(p.what)}.</p>` +
+      `<p>Please release or allowlist this use with the platform and tell us the result by ${esc(p.dueNote)}.</p>` +
+      `<p><a href="${esc(p.respondUrl)}">Respond here</a>. The link works once and expires on ${esc(p.expiresNote)}.</p>`,
+  }),
+  clearance_update: (p) => ({
+    subject: `Clearance update for “${esc(p.trackTitle)}”`,
+    html: `<p>${esc(p.message)}</p><p>Clearance is a process run with the track's seller; check the license page for the current status of each channel and video.</p>`,
+  }),
+  // Disputes and complaints (PLAN §4.6, §5.4, §5.5).
+  dispute_update: (p) => ({
+    subject: `${esc(p.subject)}`,
+    html: `<p>${esc(p.message)}</p>`,
+  }),
+  complaint_ack: (p) => ({
+    subject: 'We received your copyright complaint',
+    html: `<p>Reference ${esc(p.reference)}. Our grievance officer will review it and write to you at this address.</p>`,
+  }),
+  enquiry_ack: (p) => ({
+    subject: 'We received your enquiry',
+    html: `<p>Thank you, ${esc(p.contactName)}. We will contact you about “${esc(p.trackTitle)}”.</p>`,
+  }),
 };
 
 export function render(template: string, payload: Record<string, unknown>): Rendered {

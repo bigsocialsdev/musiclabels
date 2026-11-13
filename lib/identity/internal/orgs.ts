@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { memberships, organizations } from '@/db/schema';
+import { memberships, organizations, users } from '@/db/schema';
 import type { DbOrTx } from '@/lib/platform/db';
 
 export type NewOrganization = {
@@ -47,4 +47,14 @@ export async function getMembershipRole(db: DbOrTx, userId: string, orgId: strin
     .from(memberships)
     .where(and(eq(memberships.userId, userId), eq(memberships.orgId, orgId)));
   return (row?.role as 'owner' | 'member' | undefined) ?? null;
+}
+
+/** Owner emails of an org: where notices for the org go. */
+export async function listOrgOwnerEmails(db: DbOrTx, orgId: string): Promise<string[]> {
+  const rows = await db
+    .select({ email: users.email })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.orgId, orgId), eq(memberships.role, 'owner')));
+  return rows.flatMap((r) => (r.email ? [r.email] : []));
 }

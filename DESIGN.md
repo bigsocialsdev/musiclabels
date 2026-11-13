@@ -288,6 +288,8 @@ components:
 
 # Design System: MRM (working name)
 
+**Status: locked 2026-11-13 by the owner** (decision recorded in `docs/STATE.md`). Changes to the rules below go back to the owner.
+
 ## Overview
 
 **Creative North Star: "Night Session"**

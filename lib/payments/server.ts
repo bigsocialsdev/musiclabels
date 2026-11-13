@@ -1,6 +1,21 @@
 import 'server-only';
 export * from './index';
-export { RazorpayGateway, getPaymentGateway, toGatewayPayment } from './internal/razorpay';
+export { RazorpayGateway, getPaymentGateway, toGatewayPayment, toGatewayRefund } from './internal/razorpay';
+export {
+  REFUND_REASONS,
+  createRefundRequest,
+  getRefund,
+  findRefundByGateway,
+  claimRefund,
+  setGatewayRefundId,
+  releaseRefund,
+  markRefundProcessed,
+  markRefundFailed,
+  listRefundsToSweep,
+  type Refund,
+  type RefundReason,
+} from './internal/refunds';
+export { recordChargeback, decideChargeback } from './internal/chargebacks';
 export {
   recordPaymentEvent,
   getPaymentEvent,

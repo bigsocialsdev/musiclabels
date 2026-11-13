@@ -22,7 +22,22 @@ export interface PaymentGateway {
   fetchPayment(paymentId: string): Promise<GatewayPayment>;
   fetchOrderPayments(gatewayOrderId: string): Promise<GatewayPayment[]>;
   listPayments(from: Date, to: Date): Promise<GatewayPayment[]>;
+  /** Full refund; `receipt` is our refund row id. */
+  refund(input: { paymentId: string; amountPaise: number; receipt: string }): Promise<GatewayRefund>;
+  /** The refund already made for this receipt, if any: makes a retried refund call safe. */
+  findRefund(paymentId: string, receipt: string): Promise<GatewayRefund | null>;
 }
 
-/** Webhook events this milestone acts on; refund and dispute events are added with S3-M5. */
-export const HANDLED_EVENT_TYPES = ['payment.captured', 'order.paid', 'payment.failed'] as const;
+export type GatewayRefund = { id: string; paymentId: string; amountPaise: number; receipt: string | null; status: 'pending' | 'processed' | 'failed' };
+
+/** Webhook events acted on (PLAN §8.1). Anything else is stored and left unprocessed. */
+export const HANDLED_EVENT_TYPES = [
+  'payment.captured',
+  'order.paid',
+  'payment.failed',
+  'refund.processed',
+  'refund.failed',
+  'payment.dispute.created',
+  'payment.dispute.won',
+  'payment.dispute.lost',
+] as const;

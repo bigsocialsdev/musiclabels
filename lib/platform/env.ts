@@ -41,6 +41,13 @@ const schema = z.object({
   SAC_CODE: z.string().optional(),
   GST_RATE_BPS: z.coerce.number().int().min(0).max(10_000).optional(),
   DEFAULT_ROYALTY_RATE_BPS: z.coerce.number().int().min(0).max(10_000).optional(),
+  // [CA] payout tax config (PLAN §8.3, F5). Checked at use by the payouts slice.
+  TDS_RATE_BPS: z.coerce.number().int().min(0).max(10_000).optional(),
+  TDS_RATE_NO_PAN_BPS: z.coerce.number().int().min(0).max(10_000).optional(),
+  TDS_FY_THRESHOLD_PAISE: z.coerce.number().int().min(0).optional(),
+  RCM_ON_UNREGISTERED_SELLERS: z.enum(['true', 'false']).optional(),
+  PAYOUT_MIN_PAISE: z.coerce.number().int().min(0).optional(),
+  PAYOUT_DAY_OF_MONTH: z.coerce.number().int().min(1).max(28).optional(),
 });
 
 export type Env = z.infer<typeof schema>;

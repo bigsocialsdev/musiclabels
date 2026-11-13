@@ -3,7 +3,9 @@ import { orders } from '@/db/schema';
 import { enqueueOpsAlert } from '@/lib/notifications/server';
 import { consume } from '@/lib/platform/ratelimit';
 import type { PaymentGateway } from '@/lib/payments';
-import { listUnprocessedPaymentEvents, recordReconciliationItem } from '@/lib/payments/server';
+import { listCreditNotesWithoutPdf, storeCreditNotePdf } from '@/lib/invoicing/server';
+import { listRefundsToSweep, listUnprocessedPaymentEvents, recordReconciliationItem } from '@/lib/payments/server';
+import { executeRefund } from './refund';
 import type { DbOrTx } from '@/lib/platform/db';
 import { errorMessage, log } from '@/lib/platform/log';
 import type { ObjectStore } from '@/lib/platform/storage';
@@ -46,6 +48,8 @@ export async function sweepOrders(db: DbOrTx, deps: OrderDeps) {
   const events = await each(db, await listUnprocessedPaymentEvents(db), 'payment event', (id) => processPaymentEvent(db, id));
   const expired = await each(db, await listStaleUnpaidOrders(db), 'expiry', (id) => expireIfUnpaid(db, id, deps.gateway));
   const fulfilled = await each(db, await listPaidOrders(db), 'fulfil', (id) => fulfilOrder(db, id, deps.store));
+  const refunds = await each(db, await listRefundsToSweep(db), 'refund', (id) => executeRefund(db, id, deps));
+  await each(db, await listCreditNotesWithoutPdf(db), 'credit note pdf', (id) => storeCreditNotePdf(db, id, deps.store));
   const stuck = await db
     .select({ id: orders.id, lastError: orders.lastError })
     .from(orders)
@@ -53,7 +57,7 @@ export async function sweepOrders(db: DbOrTx, deps: OrderDeps) {
   for (const o of stuck) {
     await alertOnce(db, `stuck_paid:${o.id}`, DAY, 'stuck_paid', 'Order paid but not fulfilled', { orderId: o.id, lastError: o.lastError });
   }
-  return { events, expired, fulfilled, stuckPaid: stuck.length };
+  return { events, expired, fulfilled, refunds, stuckPaid: stuck.length };
 }
 
 const IST_OFFSET_MS = 330 * 60_000;

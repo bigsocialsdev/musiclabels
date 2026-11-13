@@ -1,10 +1,10 @@
 import { and, eq, isNull } from 'drizzle-orm';
-import { invoiceSeries, invoices } from '@/db/schema';
+import { creditNotes, invoiceSeries, invoices } from '@/db/schema';
 import { getEnv } from '@/lib/platform/env';
 import type { DbOrTx, Tx } from '@/lib/platform/db';
 import { BUCKETS, type ObjectStore } from '@/lib/platform/storage';
 import { financialYear, formatDocumentNumber, isValidGstin, type GstBreakdown, type SeriesKind } from '../index';
-import { renderInvoicePdf } from './invoice-pdf';
+import { renderCreditNotePdf, renderInvoicePdf } from './invoice-pdf';
 
 export type Invoice = typeof invoices.$inferSelect;
 
@@ -103,6 +103,52 @@ export async function issueInvoice(tx: Tx, input: IssueInvoiceInput): Promise<{ 
 export async function getInvoiceByOrder(db: DbOrTx, orderId: string): Promise<Invoice | null> {
   const [row] = await db.select().from(invoices).where(eq(invoices.orderId, orderId));
   return row ?? null;
+}
+
+export type CreditNote = typeof creditNotes.$inferSelect;
+
+/**
+ * Credit note reversing an invoice in full (refunds are full only), inside the refund's completion
+ * transaction. Idempotent on the invoice: a re-run returns the existing note and allocates nothing.
+ */
+export async function issueCreditNote(tx: Tx, input: { invoiceId: string; refundId: string; reason: string; issuedAt: Date }): Promise<{ creditNote: CreditNote; created: boolean }> {
+  const [existing] = await tx.select().from(creditNotes).where(eq(creditNotes.invoiceId, input.invoiceId));
+  if (existing) return { creditNote: existing, created: false };
+  const [inv] = await tx.select().from(invoices).where(eq(invoices.id, input.invoiceId));
+  if (!inv) throw new Error('invoice not found');
+  const fy = financialYear(input.issuedAt);
+  const [note] = await tx
+    .insert(creditNotes)
+    .values({
+      invoiceId: inv.id,
+      refundId: input.refundId,
+      number: await allocateDocumentNumber(tx, 'credit_note', fy),
+      fy,
+      issuedAt: input.issuedAt,
+      reason: input.reason,
+      taxablePaise: inv.taxablePaise,
+      cgstPaise: inv.cgstPaise,
+      sgstPaise: inv.sgstPaise,
+      igstPaise: inv.igstPaise,
+      totalPaise: inv.totalPaise,
+    })
+    .returning();
+  return { creditNote: note!, created: true };
+}
+
+export async function listCreditNotesWithoutPdf(db: DbOrTx, limit = 50): Promise<string[]> {
+  return (await db.select({ id: creditNotes.id }).from(creditNotes).where(isNull(creditNotes.pdfKey)).limit(limit)).map((r) => r.id);
+}
+
+export async function storeCreditNotePdf(db: DbOrTx, creditNoteId: string, store: ObjectStore): Promise<string> {
+  const [note] = await db.select().from(creditNotes).where(eq(creditNotes.id, creditNoteId));
+  if (!note) throw new Error('credit note not found');
+  if (note.pdfKey) return note.pdfKey;
+  const [inv] = await db.select().from(invoices).where(eq(invoices.id, note.invoiceId));
+  const key = `credit-notes/${note.fy}/${note.number.replaceAll('/', '-')}.pdf`;
+  await store.upload(BUCKETS.pdfs, key, await renderCreditNotePdf(note, inv!), 'application/pdf');
+  await db.update(creditNotes).set({ pdfKey: key }).where(and(eq(creditNotes.id, creditNoteId), isNull(creditNotes.pdfKey)));
+  return key;
 }
 
 /** Renders and stores the PDF once (pdf_key is write-once). Re-renderable from the row; safe to re-run. */

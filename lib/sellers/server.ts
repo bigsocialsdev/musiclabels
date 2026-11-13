@@ -1,3 +1,13 @@
 import 'server-only';
 export { getSellerStanding, type SellerStanding } from './internal/standing';
-// Onboarding (profile, KYC, payout accounts) arrives with S4-M7.
+export {
+  setPayoutAccount,
+  verifyPayoutAccount,
+  getPayoutAccount,
+  getVerifiedBankDetails,
+  payoutAccountInputSchema,
+  PayoutAccountError,
+  type PayoutAccountInput,
+  type PayoutAccountView,
+} from './internal/payout-accounts';
+// Onboarding UI (profile, KYC, payout account form) arrives with S4-M7.

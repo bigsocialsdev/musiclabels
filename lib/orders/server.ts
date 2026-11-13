@@ -17,6 +17,8 @@ export {
   type WebhookOutcome,
 } from './internal/payment';
 export { fulfilOrder, type FulfilResult } from './internal/fulfil';
+export { requestRefund, executeRefund, completeRefund, failRefund, type RequestRefundResult, type RefundRun } from './internal/refund';
+export { applyDisputeEvent } from './internal/chargeback';
 export { sweepOrders, reconcilePayments, reconcilePreviousDay, type OrderDeps } from './internal/sweep';
 export { getOrderForBuyer } from './internal/read';
 

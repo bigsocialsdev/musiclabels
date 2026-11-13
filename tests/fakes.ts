@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import type { GatewayPayment } from '@/lib/payments';
+import type { GatewayPayment, GatewayRefund } from '@/lib/payments';
 import { RazorpayGateway } from '@/lib/payments/server';
 import type { ObjectStore } from '@/lib/platform/storage';
 
@@ -46,6 +46,38 @@ export class FakeGateway extends RazorpayGateway {
     };
     this.payments.set(p.id, p);
     return p;
+  }
+
+  refunds = new Map<string, GatewayRefund>();
+  refundCalls = 0;
+  refundOutcome: GatewayRefund['status'] = 'processed';
+  /** The next refund is accepted by "Razorpay" but the call then fails, as if our process died mid-request. */
+  dieAfterNextRefund = false;
+
+  async refund(input: { paymentId: string; amountPaise: number; receipt: string }) {
+    this.refundCalls++;
+    const r: GatewayRefund = { id: rid('rfnd'), paymentId: input.paymentId, amountPaise: input.amountPaise, receipt: input.receipt, status: this.refundOutcome };
+    this.refunds.set(r.id, r);
+    if (this.dieAfterNextRefund) {
+      this.dieAfterNextRefund = false;
+      throw new Error('connection reset after the refund was accepted');
+    }
+    return r;
+  }
+  async findRefund(paymentId: string, receipt: string) {
+    return [...this.refunds.values()].find((r) => r.paymentId === paymentId && r.receipt === receipt) ?? null;
+  }
+
+  /** Any signed event with a raw payload (refund, dispute, …). */
+  event(event: string, payload: Record<string, unknown>, eventId = rid('evt')) {
+    const rawBody = JSON.stringify({ entity: 'event', event, payload });
+    return { rawBody, signature: createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET!).update(rawBody).digest('hex'), eventId };
+  }
+  refundEvent(event: 'refund.processed' | 'refund.failed', r: GatewayRefund) {
+    return this.event(event, { refund: { entity: { id: r.id, payment_id: r.paymentId, amount: r.amountPaise, receipt: r.receipt, status: event === 'refund.processed' ? 'processed' : 'failed' } } });
+  }
+  disputeEvent(outcome: 'created' | 'won' | 'lost', d: { id: string; paymentId: string; amountPaise: number }) {
+    return this.event(`payment.dispute.${outcome}`, { dispute: { entity: { id: d.id, payment_id: d.paymentId, amount: d.amountPaise } } });
   }
 
   callbackSignature(gatewayOrderId: string, paymentId: string) {

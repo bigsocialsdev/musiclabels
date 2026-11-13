@@ -1,4 +1,6 @@
-import { addChannel, registerVideo, replaceChannel, type BuyerActor, type ChannelInput, type Result, type VideoInput } from '@/lib/licensing/server';
+import { eq } from 'drizzle-orm';
+import { clearanceRequests } from '@/db/schema';
+import { addChannel, getLicenseForBuyer, registerVideo, replaceChannel, type BuyerActor, type ChannelInput, type Result, type VideoInput } from '@/lib/licensing/server';
 import type { DbOrTx } from '@/lib/platform/db';
 import { ensureClearanceRequests } from './requests';
 
@@ -28,3 +30,12 @@ export const registerVideoWithClearance = (db: DbOrTx, actor: BuyerActor, licens
     if (r.ok) await ensureClearanceRequests(tx, licenseId);
     return r;
   });
+
+/** Where each channel's or video's clearance stands, for the buyer's license page; nothing for another org's license. */
+export async function listBuyerClearance(db: DbOrTx, actor: BuyerActor, licenseId: string) {
+  if (!(await getLicenseForBuyer(db, actor, licenseId))) return [];
+  return db
+    .select({ channelId: clearanceRequests.licensedChannelId, videoId: clearanceRequests.licensedVideoId, status: clearanceRequests.status, dueAt: clearanceRequests.dueAt })
+    .from(clearanceRequests)
+    .where(eq(clearanceRequests.licenseId, licenseId));
+}

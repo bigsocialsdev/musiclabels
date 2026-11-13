@@ -4,6 +4,7 @@ import { getMembershipRole } from '@/lib/identity/server';
 import type { DbOrTx, Tx } from '@/lib/platform/db';
 import {
   MAX_CHANNEL_CORRECTIONS,
+  MAX_VIDEO_URLS,
   channelInputSchema,
   effectiveStatus,
   videoInputSchema,
@@ -127,7 +128,7 @@ export async function addVideoUrl(db: DbOrTx, actor: BuyerActor, licenseId: stri
       .where(and(eq(licensedVideos.id, videoId), eq(licensedVideos.licenseId, licenseId)));
     if (!video) return { ok: false, issues: ['video_not_found'] };
     if (video.urls.includes(url)) return { ok: true, value: undefined };
-    if (video.urls.length >= 10) return { ok: false, issues: ['too_many_urls'] };
+    if (video.urls.length >= MAX_VIDEO_URLS) return { ok: false, issues: ['too_many_urls'] };
     await tx
       .update(licensedVideos)
       .set({ urls: sql`array_append(${licensedVideos.urls}, ${url})` })

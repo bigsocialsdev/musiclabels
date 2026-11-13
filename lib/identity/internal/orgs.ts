@@ -30,7 +30,7 @@ export async function createOrganization(db: DbOrTx, userId: string, input: NewO
 /** The buyer orgs a user can purchase for (any membership role). */
 export async function listBuyerOrgs(db: DbOrTx, userId: string) {
   return db
-    .select({ id: organizations.id, legalName: organizations.legalName, buyerType: organizations.buyerType, verifyFullName: organizations.verifyFullName })
+    .select({ id: organizations.id, legalName: organizations.legalName, buyerType: organizations.buyerType, verifyFullName: organizations.verifyFullName, role: memberships.role })
     .from(memberships)
     .innerJoin(organizations, eq(organizations.id, memberships.orgId))
     .where(and(eq(memberships.userId, userId), eq(organizations.kind, 'buyer')));

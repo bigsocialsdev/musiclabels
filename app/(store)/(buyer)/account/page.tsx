@@ -37,13 +37,17 @@ export default async function AccountPage() {
                 </p>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <StatusLabel tone={o.verifyFullName ? 'attention' : 'ok'}>{o.verifyFullName ? 'Full name shown' : 'Name masked'}</StatusLabel>
-                  <form action={verifyDisplayAction}>
-                    <input type="hidden" name="orgId" value={o.id} />
-                    <input type="hidden" name="show" value={o.verifyFullName ? 'off' : 'on'} />
-                    <Button type="submit" variant="secondary">
-                      {o.verifyFullName ? 'Mask my name' : 'Show my full name'}
-                    </Button>
-                  </form>
+                  {o.role === 'owner' ? (
+                    <form action={verifyDisplayAction}>
+                      <input type="hidden" name="orgId" value={o.id} />
+                      <input type="hidden" name="show" value={o.verifyFullName ? 'off' : 'on'} />
+                      <Button type="submit" variant="secondary">
+                        {o.verifyFullName ? 'Mask my name' : 'Show my full name'}
+                      </Button>
+                    </form>
+                  ) : (
+                    <span className="text-[13px] text-muted-foreground">Only the account owner can change this.</span>
+                  )}
                 </div>
               </>
             ) : (

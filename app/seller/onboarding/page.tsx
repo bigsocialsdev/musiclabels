@@ -143,7 +143,7 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
         )}
       </Step>
 
-      <Step title="KYC documents" done={status.documents.valid > 0} description="Upload your PAN card and an ID. Only our verification team can open them.">
+      <Step title="KYC documents" done={status.documents.panCardValid} description="Upload your PAN card (required) and an ID. Only our verification team can open them.">
         {documents.length > 0 && (
           <ul className="space-y-1 text-sm">
             {documents.map((d) => (

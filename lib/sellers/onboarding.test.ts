@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { and, eq, sql } from 'drizzle-orm';
 import { auditLog, sellerDocuments, sellerProfiles } from '@/db/schema';
+import { listSellerOrgs } from '@/lib/identity/server';
 import { getCurrentDocument, publishLegalDocument } from '@/lib/legal/server';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { decrypt } from '@/lib/platform/crypto';
@@ -74,6 +75,13 @@ describe('creating the seller account', () => {
     expect(await err(createSellerAccount(db, await makeUser(db, { verified: false }), newSeller()))).toMatchObject({ message: 'unverified' });
   });
 
+  it('a user gets one seller org', async () => {
+    const me = await makeUser(db);
+    await createSellerAccount(db, me, newSeller());
+    expect(await err(createSellerAccount(db, me, newSeller()))).toMatchObject({ message: 'You already have a seller account.' });
+    expect(await listSellerOrgs(db, me.userId)).toHaveLength(1);
+  });
+
   it('only the owner edits the profile; a blank GSTIN clears the registration flag', async () => {
     const s = await makeSeller(db);
     await updateSellerProfile(db, s.owner, s.orgId, { entityType: 'llp', opsContactEmail: 'new@seller.example', gstin: '29ABCDE1234F1Z5' });
@@ -98,6 +106,10 @@ describe('PAN', () => {
     expect(p!.panEncrypted).not.toContain('ABCDE1234F');
     expect(decrypt(p!.panEncrypted!)).toBe('ABCDE1234F');
     expect(p!.kycStatus).toBe('pending');
+
+    const rejected = await makeSeller(db, { kyc: 'rejected' }); // re-entering a PAN does not undo a rejection
+    await setSellerPan(db, { ...rejected.owner, aal: 'aal2' }, rejected.orgId, 'ABCDE1234F');
+    expect((await db.select().from(sellerProfiles).where(eq(sellerProfiles.orgId, rejected.orgId)))[0]!.kycStatus).toBe('rejected');
     const [a] = await db.select().from(auditLog).where(and(eq(auditLog.entityId, s.orgId), eq(auditLog.action, 'seller.pan_set')));
     expect(JSON.stringify(a!.after)).not.toContain('ABCDE1234F');
     expect(JSON.stringify(a!.after)).toContain('234F');
@@ -117,7 +129,10 @@ describe('KYC documents', () => {
     const list = await listSellerDocuments(db, s.owner, s.orgId);
     expect(list.map((d) => d.status)).toEqual(['valid', 'rejected', 'rejected']);
     expect(JSON.stringify(list)).not.toContain(s.orgId); // no storage keys in what the seller sees
-    expect(await getOnboardingStatus(db, s.owner, s.orgId)).toMatchObject({ documents: { valid: 1, pending: 0, rejected: 2 } });
+    expect(await getOnboardingStatus(db, s.owner, s.orgId)).toMatchObject({ documents: { valid: 1, pending: 0, rejected: 2, panCardValid: true } });
+    const [badRow] = await db.select().from(sellerDocuments).where(eq(sellerDocuments.id, bad));
+    files.set(`documents/${badRow!.fileKey}`, pdf); // swapping the file after the verdict changes nothing
+    expect(await confirmSellerDocument(db, s.owner, bad, store)).toMatchObject({ status: 'rejected' });
 
     const other = await makeSeller(db);
     expect(await err(listSellerDocuments(db, other.owner, s.orgId))).toMatchObject({ message: 'forbidden' });
@@ -125,6 +140,12 @@ describe('KYC documents', () => {
     expect(await err(confirmSellerDocument(db, other.owner, good, store))).toMatchObject({ message: 'forbidden' });
     expect(await err(requestSellerDocumentUpload(db, other.owner, s.orgId, { kind: 'pan_card', mime: 'application/pdf' }))).toMatchObject({ message: 'forbidden' });
     expect(await err(requestSellerDocumentUpload(db, s.owner, s.orgId, { kind: 'pan_card', mime: 'application/zip' }))).toBeInstanceOf(OnboardingError);
+  });
+
+  it('an org holds at most 20 upload rows', async () => {
+    const s = await makeSeller(db);
+    for (let i = 0; i < 20; i++) await requestSellerDocumentUpload(db, s.owner, s.orgId, { kind: 'id_proof', mime: 'application/pdf' });
+    expect(await err(requestSellerDocumentUpload(db, s.owner, s.orgId, { kind: 'id_proof', mime: 'application/pdf' }))).toBeInstanceOf(OnboardingError);
   });
 
   it('the database never deletes a document or changes anything but the validation result', async () => {
@@ -173,13 +194,17 @@ describe('admin KYC review', () => {
 
     await setSellerPan(db, me, orgId, 'ABCDE1234F');
     expect(await setKycStatus(db, admin, orgId, 'verified', 'looks fine')).toEqual({ ok: false, reason: 'incomplete' }); // still no valid document
+    await confirmSellerDocument(db, me, await uploaded(orgId, me, pdf, 'id_proof'), store);
+    expect(await setKycStatus(db, admin, orgId, 'verified', 'looks fine')).toEqual({ ok: false, reason: 'incomplete' }); // an ID alone is not the PAN card
     const doc = await uploaded(orgId, me, pdf);
     await confirmSellerDocument(db, me, doc, store);
     expect(await setKycStatus(db, admin, orgId, 'verified', 'PAN card matches')).toEqual({ ok: true });
     expect((await getOnboardingStatus(db, me, orgId))!.kycStatus).toBe('verified');
     expect(await setKycStatus(db, admin, orgId, 'rejected', 'name mismatch')).toEqual({ ok: true });
     expect(await setKycStatus(db, admin, '00000000-0000-7000-8000-000000000000', 'rejected', 'x')).toEqual({ ok: false, reason: 'not_found' });
-    expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, orgId), sql`${auditLog.action} like 'seller.kyc_%'`))).toHaveLength(2);
+    expect(await setKycStatus(db, admin, orgId, 'pending', 'seller sent a new document')).toEqual({ ok: true }); // only an admin re-opens a rejection
+    expect((await getOnboardingStatus(db, me, orgId))!.kycStatus).toBe('pending');
+    expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, orgId), sql`${auditLog.action} like 'seller.kyc_%'`))).toHaveLength(3);
 
     expect(await sellerDocumentDownloadUrl(db, admin, doc)).toContain(`/download/${orgId}/kyc/`);
     expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, doc), eq(auditLog.action, 'seller_document.download')))).toHaveLength(1);

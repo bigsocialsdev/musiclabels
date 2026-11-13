@@ -54,42 +54,44 @@ async function submit(fn: (session: Session, orgId: string | null, ctx: Ctx) => 
 }
 
 const text = (f: FormData, k: string) => (typeof f.get(k) === 'string' ? (f.get(k) as string) : '');
-const need = (orgId: string | null) => orgId ?? (() => { throw new OnboardingError('Create your seller account first.'); })();
+function requireOrg(orgId: string | null): string {
+  if (!orgId) throw new OnboardingError('Create your seller account first.');
+  return orgId;
+}
+/** The profile fields both forms share; the slice's zod schema does the real validation. */
+const profileFields = (f: FormData) => ({
+  entityType: text(f, 'entityType'),
+  gstin: text(f, 'gstin'),
+  opsContactEmail: text(f, 'opsContactEmail'),
+  opsContactPhone: text(f, 'opsContactPhone') || undefined,
+});
 
 export async function createSellerAction(formData: FormData) {
   return submit(async (session) => {
     await createSellerAccount(getDb(), session, {
+      ...profileFields(formData),
       legalName: text(formData, 'legalName'),
       displayName: text(formData, 'displayName'),
-      entityType: text(formData, 'entityType') as 'company',
-      gstin: text(formData, 'gstin'),
-      opsContactEmail: text(formData, 'opsContactEmail'),
-      opsContactPhone: text(formData, 'opsContactPhone') || undefined,
-      worldwideRightsWarranted: (formData.get('worldwideRightsWarranted') === 'on') as true, // the schema rejects false with a message
+      worldwideRightsWarranted: formData.get('worldwideRightsWarranted') === 'on', // the schema rejects false with a message
     });
   }, 'Seller account created.');
 }
 
 export async function updateProfileAction(formData: FormData) {
   return submit(async (session, orgId) => {
-    await updateSellerProfile(getDb(), session, need(orgId), {
-      entityType: text(formData, 'entityType') as 'company',
-      gstin: text(formData, 'gstin'),
-      opsContactEmail: text(formData, 'opsContactEmail'),
-      opsContactPhone: text(formData, 'opsContactPhone') || undefined,
-    });
+    await updateSellerProfile(getDb(), session, requireOrg(orgId), profileFields(formData));
   }, 'Profile saved.');
 }
 
 export async function setPanAction(formData: FormData) {
   return submit(async (session, orgId, ctx) => {
-    await setSellerPan(getDb(), session, need(orgId), text(formData, 'pan'), { ip: ctx.ip });
+    await setSellerPan(getDb(), session, requireOrg(orgId), text(formData, 'pan'), { ip: ctx.ip });
   }, 'PAN saved.');
 }
 
 export async function setBankAction(formData: FormData) {
   return submit(async (session, orgId, ctx) => {
-    await setPayoutAccount(getDb(), session, need(orgId), { accountNumber: text(formData, 'accountNumber'), ifsc: text(formData, 'ifsc'), accountHolderName: text(formData, 'accountHolderName') }, ctx.ip);
+    await setPayoutAccount(getDb(), session, requireOrg(orgId), { accountNumber: text(formData, 'accountNumber'), ifsc: text(formData, 'ifsc'), accountHolderName: text(formData, 'accountHolderName') }, ctx.ip);
   }, 'Bank account saved. Finance will verify it before the first payout.');
 }
 
@@ -97,7 +99,7 @@ const termsInput = z.array(z.enum(SELLER_TERMS)).min(1, 'Tick the box to accept.
 export async function acceptTermsAction(formData: FormData) {
   return submit(async (session, orgId, ctx) => {
     const kinds = termsInput.parse(formData.getAll('kind'));
-    await acceptSellerTerms(getDb(), session, need(orgId), kinds, ctx);
+    await acceptSellerTerms(getDb(), session, requireOrg(orgId), kinds, ctx);
   }, 'Accepted.');
 }
 
@@ -106,7 +108,7 @@ export async function requestKycUploadAction(raw: { kind: string; mime: string }
   const { session, orgId } = await requireSellerSession(HERE);
   const input = z.object({ kind: z.enum(KYC_DOC_KINDS), mime: z.string().max(100) }).parse(raw);
   try {
-    return { ok: true as const, ...(await requestSellerDocumentUpload(getDb(), session, need(orgId), input)) };
+    return { ok: true as const, ...(await requestSellerDocumentUpload(getDb(), session, requireOrg(orgId), input)) };
   } catch (e) {
     const message = friendly(e);
     if (message === null) throw e;

@@ -2,7 +2,7 @@ import { escalateClearance, listClearanceQueue, resendClearance, resolveClearanc
 import { getDisputeDetail, listComplaints, listRefundEligibleDisputes, listDisputes, recordFirstAction, requestDisputeRefund, resolveComplaint, resolveDispute, setClaimantCataloged, startInvestigation } from '@/lib/disputes/server';
 import { listEnquiries, setEnquiryStatus } from '@/lib/enquiries/server';
 import type { AdminContext, AdminPermission } from '@/lib/identity/server';
-import { listReconciliationItems, listRefunds, resolveReconciliationItem } from '@/lib/payments/server';
+import { listReconciliationItems, listRefunds, resolveReconciliationItem, retryRefund } from '@/lib/payments/server';
 import { approvePayoutBatch, computePayoutBatch, getPayoutBatchDetail, listPayoutBatches, payoutBankFileUrl, recordPayoutFailed, recordPayoutPaid, submitPayoutBatch } from '@/lib/payouts/server';
 import type { Db } from '@/lib/platform/db';
 
@@ -31,6 +31,7 @@ export const ADMIN_CALLS: readonly AdminCall[] = [
   { name: 'complaints.resolve', permission: 'disputes', mutates: true, run: (db, a) => resolveComplaint(db, a, ID, { outcome: 'rejected', note: 'spam' }) },
   { name: 'refunds.list', permission: 'finance', mutates: false, run: (db, a) => listRefunds(db, a) },
   { name: 'refunds.eligible_disputes', permission: 'finance', mutates: false, run: (db, a) => listRefundEligibleDisputes(db, a) },
+  { name: 'refunds.retry', permission: 'finance', mutates: true, run: (db, a) => retryRefund(db, a, ID) },
   { name: 'payouts.list', permission: 'finance', mutates: false, run: (db, a) => listPayoutBatches(db, a) },
   { name: 'payouts.detail', permission: 'finance', mutates: false, run: (db, a) => getPayoutBatchDetail(db, a, ID) },
   // A period that has not ended: past the permission check the compute refuses, so the shared test database gains no batch.

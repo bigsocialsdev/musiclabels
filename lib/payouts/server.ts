@@ -9,6 +9,7 @@ export {
   recordPayoutFailed,
   storePayoutStatement,
   runPayoutsCron,
+  PayoutRefusal,
   type ComputeResult,
   type Payout,
   type PayoutBatch,

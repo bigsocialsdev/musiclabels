@@ -13,6 +13,7 @@ export {
   markRefundFailed,
   listRefundsToSweep,
   listRefunds,
+  retryRefund,
   type Refund,
   type RefundReason,
 } from './internal/refunds';

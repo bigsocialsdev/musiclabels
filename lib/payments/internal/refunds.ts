@@ -27,7 +27,10 @@ export async function createRefundRequest(
     .values({ orderId: input.orderId, reason: input.reason, amountPaise: input.amountPaise, requestedBy: input.requestedBy, note: input.note ?? null })
     .onConflictDoNothing({ target: refunds.orderId })
     .returning();
-  if (row) return row;
+  if (row) {
+    await writeAudit(db, { actorUserId: input.requestedBy, action: 'refund.requested', entityType: 'refund', entityId: row.id, after: { status: 'requested', reason: input.reason, amountPaise: input.amountPaise, orderId: input.orderId } });
+    return row;
+  }
   const [existing] = await db.select().from(refunds).where(eq(refunds.orderId, input.orderId));
   return existing!;
 }
@@ -115,4 +118,18 @@ export async function listRefunds(db: DbOrTx, admin: AdminContext, status?: Refu
     .where(status ? eq(refunds.status, status) : undefined)
     .orderBy(desc(refunds.createdAt))
     .limit(500);
+}
+
+/**
+ * Finance re-sends a refund that failed or was never sent. Only the audit row (who asked) is written here; the caller
+ * kicks `executeRefund`, whose claim is the compare-and-set that keeps a double click to one send.
+ */
+export async function retryRefund(db: DbOrTx, admin: AdminContext, refundId: string, ip?: string | null): Promise<{ ok: boolean }> {
+  requirePermission(admin, 'finance');
+  return db.transaction(async (tx) => {
+    const [r] = await tx.select({ status: refunds.status }).from(refunds).where(eq(refunds.id, refundId)).for('update');
+    if (!r || (r.status !== 'requested' && r.status !== 'failed')) return { ok: false };
+    await writeAudit(tx, { actorUserId: admin.userId, action: 'refund.retry', entityType: 'refund', entityId: refundId, before: { status: r.status }, after: { status: r.status }, ip });
+    return { ok: true };
+  });
 }

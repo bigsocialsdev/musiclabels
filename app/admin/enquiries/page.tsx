@@ -19,7 +19,7 @@ const STATUS: Record<EnquiryStatus, { tone: StatusTone; label: string }> = {
   closed_won: { tone: 'ok', label: 'Won' },
   closed_lost: { tone: 'muted', label: 'Lost' },
 };
-const MOVE: Record<EnquiryStatus, string> = { new: 'New', contacted: 'Mark contacted', closed_won: 'Close as won', closed_lost: 'Close as lost' };
+const MOVE: Record<Exclude<EnquiryStatus, 'new'>, string> = { contacted: 'Mark contacted', closed_won: 'Close as won', closed_lost: 'Close as lost' };
 const ERRORS: Record<string, string> = { moved: 'That enquiry has already moved on.' };
 
 /** Commercial and Broadcast enquiries (PLAN §6.1, §9): the sales pipeline, open to any admin. These are leads; nothing is sold from here. */
@@ -73,7 +73,7 @@ export default async function EnquiriesPage({ searchParams }: { searchParams: Pr
           </thead>
           <tbody>
             {rows.map((e) => {
-              const s = STATUS[e.status as EnquiryStatus];
+              const s = own(STATUS, e.status);
               const next = ENQUIRY_TRANSITIONS.filter((t) => t.from === e.status).map((t) => t.to);
               return (
                 <tr key={e.id} className="align-top">
@@ -98,7 +98,7 @@ export default async function EnquiriesPage({ searchParams }: { searchParams: Pr
                     <div className="grid gap-2">
                       {next.map((to) => (
                         <form key={to} action={setEnquiryStatusAction.bind(null, e.id, to)}>
-                          <button className={docActionClass}>{MOVE[to]}</button>
+                          <button className={docActionClass}>{MOVE[to as keyof typeof MOVE]}</button>
                         </form>
                       ))}
                     </div>

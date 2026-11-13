@@ -21,7 +21,10 @@ const STATUS: Record<string, { tone: StatusTone; label: string }> = {
   failed: { tone: 'blocked', label: 'Failed' },
 };
 const DONE: Record<string, string> = { approved: 'Refund approved. It is being sent to Razorpay.', retry: 'Refund re-sent. Its status updates when Razorpay confirms.' };
-const ERRORS: Record<string, string> = { refund_unavailable: 'That dispute can no longer be refunded: it moved on, or its order is already refunded.' };
+const ERRORS: Record<string, string> = {
+  refund_unavailable: 'That dispute can no longer be refunded: it moved on, or its order is already refunded.',
+  refund_settled: 'That refund is already with Razorpay or done, so it cannot be sent again.',
+};
 
 /** Refunds (PLAN §9, finance): disputes waiting for approval, then every refund and where it stands. Refunds are full-order only. */
 export default async function RefundsPage({ searchParams }: { searchParams: Promise<{ done?: string; error?: string }> }) {

@@ -1,5 +1,5 @@
-import { asc, eq, sql } from 'drizzle-orm';
-import { disputeEvents, disputes, licenses } from '@/db/schema';
+import { and, asc, eq, notExists, sql } from 'drizzle-orm';
+import { disputeEvents, disputes, licenses, refunds } from '@/db/schema';
 import { writeAudit } from '@/lib/audit/server';
 import { requirePermission, type AdminContext } from '@/lib/identity';
 import { getLicenseById } from '@/lib/licensing/server';
@@ -122,7 +122,8 @@ export async function listRefundEligibleDisputes(db: DbOrTx, admin: AdminContext
     .select({ d: disputes, licensePublicId: licenses.publicId, trackTitle: licenses.trackTitle })
     .from(disputes)
     .innerJoin(licenses, eq(licenses.id, disputes.licenseId))
-    .where(eq(disputes.status, 'refund_eligible'))
+    // Once finance has approved, the refund row exists but the dispute stays refund_eligible until the sweep settles it.
+    .where(and(eq(disputes.status, 'refund_eligible'), notExists(db.select({ one: sql`1` }).from(refunds).where(eq(refunds.orderId, licenses.orderId)))))
     .orderBy(asc(disputes.refundEligibleAt))
     .limit(200);
   return rows.map((r) => ({ ...r.d, licensePublicId: r.licensePublicId, trackTitle: r.trackTitle }));

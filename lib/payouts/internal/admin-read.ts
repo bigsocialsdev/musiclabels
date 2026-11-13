@@ -46,6 +46,7 @@ export async function payoutBankFileUrl(db: DbOrTx, admin: AdminContext, batchId
   requirePermission(admin, 'finance');
   const [batch] = await db.select({ key: payoutBatches.railFileKey, period: payoutBatches.period }).from(payoutBatches).where(eq(payoutBatches.id, batchId));
   if (!batch?.key) return null;
+  const url = await createSignedDownloadUrl(BUCKETS.documents, batch.key, 120, `payout-bank-file-${batch.period}.csv`);
   await writeAudit(db, { actorUserId: admin.userId, action: 'payout_batch.download_bank_file', entityType: 'payout_batch', entityId: batchId, ip });
-  return createSignedDownloadUrl(BUCKETS.documents, batch.key, 120, `payout-bank-file-${batch.period}.csv`);
+  return url; // audited only once a link exists
 }

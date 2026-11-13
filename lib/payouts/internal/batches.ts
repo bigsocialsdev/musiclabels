@@ -12,6 +12,9 @@ import { getSellerStanding, getVerifiedBankDetails } from '@/lib/sellers/server'
 import { computePayoutLine, istDayOfMonth, periodCutoff, previousPeriod, type PayoutRail, type PayoutTaxConfig, type RailLine } from '../index';
 import { renderPayoutStatement } from './statement-pdf';
 
+/** A refusal the admin can act on (period not over or out of order, batch in the wrong state), as opposed to a fault. */
+export class PayoutRefusal extends Error {}
+
 export type PayoutBatch = typeof payoutBatches.$inferSelect;
 export type Payout = typeof payouts.$inferSelect;
 
@@ -52,11 +55,11 @@ export async function computePayoutBatch(db: DbOrTx, admin: AdminContext | null,
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('payout_batch'))`);
     const [existing] = await tx.select().from(payoutBatches).where(eq(payoutBatches.period, period));
     if (existing) return { batch: existing, created: false, lines: 0, skipped: [] };
-    if (cutoffAt > new Date()) throw new Error(`period ${period} has not ended`);
+    if (cutoffAt > new Date()) throw new PayoutRefusal(`period ${period} has not ended`);
     // Periods run in order. A balance is "everything available by the cutoff", and a payout's debit is dated at its
     // batch's cutoff, so an earlier period computed after a later one would not see that debit and pay twice.
     const [latest] = await tx.select({ cutoffAt: payoutBatches.cutoffAt, period: payoutBatches.period }).from(payoutBatches).orderBy(desc(payoutBatches.cutoffAt)).limit(1);
-    if (latest && cutoffAt <= latest.cutoffAt) throw new Error(`period ${period} is not after the latest batch (${latest.period}); payout periods run in order`);
+    if (latest && cutoffAt <= latest.cutoffAt) throw new PayoutRefusal(`period ${period} is not after the latest batch (${latest.period}); payout periods run in order`);
 
     const [batch] = await tx.insert(payoutBatches).values({ period, cutoffAt }).returning();
     const unsettled = new Set(
@@ -142,7 +145,7 @@ export async function submitPayoutBatch(
     if (moved.length) await audit(tx, admin.userId, 'payout_batch.submit', batchId, { rail: rail.id });
   });
   const [batch] = await db.select().from(payoutBatches).where(eq(payoutBatches.id, batchId));
-  if (batch?.status !== 'processing') throw new Error(`batch is ${batch?.status ?? 'missing'}, not approved`);
+  if (batch?.status !== 'processing') throw new PayoutRefusal(`batch is ${batch?.status ?? 'missing'}, not approved`);
   const pending = await db.select().from(payouts).where(and(eq(payouts.batchId, batchId), eq(payouts.status, 'pending')));
   if (pending.length === 0) return { submitted: 0, held: [], railRef: batch.railFileKey };
 

@@ -1,13 +1,18 @@
-import { afterAll, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { and, eq } from 'drizzle-orm';
 import { auditLog, payoutBatches, reconciliationItems } from '@/db/schema';
+import { executeRefund, requestRefund } from '@/lib/orders/server';
 import { getPayoutBatchDetail, payoutBankFileUrl } from '@/lib/payouts/server';
 import { closeDb, getDb } from '@/lib/platform/db';
-import { adminCtx } from '@/tests/commerce';
-import { listReconciliationItems, listRefunds, resolveReconciliationItem } from './server';
+import { adminCtx, sale, setupCommerce } from '@/tests/commerce';
+import { FakeGateway, MemoryStore } from '@/tests/fakes';
+import { listReconciliationItems, listRefunds, resolveReconciliationItem, retryRefund } from './server';
 
 afterAll(closeDb);
 const db = getDb();
+const gw = new FakeGateway();
+const store = new MemoryStore();
+beforeAll(() => setupCommerce(db, { L1: 100_000, L2: 200_000, L3: 300_000, L4: 400_000, L5: 5_000_000 }));
 
 const item = async (kind: 'unknown_payment' | 'amount_mismatch') => {
   const ref = `pay_${crypto.randomUUID()}`;
@@ -56,5 +61,34 @@ describe('finance reads', () => {
     expect(await payoutBankFileUrl(db, finance, batch!.id)).toBeNull();
     expect(await getPayoutBatchDetail(db, finance, '00000000-0000-7000-8000-000000000000')).toBeNull();
     expect(await db.select().from(auditLog).where(eq(auditLog.entityId, batch!.id))).toEqual([]);
+  });
+});
+
+describe('refund approval and retry are audited with the admin (PLAN §9)', () => {
+  const audits = (refundId: string, action: string) => db.select().from(auditLog).where(and(eq(auditLog.entityId, refundId), eq(auditLog.action, action)));
+
+  it('approving writes one refund.requested row naming the admin, and approving again adds none', async () => {
+    const finance = await adminCtx(db, ['finance']);
+    const s = await sale(db, gw, store);
+    const first = await requestRefund(db, finance, s.orderId, { reason: 'admin_goodwill' });
+    if (!first.ok) throw new Error(first.reason);
+    expect(await audits(first.refundId, 'refund.requested')).toMatchObject([{ actorUserId: finance.userId, entityType: 'refund' }]);
+    const again = await requestRefund(db, finance, s.orderId, { reason: 'admin_goodwill' });
+    expect(again).toMatchObject({ ok: true, refundId: first.refundId }); // refund_pending: returns the existing row
+    expect(await audits(first.refundId, 'refund.requested')).toHaveLength(1);
+  });
+
+  it('"send again" audits the admin, only for a refund that can still be sent, and needs finance', async () => {
+    const finance = await adminCtx(db, ['finance']);
+    const s = await sale(db, gw, store);
+    const r = await requestRefund(db, finance, s.orderId, { reason: 'admin_goodwill' });
+    if (!r.ok) throw new Error(r.reason);
+    await expect(retryRefund(db, await adminCtx(db, ['disputes']), r.refundId)).rejects.toThrow();
+    expect(await retryRefund(db, finance, r.refundId, '203.0.113.7')).toEqual({ ok: true });
+    expect(await audits(r.refundId, 'refund.retry')).toMatchObject([{ actorUserId: finance.userId, before: { status: 'requested' } }]);
+    expect(await executeRefund(db, r.refundId, { gateway: gw, store })).toBe('processed');
+    expect(await retryRefund(db, finance, r.refundId)).toEqual({ ok: false });
+    expect(await retryRefund(db, finance, '00000000-0000-7000-8000-000000000000')).toEqual({ ok: false });
+    expect(await audits(r.refundId, 'refund.retry')).toHaveLength(1);
   });
 });

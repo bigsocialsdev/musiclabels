@@ -18,3 +18,4 @@ export {
 } from './internal/channel-verify';
 export { addChannelWithClearance, replaceChannelWithClearance, registerVideoWithClearance } from './internal/usage';
 export { hashToken } from './internal/token';
+export { listSellerClearance, respondAsSeller, ClearanceInboxError, type ClearanceActor, type SellerClearanceRow } from './internal/seller-inbox';

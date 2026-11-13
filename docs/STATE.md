@@ -11,7 +11,7 @@ Phase 3 — Plan (Architect): outputs written (docs/PLAN.md, root CLAUDE.md) —
 | 1. Understand | Done — docs/PRD-analysis.md written; open questions resolved via assumptions |
 | 2. Critique | Done — docs/PRD-critique.md written; all recommendations ACCEPTED by user (2026-11-11) |
 | 3. Plan | Done pending [GATE] — docs/PLAN.md + CLAUDE.md written (2026-11-12) |
-| 4. Build | In progress — Session 3 (S3-M0 to S3-M6) merged; S4-M7 seller portal in progress (part a, onboarding, merged; part b, catalog management, in review) |
+| 4. Build | In progress — Session 3 (S3-M0 to S3-M6) merged; S4-M7 seller portal in progress (parts a, onboarding, and b, catalog management, merged; part c, sales, payouts and clearance inbox, in review) |
 | 5. Review | Not started |
 
 ## Decisions Made
@@ -281,6 +281,15 @@ Assumptions / deviations:
 - Not verified in a browser or with Playwright (no Auth stack here), as in part a.
 - **After review:** the rejection reason stays on the page while a rejected track is back in draft (until it is resubmitted or rejected again). Form messages travel sealed in the URL (`?m=`, AES-GCM via `lib/platform/flash.ts`), so a hand-made link cannot put its own text in the banner; part a's onboarding page uses the same. Background ingest uses `kick` (logged) instead of a bare `after`. Malformed ids from the browser are a message or a 404, not a 500; zod messages name the field; submit issues read as one sentence; the page refreshes itself every 5 s while audio is being processed; `/seller/tracks/new` checks seller standing before showing the form; shared `Field`, `Check` and `selectClass` live in `app/seller/ui.tsx`.
 - **Left as is (deliberate):** `createTrack`, `updateTrack` and `saveRightsDeclaration` still take `unknown` (the zod schema is the contract; the form hands over raw fields); a failed save loses what was typed (HTML constraints catch the common cases; keeping input needs a form-state redesign, better done with the design pass); `confirmMasterUpload` does not check that the file exists in storage (a missing file fails ingest with a visible reason); rejected rights documents stay listed (rows are never deleted); the track page says to check back for the decision, because no approval or rejection email is sent yet (needs an outbox template and a decision on the wording, so it is its own piece of work); there are no tests for the server actions themselves (Playwright, once an Auth stack exists).
+### S4-M7c Seller portal: sales, payouts, clearance inbox, 2026-11-13
+Built (the last of three S4-M7 PRs). Slices gain read sides, each scoped by the caller's org inside the function (a non-member is refused; another org's rows look missing): `lib/ledger` (`listSellerLedger`, `getSellerBalances`: available vs inside the 30-day hold), `lib/payouts` (`listSellerPayouts`, `sellerStatementUrl`), `lib/clearance` (`listSellerClearance`, `respondAsSeller`). Pages: `/seller/sales` (balances, latest 200 ledger entries, "Download CSV"), `/seller/sales/export` (CSV of up to 5000 entries, attachment, `no-store`; text cells go through `csvCell`, numbers and dates stay plain), `/seller/payouts` (royalty base, TDS, GST, net, UTR once paid; statement link for paid payouts, served as a 302 to a 5-minute signed attachment URL), `/seller/clearance` (open requests first; the owner answers "released" or "cannot release" with a note). Nav now has Sales, Payouts, Clearance.
+Tests (real Postgres): a seller sees only their own ledger, payouts and clearance rows, never the buyer; balances split by the hold; statement link only for the owning org and only for paid payouts with a statement; the owner answers once (audited by user, emailed link cleared), other orgs, non-owners and bad input are refused. Mutation-checked: ledger `WHERE`, payout org scope, clearance list and respond scope. `tsc`, `eslint` and `next build` pass. **The DB tests were last run on the local stack before it became unavailable (the machine no longer has Docker); CI is the re-run.**
+Assumptions / deviations:
+- **Sellers do not see the buyer** (licensee) in sales rows: track, tier and sale value only. Assumption; say if sellers should see the licensee name.
+- **The clearance inbox answers through the same `finishRequest` as the emailed link and admin**, with `via: 'seller_portal'` and the user recorded in `audit_log`. Only the org owner may answer; other members can look. The evidence-upload column stays reserved (not used).
+- Failed payouts show their status only; bank references and failure reasons stay with finance.
+- Not verified in a browser or with Playwright (no Auth stack), as in parts a and b. The S4-M7 Playwright exit criteria (onboarding, upload and resubmit, seller sees only own data) are covered at function level and remain open for the e2e run.
+- Still open from part b: new versions of published tracks, and seller approval/rejection emails.
 
 
 ## Notes

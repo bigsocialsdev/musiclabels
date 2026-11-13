@@ -7,3 +7,6 @@ export function royaltyPaise(taxablePaise: number, royaltyRateBps: number): numb
   if (!Number.isInteger(royaltyRateBps) || royaltyRateBps < 0 || royaltyRateBps > 10_000) throw new Error('invalid royalty rate');
   return Number((BigInt(taxablePaise) * BigInt(royaltyRateBps)) / 10_000n);
 }
+
+export const LEDGER_KINDS = ['sale_royalty', 'refund_reversal', 'chargeback_reversal', 'clawback', 'payout', 'adjustment'] as const;
+export type LedgerKind = (typeof LEDGER_KINDS)[number];

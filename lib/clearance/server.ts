@@ -5,8 +5,10 @@ export { ensureClearanceRequests, applyClearanceTransition, type ClearanceRow, t
 export { dispatchClearance, markOverdue, backfillClearance, peekResponse, respondToClearance, type ResponseView, type FinishOutcome } from './internal/workflow';
 export { listClearanceQueue, escalateClearance, resolveClearance, resendClearance, sellerTurnaround, type ClearanceQueueRow, type SellerTurnaround } from './internal/admin';
 export {
+  bioCodeVerifier,
   startBioCodeVerification,
   checkBioCode,
+  type ChannelVerifier,
   adminConfirmChannel,
   parseYoutubeChannel,
   youtubeBioFetcher,

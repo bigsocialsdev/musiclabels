@@ -13,7 +13,7 @@ import { describeTarget, emailSeller, providerById } from './providers';
 import { applyClearanceTransition, ensureClearanceRequests, liveTarget, type ClearanceRow } from './requests';
 import { hashToken } from './token';
 
-const turnaroundDays = () => getEnv().CLEARANCE_TURNAROUND_BUSINESS_DAYS ?? 1;
+const turnaroundDays = () => getEnv().CLEARANCE_TURNAROUND_BUSINESS_DAYS;
 const BATCH = 25;
 
 /** Tells the license's purchasing org (its owners) how a clearance request stands. Written with the caller's transaction. */
@@ -55,7 +55,16 @@ async function dispatchOne(db: DbOrTx, id: string): Promise<boolean> {
     });
   } catch (e) {
     log.error('clearance dispatch failed', { requestId: id, error: errorMessage(e) });
-    await db.update(clearanceRequests).set({ lastError: errorMessage(e).slice(0, 500) }).where(and(eq(clearanceRequests.id, id), eq(clearanceRequests.status, 'pending')));
+    const lastError = errorMessage(e).slice(0, 500);
+    // Alert ops once per distinct failure, not on every sweep that retries it.
+    await db.transaction(async (tx) => {
+      const [changed] = await tx
+        .update(clearanceRequests)
+        .set({ lastError })
+        .where(and(eq(clearanceRequests.id, id), eq(clearanceRequests.status, 'pending'), sql`${clearanceRequests.lastError} is distinct from ${lastError}`))
+        .returning({ licenseId: clearanceRequests.licenseId });
+      if (changed) await enqueueOpsAlert(tx, 'clearance_dispatch_failed', 'A clearance request could not be sent', { requestId: id, licenseId: changed.licenseId, error: lastError });
+    });
     return false;
   }
 }
@@ -140,8 +149,8 @@ export async function respondToClearance(db: DbOrTx, token: string, raw: unknown
 /** sent → overdue once due_at has passed: a fresh link and reminder to the seller, a notice to the buyer and to ops. */
 export async function markOverdue(db: DbOrTx, limit = BATCH): Promise<number> {
   const rows = await db.execute<{ id: string }>(sql`
-    SELECT r.id FROM clearance_requests r
-    WHERE r.status = 'sent' AND r.due_at < now() AND ${liveTarget}
+    SELECT r.id FROM clearance_requests r JOIN licenses l ON l.id = r.license_id
+    WHERE r.status = 'sent' AND r.due_at < now() AND l.status = 'active' AND ${liveTarget}
     ORDER BY r.due_at LIMIT ${limit}`);
   let n = 0;
   for (const { id } of rows) {

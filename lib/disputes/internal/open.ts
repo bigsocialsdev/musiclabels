@@ -13,7 +13,7 @@ import { notifyOrg } from './transition';
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
-const refundWindowDays = () => getEnv().CLAIM_RELEASE_REFUND_WINDOW_DAYS ?? 7;
+const refundWindowDays = () => getEnv().CLAIM_RELEASE_REFUND_WINDOW_DAYS;
 
 /**
  * A buyer reports a claim or strike against a use of a license they hold (PLAN §5.4 step 1). Timers are fixed

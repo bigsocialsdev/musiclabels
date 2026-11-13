@@ -71,12 +71,16 @@ export async function noticeOverdueDisputes(db: DbOrTx, limit = BATCH): Promise<
   });
 }
 
-/** refund_eligible → resolved_refunded once the order's refund has completed (the refund flow knows nothing of disputes). */
+/**
+ * refund_eligible → resolved_refunded once the order's `claim_not_released` refund has been processed (the refund flow
+ * knows nothing of disputes; a chargeback or goodwill refund of the same order does not settle a dispute).
+ */
 export async function settleRefundedDisputes(db: DbOrTx, limit = BATCH): Promise<number> {
   const ids = await idsOf(
     db,
-    sql`SELECT d.id FROM disputes d JOIN licenses l ON l.id = d.license_id JOIN orders o ON o.id = l.order_id
-        WHERE d.status = 'refund_eligible' AND o.status = 'refunded' ORDER BY d.created_at LIMIT ${limit}`,
+    sql`SELECT d.id FROM disputes d JOIN licenses l ON l.id = d.license_id
+        JOIN refunds f ON f.order_id = l.order_id AND f.reason = 'claim_not_released' AND f.status = 'processed'
+        WHERE d.status = 'refund_eligible' ORDER BY d.created_at LIMIT ${limit}`,
   );
   return each(db, ids, async (tx, id) => {
     const moved = await applyDisputeTransition(tx, id, 'refund_processed', { actorUserId: null, note: 'order refunded', set: { closedAt: new Date() } });

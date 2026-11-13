@@ -6,7 +6,7 @@ import { adminCtx, sale, setupCommerce } from '@/tests/commerce';
 import { makeSellableTrack } from '@/tests/factories';
 import { FakeGateway, MemoryStore } from '@/tests/fakes';
 import { adminRevokeLicense } from '@/lib/licensing/server';
-import { executeRefund } from '@/lib/orders/server';
+import { executeRefund, requestRefund } from '@/lib/orders/server';
 import {
   DISPUTE_EVENTS,
   DISPUTE_STATUSES,
@@ -256,6 +256,18 @@ describe('refund eligibility (PLAN 4.6, 5.4)', () => {
     expect((await row(kitId)).status).toBe('refund_eligible');
     expect((await row(releasedId)).status).toBe('resolved_released');
     expect((await row(releasedId)).closedAt).not.toBeNull();
+  });
+
+  it('a refund of the order for another reason (goodwill, chargeback) does not settle the dispute', async () => {
+    const s = await sale(db, gw, store, { clearanceClass: 'A' });
+    const id = await opened(s, {}, old());
+    await recordFirstAction(db, await dispatcher(), id, { note: 'x' });
+    await makeRefundEligible(db, 1000);
+    const goodwill = await requestRefund(db, await adminCtx(db, ['finance']), s.orderId, { reason: 'admin_goodwill' });
+    if (!goodwill.ok) throw new Error(goodwill.reason);
+    expect(await executeRefund(db, goodwill.refundId, { gateway: gw, store })).toBe('processed');
+    await settleRefundedDisputes(db, 1000);
+    expect((await row(id)).status).toBe('refund_eligible');
   });
 
   it('finance approves the refund; once Razorpay refunds the order the sweep settles the dispute', async () => {

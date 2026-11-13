@@ -120,6 +120,18 @@ export async function checkBioCode(db: DbOrTx, actor: BuyerActor, channelId: str
   return { ok: true, value: 'verified' };
 }
 
+/**
+ * The PLAN §11 seam: a buyer proves control of a licensed channel. `bio_code` is the only method; OAuth verifiers
+ * (PLAN F4) implement this later. The channel is addressed by id and checked for the acting buyer's org.
+ */
+export interface ChannelVerifier {
+  readonly method: 'bio_code';
+  start(db: DbOrTx, actor: BuyerActor, channelId: string): ReturnType<typeof startBioCodeVerification>;
+  check(db: DbOrTx, actor: BuyerActor, channelId: string): ReturnType<typeof checkBioCode>;
+}
+
+export const bioCodeVerifier: ChannelVerifier = { method: 'bio_code', start: startBioCodeVerification, check: (db, actor, id) => checkBioCode(db, actor, id) };
+
 async function markVerified(db: DbOrTx, channel: ChannelRef, verificationId: string, adminUserId: string | null) {
   await db.transaction(async (tx) => {
     await tx

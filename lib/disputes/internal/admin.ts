@@ -100,8 +100,9 @@ export async function setClaimantCataloged(db: DbOrTx, admin: AdminContext, disp
 
 /**
  * Finance approves the refund for a refund-eligible dispute (PLAN §5.4): the full-order refund with reason
- * `claim_not_released`. One refund per order, so repeating this returns the same refund. The dispute moves to
- * resolved_refunded when the refund completes (the timers sweep notices the refunded order).
+ * `claim_not_released`. One refund per order, so repeating this returns the same refund. The caller (the finance
+ * server action) runs `executeRefund` for the returned `refundId` after commit; the orders sweep retries it if that
+ * is missed. The dispute moves to resolved_refunded when that refund is processed (the timers sweep notices it).
  */
 export async function requestDisputeRefund(db: DbOrTx, admin: AdminContext, disputeId: string) {
   requirePermission(admin, 'finance');

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { auditLog, channelVerifications, clearanceRequests, licensedChannels, outbox, sellerProfiles, tracks } from '@/db/schema';
-import { addChannel } from '@/lib/licensing/server';
+import { addChannel, adminRevokeLicense } from '@/lib/licensing/server';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { adminCtx, sale, setupCommerce } from '@/tests/commerce';
 import { makeSeller } from '@/tests/factories';
@@ -176,6 +176,10 @@ describe('requests are created with the license (PLAN 5.2 b, 4.5)', () => {
     const [r] = await requests(s.licenseId!);
     expect(r).toMatchObject({ status: 'pending' });
     expect(r!.lastError).toMatch(/no ops contact/);
+    const failAlerts = async () => (await mails('alert.clearance_dispatch_failed')).filter((m) => JSON.stringify(m.payload).includes(s.licenseId!));
+    expect(await failAlerts()).toHaveLength(1); // ops hear about it...
+    await dispatchClearance(db, { licenseId: s.licenseId! });
+    expect(await failAlerts()).toHaveLength(1); // ...once, not on every retry
     await db.update(sellerProfiles).set({ opsContactEmail: e_late_ops }).where(eq(sellerProfiles.orgId, seller.orgId));
     expect(await dispatchClearance(db, { licenseId: s.licenseId! })).toBe(1);
     expect((await requests(s.licenseId!))[0]).toMatchObject({ status: 'sent', lastError: null });
@@ -226,6 +230,16 @@ describe('overdue (PLAN 4.5)', () => {
     expect(await db.select().from(outbox).where(and(eq(outbox.kind, 'clearance.overdue'), eq(outbox.to, s.buyer.owner.email!)))).toHaveLength(1);
     expect((await mails('alert.clearance_overdue')).length).toBeGreaterThan(0);
     expect(await db.select().from(auditLog).where(and(eq(auditLog.entityId, r!.id), eq(auditLog.action, 'clearance.mark_overdue')))).toHaveLength(1);
+  });
+
+  it('a revoked license\'s request is not chased', async () => {
+    const s = await classB();
+    const [r] = await requests(s.licenseId!);
+    await db.update(clearanceRequests).set({ dueAt: sql`now() - interval '1 minute'` }).where(eq(clearanceRequests.id, r!.id));
+    await adminRevokeLicense(db, await adminCtx(db, ['disputes']), s.licenseId!, { reason: 'fraud', note: 'test' });
+    await markOverdue(db, 1000);
+    expect((await requests(s.licenseId!))[0]!.status).toBe('sent');
+    expect(await db.select().from(outbox).where(and(eq(outbox.kind, 'clearance.reminder'), sql`${outbox.payload}::text like ${'%' + s.licenseId + '%'}`))).toHaveLength(0);
   });
 
   it('an overdue request can still be completed by the seller', async () => {

@@ -1,15 +1,8 @@
 'use server';
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
-import { ZodError, z } from 'zod';
-import type { Session } from '@/lib/identity/server';
+import { z } from 'zod';
 import { getDb } from '@/lib/platform/db';
-import { clientIp } from '@/lib/platform/request';
 import {
   KYC_DOC_KINDS,
-  OnboardingError,
-  PayoutAccountError,
   SELLER_TERMS,
   acceptSellerTerms,
   confirmSellerDocument,
@@ -19,45 +12,11 @@ import {
   setSellerPan,
   updateSellerProfile,
 } from '@/lib/sellers/server';
+import { attempt, requireOrg, runForm, text } from '../form-action';
 import { requireSellerSession } from '../session';
 
 const HERE = '/seller/onboarding';
-type Ctx = { ip: string | null; userAgent: string | null };
 
-const MESSAGES: Record<string, string> = {
-  unverified: 'Confirm your email or phone first.',
-  mfa_required: 'Sign in with your authenticator app first (two-factor), then try again.',
-  forbidden: 'Only the account owner can do this.',
-  not_found: 'That was not found.',
-};
-
-/** User-facing text for the errors the slices raise on purpose; anything else is a bug and propagates. */
-function friendly(e: unknown): string | null {
-  if (e instanceof ZodError) return e.issues[0]?.message ?? 'Check the form and try again.';
-  if (e instanceof OnboardingError || e instanceof PayoutAccountError) return MESSAGES[e.message] ?? e.message;
-  return null;
-}
-
-/** Runs one form action as the signed-in seller and comes back to the checklist with a message. */
-async function submit(fn: (session: Session, orgId: string | null, ctx: Ctx) => Promise<void>, done: string): Promise<never> {
-  const { session, orgId } = await requireSellerSession(HERE);
-  const h = await headers();
-  let error: string | null = null;
-  try {
-    await fn(session, orgId, { ip: clientIp(h), userAgent: h.get('user-agent') });
-  } catch (e) {
-    error = friendly(e);
-    if (error === null) throw e;
-  }
-  revalidatePath(HERE);
-  redirect(`${HERE}?${error ? `error=${encodeURIComponent(error)}` : `done=${encodeURIComponent(done)}`}`);
-}
-
-const text = (f: FormData, k: string) => (typeof f.get(k) === 'string' ? (f.get(k) as string) : '');
-function requireOrg(orgId: string | null): string {
-  if (!orgId) throw new OnboardingError('Create your seller account first.');
-  return orgId;
-}
 /** The profile fields both forms share; the slice's zod schema does the real validation. */
 const profileFields = (f: FormData) => ({
   entityType: text(f, 'entityType'),
@@ -67,63 +26,56 @@ const profileFields = (f: FormData) => ({
 });
 
 export async function createSellerAction(formData: FormData) {
-  return submit(async (session) => {
+  return runForm(HERE, 'Seller account created.', async ({ session }) => {
     await createSellerAccount(getDb(), session, {
       ...profileFields(formData),
       legalName: text(formData, 'legalName'),
       displayName: text(formData, 'displayName'),
       worldwideRightsWarranted: formData.get('worldwideRightsWarranted') === 'on', // the schema rejects false with a message
     });
-  }, 'Seller account created.');
+  });
 }
 
 export async function updateProfileAction(formData: FormData) {
-  return submit(async (session, orgId) => {
+  return runForm(HERE, 'Profile saved.', async ({ session, orgId }) => {
     await updateSellerProfile(getDb(), session, requireOrg(orgId), profileFields(formData));
-  }, 'Profile saved.');
+  });
 }
 
 export async function setPanAction(formData: FormData) {
-  return submit(async (session, orgId, ctx) => {
-    await setSellerPan(getDb(), session, requireOrg(orgId), text(formData, 'pan'), { ip: ctx.ip });
-  }, 'PAN saved.');
+  return runForm(HERE, 'PAN saved.', async ({ session, orgId, ip }) => {
+    await setSellerPan(getDb(), session, requireOrg(orgId), text(formData, 'pan'), { ip });
+  });
 }
 
 export async function setBankAction(formData: FormData) {
-  return submit(async (session, orgId, ctx) => {
-    await setPayoutAccount(getDb(), session, requireOrg(orgId), { accountNumber: text(formData, 'accountNumber'), ifsc: text(formData, 'ifsc'), accountHolderName: text(formData, 'accountHolderName') }, ctx.ip);
-  }, 'Bank account saved. Finance will verify it before the first payout.');
+  return runForm(HERE, 'Bank account saved. Finance will verify it before the first payout.', async ({ session, orgId, ip }) => {
+    await setPayoutAccount(getDb(), session, requireOrg(orgId), { accountNumber: text(formData, 'accountNumber'), ifsc: text(formData, 'ifsc'), accountHolderName: text(formData, 'accountHolderName') }, ip);
+  });
 }
 
 const termsInput = z.array(z.enum(SELLER_TERMS)).min(1, 'Tick the box to accept.');
 export async function acceptTermsAction(formData: FormData) {
-  return submit(async (session, orgId, ctx) => {
-    const kinds = termsInput.parse(formData.getAll('kind'));
-    await acceptSellerTerms(getDb(), session, requireOrg(orgId), kinds, ctx);
-  }, 'Accepted.');
+  return runForm(HERE, 'Accepted.', async ({ session, orgId, ip, userAgent }) => {
+    await acceptSellerTerms(getDb(), session, requireOrg(orgId), termsInput.parse(formData.getAll('kind')), { ip, userAgent });
+  });
 }
 
 /** Step 1 of a KYC upload: a document row and a short-lived signed upload URL for the browser. */
-export async function requestKycUploadAction(raw: { kind: string; mime: string }) {
+export async function requestKycUploadAction(raw: { choice: string; filename: string; mime: string }) {
   const { session, orgId } = await requireSellerSession(HERE);
-  const input = z.object({ kind: z.enum(KYC_DOC_KINDS), mime: z.string().max(100) }).parse(raw);
-  try {
-    return { ok: true as const, ...(await requestSellerDocumentUpload(getDb(), session, requireOrg(orgId), input)) };
-  } catch (e) {
-    const message = friendly(e);
-    if (message === null) throw e;
-    return { ok: false as const, error: message };
-  }
+  const input = z.object({ choice: z.enum(KYC_DOC_KINDS), mime: z.string().max(100) }).parse(raw);
+  return attempt(async () => {
+    const r = await requestSellerDocumentUpload(getDb(), session, requireOrg(orgId), { kind: input.choice, mime: input.mime });
+    return { id: r.documentId, key: r.key, token: r.token };
+  });
 }
 
 /** Step 3: the server downloads the upload and checks its content (magic bytes, size, PDF active content). */
 export async function confirmKycDocumentAction(documentId: string) {
   const { session } = await requireSellerSession(HERE);
-  try {
-    return { ok: true as const, ...(await confirmSellerDocument(getDb(), session, z.uuid().parse(documentId))) };
-  } catch (e) {
-    const message = friendly(e);
-    if (message === null) throw e;
-    return { ok: false as const, error: message };
-  }
+  const id = z.uuid().parse(documentId);
+  const r = await attempt(() => confirmSellerDocument(getDb(), session, id));
+  if (!r.ok) return r;
+  return r.status === 'valid' ? { ok: true as const, message: 'Uploaded and checked.' } : { ok: false as const, error: r.error ?? 'The file was rejected.' };
 }

@@ -13,8 +13,6 @@ import {
   trackInputSchema,
   type DocType,
   type GuardResult,
-  type RightsDeclarationInput,
-  type TrackInput,
 } from '../index';
 import { applyTransition } from './transition';
 
@@ -25,9 +23,14 @@ export class CatalogError extends Error {}
 
 const AUDIO_EXTENSIONS = ['wav', 'mp3'] as const;
 
-/** Membership check (org ids from the client are inputs to verify) plus the track belongs to that org. */
-async function ownTrack(db: DbOrTx, actor: SellerActor, trackId: string) {
+/** The org id comes from the client: verify the caller is a member of it. */
+export async function requireMember(db: DbOrTx, actor: SellerActor): Promise<void> {
   if (!(await getMembershipRole(db, actor.userId, actor.orgId))) throw new CatalogError('Not a member of this organisation');
+}
+
+/** Membership check plus the track belongs to that org. */
+async function ownTrack(db: DbOrTx, actor: SellerActor, trackId: string) {
+  await requireMember(db, actor);
   const [track] = await db.select().from(tracks).where(and(eq(tracks.id, trackId), eq(tracks.sellerOrgId, actor.orgId)));
   if (!track) throw new CatalogError('Track not found');
   return track;
@@ -38,8 +41,9 @@ function slugify(title: string) {
   return `${base || 'track'}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function createTrack(db: DbOrTx, actor: SellerActor, input: TrackInput): Promise<string> {
-  if (!(await getMembershipRole(db, actor.userId, actor.orgId))) throw new CatalogError('Not a member of this organisation');
+/** `input` is validated here with `trackInputSchema`; the form passes raw fields. */
+export async function createTrack(db: DbOrTx, actor: SellerActor, input: unknown): Promise<string> {
+  await requireMember(db, actor);
   const standing = await getSellerStanding(db, actor.orgId);
   if (!standing) throw new CatalogError('Complete seller onboarding before adding tracks');
   const data = trackInputSchema.parse(input);
@@ -48,7 +52,7 @@ export async function createTrack(db: DbOrTx, actor: SellerActor, input: TrackIn
 }
 
 /** Metadata is editable while the track is a draft (a rejected track returns to draft via `editTrack`). */
-export async function updateTrack(db: DbOrTx, actor: SellerActor, trackId: string, input: TrackInput): Promise<void> {
+export async function updateTrack(db: DbOrTx, actor: SellerActor, trackId: string, input: unknown): Promise<void> {
   const track = await ownTrack(db, actor, trackId);
   if (track.status !== 'draft') throw new CatalogError('Only draft tracks can be edited');
   await db.update(tracks).set({ ...trackInputSchema.parse(input), updatedAt: new Date() }).where(and(eq(tracks.id, trackId), eq(tracks.status, 'draft')));
@@ -61,7 +65,7 @@ export async function editTrack(db: DbOrTx, actor: SellerActor, trackId: string)
   return applyTransition(db, trackId, 'edit', actor.userId);
 }
 
-export async function saveRightsDeclaration(db: DbOrTx, actor: SellerActor, trackId: string, input: RightsDeclarationInput): Promise<void> {
+export async function saveRightsDeclaration(db: DbOrTx, actor: SellerActor, trackId: string, input: unknown): Promise<void> {
   await ownTrack(db, actor, trackId);
   const data = rightsDeclarationSchema.parse(input);
   const agreement = await getCurrentDocument(db, 'seller_agreement');

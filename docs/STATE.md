@@ -509,6 +509,14 @@ Owner decision 2026-11-14: expand scope to cover the above; implementation hande
 - "Sell your music" points at `/seller/onboarding`, which already sends signed-out visitors to `/auth/sign-in?next=/seller/onboarding` (`requireSellerSession`), so there is one path and no new redirect logic. It is in the top bar on desktop, in the menu, and in a new one-line storefront footer on every screen size (the mobile top bar has room for the wordmark and one button only). The sign-in page adds one line of context when `next` is a seller page, stating that one account can both buy and sell.
 - Tests: `account-links.test.ts` (menu links per org combination, `next` round-trips through `safeNext`); `tests/e2e/account-menu.spec.ts` (signed-out → footer link → sign-in with `next`; buyer menu and sign-out clears the session cookie; seller reaches the dashboard), desktop and mobile; the existing axe gate passes on the changed header.
 
+### Scope addition (part 3): first-visit band, 2026-11-14 (Opus)
+- **Owner decision 2026-11-14:** a compact, dismissible band above the browse grid, chosen over a stage-first intro line. It bends the Stage-First Rule, so DESIGN.md records it as an amendment under that rule.
+- Shown only on the unfiltered home page, to a signed-out visitor without the `mrm_intro=dismissed` cookie. The server reads the cookie, so a returning visitor never sees it flash. The cookie is a display preference only; nothing trusts it. Filtered and paged views, track pages and signed-in users go straight to work.
+- Content: "Music for your videos, licensed properly.", one line of plain fact (screening, certificate, public verify link, GST invoice; no protection promises), a "Sell your music" link, and a dismiss button. Headline type, no card, no glow, a hairline below: quieter than the stage under it. The heading is an h2 so the page's h1 stays "Browse tracks".
+- The top bar and the home page share one `loadSession` per request (`storeSession`, React `cache`).
+- Tests: `tests/e2e/intro-band.spec.ts` (shown on first visit, dismissal survives a reload, absent on a filtered view and for a signed-in buyer), desktop and mobile; the axe gate passes with the band showing.
+- Seen in passing, not changed: on a phone, a signed-out visitor's license sheet is open when the home page loads (it was already so before this work).
+
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.
 - docs/PRD-analysis.md written by Phase 1 "PRD analyst" sub-agent (sonnet/medium): covers actors, module breakdown w/ ambiguities, 16 proposed data entities, 6 user flows, integration risk table, non-functional needs, 9 explicit assumptions, 15 open questions.

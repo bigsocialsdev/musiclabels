@@ -11,7 +11,7 @@ const Glyph = () => (
 /** A document or file row (DESIGN.md Document Row): glyph, name with an optional muted line, and one action on the right. */
 export function DocRow({ name, note, meta, action, className }: { name: ReactNode; note?: ReactNode; meta?: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <li className={cn('flex items-center gap-3 rounded-md border bg-card px-3.5 py-2.5', className)}>
+    <li className={cn('flex min-w-0 items-center gap-3 rounded-md border bg-card px-3.5 py-2.5', className)}>
       <Glyph />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold">{name}</p>

@@ -10,7 +10,7 @@ import type { BrowserContext } from '@playwright/test';
  *  - Storage: objects are kept in memory (upload, signed URL, download), enough for fulfilment to store the invoice and
  *    certificate PDFs and for the buyer to download them.
  */
-const SECRET = 'e2e-fake-auth';
+const TOKEN_SIGNING_SECRET = 'e2e-fake-auth';
 const b64 = (v: object | string) => Buffer.from(typeof v === 'string' ? v : JSON.stringify(v)).toString('base64url');
 
 export const supabaseUrl = () => process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
@@ -63,7 +63,7 @@ export async function signIn(context: BrowserContext, who: { userId: string; ema
   const claims = { sub: who.userId, email: who.email, aud: 'authenticated', role: 'authenticated', aal: who.aal ?? 'aal1', iat: now, exp: now + 3600 };
   const head = b64({ alg: 'HS256', typ: 'JWT' });
   const body = b64(claims);
-  const jwt = `${head}.${body}.${createHmac('sha256', SECRET).update(`${head}.${body}`).digest('base64url')}`;
+  const jwt = `${head}.${body}.${createHmac('sha256', TOKEN_SIGNING_SECRET).update(`${head}.${body}`).digest('base64url')}`;
   const session = { access_token: jwt, refresh_token: 'fake', token_type: 'bearer', expires_in: 3600, expires_at: claims.exp, user: { id: who.userId, email: who.email } };
   const name = `sb-${new URL(supabaseUrl()).hostname.split('.')[0]}-auth-token`;
   await context.clearCookies();

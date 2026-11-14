@@ -1,10 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useTransition } from 'react';
 import { DropdownMenu } from 'radix-ui';
 import { buttonVariants } from '@/components/ui/button';
-import { signOut } from '@/app/auth/actions';
 import { signInHref, type AccountLink } from './account-links';
 
 export function SignInLink() {
@@ -19,7 +17,6 @@ const item = 'flex h-9 cursor-pointer items-center rounded-sm px-2.5 text-sm fon
 
 /** The portal renders outside the storefront's `.dark` wrapper, so the menu carries the class itself. */
 export function AccountDropdown({ identity, links }: { identity: string; links: AccountLink[] }) {
-  const [pending, start] = useTransition();
   return (
     <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger className={`${buttonVariants({ variant: 'secondary', size: 'lg' })} max-w-56 px-3.5 max-[900px]:px-2`} aria-label={`Account: ${identity}`}>
@@ -41,9 +38,12 @@ export function AccountDropdown({ identity, links }: { identity: string; links: 
             </DropdownMenu.Item>
           ))}
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
-          <DropdownMenu.Item className={item} disabled={pending} onSelect={() => start(() => signOut())}>
-            Sign out
-          </DropdownMenu.Item>
+          {/* Radix unmounts the menu synchronously on select, which would detach the button before the form submits. */}
+          <form action="/auth/sign-out" method="post">
+            <DropdownMenu.Item asChild className={`${item} w-full`} onSelect={(e) => e.preventDefault()}>
+              <button type="submit">Sign out</button>
+            </DropdownMenu.Item>
+          </form>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

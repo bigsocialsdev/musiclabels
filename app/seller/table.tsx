@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-/** Console table (DESIGN.md queue table): card surface, hairline rows, sticky header, 20px gutter. */
+/** Console table (DESIGN.md queue table): card surface, hairline rows, sticky header, 20px gutter. The wrapper is focusable so a keyboard user can scroll a table wider than the screen. */
 export function Table({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-lg border bg-card">
+    <div role="region" aria-label="Table" tabIndex={0} className="overflow-x-auto rounded-lg border bg-card">
       <table className="w-full border-collapse text-[13.5px]">{children}</table>
     </div>
   );

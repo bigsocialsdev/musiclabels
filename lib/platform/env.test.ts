@@ -19,6 +19,12 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...valid(), ENCRYPTION_KEYS: 'k1:c2hvcnQ=' })).toThrow(/ENCRYPTION_KEYS/);
   });
 
+  it('treats an empty RAZORPAY_API_URL as unset and rejects a malformed one', () => {
+    expect(parseEnv({ ...valid(), RAZORPAY_API_URL: '' }).RAZORPAY_API_URL).toBeUndefined();
+    expect(parseEnv({ ...valid(), RAZORPAY_API_URL: 'http://127.0.0.1:54399/v1' }).RAZORPAY_API_URL).toBe('http://127.0.0.1:54399/v1');
+    expect(() => parseEnv({ ...valid(), RAZORPAY_API_URL: 'not a url' })).toThrow(/RAZORPAY_API_URL/);
+  });
+
   it('requires the active key id to exist', () => {
     expect(() => parseEnv({ ...valid(), ENCRYPTION_ACTIVE_KEY_ID: 'nope' })).toThrow(/ACTIVE_KEY_ID/);
   });

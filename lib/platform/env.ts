@@ -34,6 +34,8 @@ const schema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  // Tests only: points the Razorpay adapter at a local stand-in (tests/e2e). Leave unset anywhere real money moves.
+  RAZORPAY_API_URL: z.preprocess((v) => (v === '' ? undefined : v), z.url().optional()), // an empty platform value means unset
   // [CA] billing config (PLAN §8.2/§8.3). Checked at use by invoicing/orders; never code constants.
   SUPPLIER_GSTIN: z.string().optional(),
   SUPPLIER_LEGAL_NAME: z.string().optional(),

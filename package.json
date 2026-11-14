@@ -16,6 +16,7 @@
     "e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "seed:e2e": "tsx --conditions=react-server scripts/seed-e2e.ts",
     "seed:dev": "tsx --conditions=react-server --env-file=.env.local scripts/seed-dev.ts",
     "restore:drill": "tsx --conditions=react-server --env-file=.env.local scripts/restore-drill.ts",
     "import:catalog": "tsx --conditions=react-server --env-file=.env.local scripts/import-catalog.ts",
@@ -43,6 +44,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/eslintrc": "^3.3.0",
     "@playwright/test": "^1.65.0",
     "@tailwindcss/postcss": "^4.3.5",

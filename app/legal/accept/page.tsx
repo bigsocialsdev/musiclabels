@@ -50,7 +50,7 @@ export default async function AcceptPage({ searchParams }: { searchParams: Promi
           <h2 className="font-medium">
             {d.kind} (version {d.version})
           </h2>
-          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded border p-3 text-sm">{d.bodyMarkdown}</pre>
+          <pre tabIndex={0} className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded border p-3 text-sm">{d.bodyMarkdown}</pre>
         </section>
       ))}
       {check.noDocument.length === 0 && (

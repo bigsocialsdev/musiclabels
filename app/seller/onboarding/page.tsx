@@ -189,7 +189,7 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
           <form action={acceptTermsAction} className="space-y-3">
             <details>
               <summary className="cursor-pointer text-sm font-semibold underline underline-offset-4">Read the agreement (version {agreement.version})</summary>
-              <pre className="mt-2 max-h-72 overflow-auto rounded-md border bg-background p-3 font-sans text-[13px] leading-relaxed whitespace-pre-wrap text-fg-2">{agreement.bodyMarkdown}</pre>
+              <pre tabIndex={0} className="mt-2 max-h-72 overflow-auto rounded-md border bg-background p-3 font-sans text-[13px] leading-relaxed whitespace-pre-wrap text-fg-2">{agreement.bodyMarkdown}</pre>
             </details>
             {status.sellerAgreement ? (
               <p className="text-sm">You accepted this version.</p>
@@ -210,7 +210,7 @@ export default async function SellerOnboardingPage({ searchParams }: { searchPar
           <form action={acceptTermsAction} className="space-y-3">
             <details>
               <summary className="cursor-pointer text-sm font-semibold underline underline-offset-4">Read the commitment (version {commitment.version})</summary>
-              <pre className="mt-2 max-h-72 overflow-auto rounded-md border bg-background p-3 font-sans text-[13px] leading-relaxed whitespace-pre-wrap text-fg-2">{commitment.bodyMarkdown}</pre>
+              <pre tabIndex={0} className="mt-2 max-h-72 overflow-auto rounded-md border bg-background p-3 font-sans text-[13px] leading-relaxed whitespace-pre-wrap text-fg-2">{commitment.bodyMarkdown}</pre>
             </details>
             {status.releaseCommitment ? (
               <p className="text-sm">You accepted this version.</p>

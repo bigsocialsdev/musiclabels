@@ -132,11 +132,11 @@ export default async function ReviewTrack({
             <h2 className="font-medium">Approve</h2>
             <form action={approveAction.bind(null, track.id)} className="mt-2 space-y-2 text-sm">
               <div className="flex gap-2">
-                <select name="clearanceClass" className="rounded border p-1" defaultValue="A">
+                <select name="clearanceClass" aria-label="Clearance class" className="rounded border p-1" defaultValue="A">
                   <option value="A">Class A</option>
                   <option value="B">Class B</option>
                 </select>
-                <select name="priceLevel" className="rounded border p-1" defaultValue={track.proposedPriceLevel ?? 'L1'}>
+                <select name="priceLevel" aria-label="Price level" className="rounded border p-1" defaultValue={track.proposedPriceLevel ?? 'L1'}>
                   {PRICE_LEVELS.map((l) => (
                     <option key={l}>{l}</option>
                   ))}

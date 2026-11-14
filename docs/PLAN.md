@@ -87,7 +87,7 @@ Mirrors BigSocials (`BigSocials-Tech-Stack.docx`, main at 486cc1fa). The few dep
 | Email | Resend via the transactional outbox | Same as BigSocials. Email is the only notification channel (critique cut 17); MSG91 is for login OTP only. |
 | Hosting / deploy | Vercel; GitHub Action `vercel-deploy.yml` (production on push to `main`, previews on PRs); Vercel Cron in `vercel.json` | Same as BigSocials. Pull requests only, never push to `main`. |
 | Secrets | Names in `.env.local.example`; values in local env files and Vercel | Same as BigSocials. App-level encryption key for PAN/bank data is an env secret. |
-| Testing | Vitest 4 (happy-dom for components; integration tests against a real local Supabase Postgres), Playwright for e2e, Razorpay test mode | Same tools as BigSocials. Unlike BigSocials, the checkout golden path e2e **is** a CI gate here. |
+| Testing | Vitest 4 (happy-dom for components; integration tests against a real local Supabase Postgres), Playwright for e2e, Razorpay test mode | Same tools as BigSocials. Unlike BigSocials, the checkout golden path e2e **is** a CI gate here: `.github/workflows/e2e.yml` runs it, with Razorpay, Supabase Auth and Storage replaced by in-process stand-ins (STATE: S4-M11 e2e in CI). |
 | Tooling | npm, ESLint 9 (eslint-config-next + import boundary rule), `tsc --noEmit`; CI: `npm ci`, env-file guard, tsc, ESLint, Vitest, `npm audit` (critical), `next build` | Same as BigSocials `ci.yml`. |
 
 Departures from BigSocials, all deliberate:

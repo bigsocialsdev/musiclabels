@@ -4,7 +4,7 @@ import { safeEqual } from '@/lib/platform/crypto';
 import { getEnv } from '@/lib/platform/env';
 import type { GatewayPayment, GatewayRefund, PaymentGateway } from '../index';
 
-const API = 'https://api.razorpay.com/v1';
+const DEFAULT_API = 'https://api.razorpay.com/v1';
 
 const paymentSchema = z.object({
   id: z.string(),
@@ -42,18 +42,22 @@ export class RazorpayGateway implements PaymentGateway {
   readonly keyId: string;
   private readonly keySecret: string;
   private readonly webhookSecret: string;
+  private readonly api: string;
 
-  constructor(cfg?: { keyId: string; keySecret: string; webhookSecret: string }) {
+  constructor(cfg?: { keyId: string; keySecret: string; webhookSecret: string; apiUrl?: string }) {
     const env = getEnv();
-    const c = cfg ?? { keyId: env.RAZORPAY_KEY_ID ?? '', keySecret: env.RAZORPAY_KEY_SECRET ?? '', webhookSecret: env.RAZORPAY_WEBHOOK_SECRET ?? '' };
+    const c = cfg ?? { keyId: env.RAZORPAY_KEY_ID ?? '', keySecret: env.RAZORPAY_KEY_SECRET ?? '', webhookSecret: env.RAZORPAY_WEBHOOK_SECRET ?? '', apiUrl: env.RAZORPAY_API_URL };
     if (!c.keyId || !c.keySecret || !c.webhookSecret) throw new Error('Razorpay is not configured');
     this.keyId = c.keyId;
     this.keySecret = c.keySecret;
     this.webhookSecret = c.webhookSecret;
+    // The key secret goes to this host in a Basic auth header: a live key must never be pointed anywhere but Razorpay.
+    if (c.apiUrl && c.keyId.startsWith('rzp_live_')) throw new Error('RAZORPAY_API_URL cannot be used with a live key');
+    this.api = c.apiUrl ?? DEFAULT_API;
   }
 
   private async call(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown> {
-    const res = await fetch(`${API}${path}`, {
+    const res = await fetch(`${this.api}${path}`, {
       method,
       headers: {
         authorization: `Basic ${Buffer.from(`${this.keyId}:${this.keySecret}`).toString('base64')}`,

@@ -8,7 +8,6 @@ export async function expectAccessible(page: Page, url: string, name = url) {
   const res = await page.goto(url);
   expect(res?.status(), `${name} answered ${res?.status()}`).toBeLessThan(400);
   expect(new URL(page.url()).pathname, `${name} was redirected`).toBe(new URL(url, 'http://x').pathname);
-  await page.waitForLoadState('networkidle');
   const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   const serious = violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
   expect(serious.map((v) => `${name}: ${v.id} ${v.nodes.map((n) => `${n.target} ${n.any[0]?.message ?? ''}`).join('; ')}`), name).toEqual([]);

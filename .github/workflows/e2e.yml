@@ -1,0 +1,78 @@
+name: E2E
+
+# Playwright against a production build (PLAN §2: the checkout golden path is a CI gate) and the axe accessibility sweep.
+# Runs beside `ci`, not inside it, so the unit and integration job stays fast. No secrets: Razorpay, Supabase Auth and
+# Supabase Storage are the in-process stand-ins in tests/e2e, started by Playwright's globalSetup.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Dummy, test-only values. The [CA] billing values are placeholders, not the real supplier details.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-service-role-key
+      APP_URL: http://localhost:3000
+      CRON_SECRET: ci-cron-secret-0123456789abcdef
+      TASKS_SECRET: ci-tasks-secret-0123456789abcdef
+      ENCRYPTION_KEYS: k1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+      ENCRYPTION_ACTIVE_KEY_ID: k1
+      RESEND_API_KEY: re_ci
+      EMAIL_FROM: CI <ci@example.com>
+      OPS_ALERT_EMAIL: ops@example.com
+      SUPPLIER_GSTIN: 27AAPFU0939F1ZV
+      SUPPLIER_LEGAL_NAME: CI Test Pvt Ltd
+      SUPPLIER_ADDRESS: Mumbai
+      SAC_CODE: '998399'
+      GST_RATE_BPS: '1800'
+      DEFAULT_ROYALTY_RATE_BPS: '5000'
+      RAZORPAY_KEY_ID: rzp_test_e2e
+      RAZORPAY_KEY_SECRET: e2e-razorpay-secret
+      RAZORPAY_WEBHOOK_SECRET: e2e-webhook-secret-0123456789
+      RAZORPAY_API_URL: http://127.0.0.1:54399/v1
+      E2E_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.1
+      - run: npm ci
+
+      # Database only, as in `ci`. Auth and Storage are not started: the fakes take their ports.
+      - name: Start local Supabase Postgres
+        run: supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      - name: Migrate and seed
+        run: |
+          DIRECT_URL="$DATABASE_URL" npm run db:migrate
+          npm run seed:e2e
+
+      - run: npm run build
+      - name: Start the app
+        run: |
+          nohup npm run start > app.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3000/auth/sign-in > /dev/null && exit 0; sleep 2; done
+          cat app.log; exit 1
+
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+
+      - name: Upload the report and the app log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure
+          path: |
+            playwright-report
+            test-results
+            app.log
+          retention-days: 7

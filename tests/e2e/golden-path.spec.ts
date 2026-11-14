@@ -63,4 +63,5 @@ test('a buyer licenses a track and the public verify page shows it', async ({ pa
   await page.goto(`/verify/${publicId}`);
   await expect(page.getByText('Active', { exact: true }).first()).toBeVisible();
   await expect(page.getByText(E2E_TRACK_TITLE)).toBeVisible();
+  await expect(page.getByText(publicId!).first()).toBeVisible();
 });

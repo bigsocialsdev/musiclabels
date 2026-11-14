@@ -8,7 +8,8 @@ import { createServer, type Server } from 'node:http';
  * the app then re-fetches the payment from here exactly as it does from Razorpay.
  */
 export const razorpayUrl = () => process.env.RAZORPAY_API_URL ?? 'http://127.0.0.1:54399/v1';
-export const paymentIdFor = (gatewayOrderId: string) => `pay_${gatewayOrderId}`;
+const PAYMENT_PREFIX = 'pay_';
+export const paymentIdFor = (gatewayOrderId: string) => `${PAYMENT_PREFIX}${gatewayOrderId}`;
 
 /** What Razorpay Checkout's success handler signs: `order_id|payment_id` with the key secret. */
 export const checkoutSignature = (secret: string, gatewayOrderId: string, paymentId: string) =>
@@ -39,7 +40,7 @@ export function startFakeRazorpay(): Promise<Server> {
       const id = `order_e2e${randomUUID().replace(/-/g, '').slice(0, 12)}`;
       orders.set(id, { amount: body.amount, currency: body.currency });
       send(200, { id, entity: 'order', amount: body.amount, currency: body.currency, status: 'created' });
-    } else if (req.method === 'GET' && (m = path.match(/^\/payments\/pay_(.+)$/)) && orders.has(m[1]!)) {
+    } else if (req.method === 'GET' && (m = path.match(new RegExp(`^/payments/${PAYMENT_PREFIX}(.+)$`))) && orders.has(m[1]!)) {
       send(200, payment(m[1]!));
     } else if (req.method === 'GET' && (m = path.match(/^\/orders\/([^/]+)\/payments$/)) && orders.has(m[1]!)) {
       send(200, { items: [payment(m[1]!)] });

@@ -9,6 +9,7 @@ import { memberships, organizations, tracks } from '@/db/schema';
 import { getCurrentDocument, recordAcceptance } from '@/lib/legal/server';
 import { closeDb, getDb } from '@/lib/platform/db';
 import { E2E_BUYER, E2E_SELLER, E2E_TRACK_TITLE } from '../tests/e2e/fixtures';
+// This script reuses the test factories and fixture names on purpose, so the seeded rows match what the specs look for.
 import { assertLocalDatabase } from '../tests/e2e/local-db';
 import { makeBuyer, makeSellableTrack, makeSeller } from '../tests/factories';
 import { seedReference } from './seed-reference';

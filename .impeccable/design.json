@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-13T13:38:07.456Z",
+  "generatedAt": "2026-11-14T07:58:00.115Z",
   "title": "Design System: MRM (working name)",
   "seededFrom": {
     "world": "Night Session",
@@ -267,7 +267,37 @@
       "daylight-ground": {
         "role": "neutral",
         "displayName": "Daylight Ground",
-        "canonical": "#F6F5F2",
+        "canonical": "#F5F7F9",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-shell": {
+        "role": "neutral",
+        "displayName": "daylight-shell (daylight)",
+        "canonical": "#EEF1F4",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-nav-active": {
+        "role": "neutral",
+        "displayName": "daylight-nav-active (daylight)",
+        "canonical": "#E2E7EC",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -297,7 +327,7 @@
       "daylight-secondary": {
         "role": "neutral",
         "displayName": "Secondary Fill (daylight)",
-        "canonical": "#EDEBE7",
+        "canonical": "#EEF1F4",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -312,7 +342,7 @@
       "daylight-accent": {
         "role": "neutral",
         "displayName": "Accent Fill (daylight)",
-        "canonical": "#E6E3DE",
+        "canonical": "#E7EBEF",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -327,7 +357,7 @@
       "daylight-border": {
         "role": "neutral",
         "displayName": "Hairline (daylight)",
-        "canonical": "#E3E0DB",
+        "canonical": "#E0E5EA",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -342,7 +372,7 @@
       "daylight-input": {
         "role": "neutral",
         "displayName": "Input Stroke (daylight)",
-        "canonical": "#D4D0CA",
+        "canonical": "#CDD5DC",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -357,7 +387,7 @@
       "daylight-ink": {
         "role": "primary",
         "displayName": "Warm Ink (daylight)",
-        "canonical": "#1A1815",
+        "canonical": "#1E2B35",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -372,7 +402,7 @@
       "daylight-ink-2": {
         "role": "neutral",
         "displayName": "Ink-2 (daylight)",
-        "canonical": "#403C36",
+        "canonical": "#33404C",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -387,7 +417,7 @@
       "daylight-ink-muted": {
         "role": "neutral",
         "displayName": "Ink-Muted (daylight)",
-        "canonical": "#66615A",
+        "canonical": "#58626D",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -402,7 +432,7 @@
       "daylight-ink-faint": {
         "role": "neutral",
         "displayName": "Ink-Faint (daylight)",
-        "canonical": "#A6A199",
+        "canonical": "#9AA4AE",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -417,7 +447,7 @@
       "daylight-wave-idle": {
         "role": "neutral",
         "displayName": "Wave Idle (daylight)",
-        "canonical": "#D2CEC7",
+        "canonical": "#CDD5DC",
         "tonalRamp": [
           "#141311",
           "#1C1A17",
@@ -462,7 +492,7 @@
       "daylight-ok": {
         "role": "tertiary",
         "displayName": "Clear Green (daylight)",
-        "canonical": "#12804F",
+        "canonical": "#05704F",
         "tonalRamp": [
           "oklch(15% 0.060 160)",
           "oklch(26% 0.098 160)",
@@ -477,7 +507,7 @@
       "daylight-attention": {
         "role": "tertiary",
         "displayName": "Amber Pending (daylight)",
-        "canonical": "#9A5B00",
+        "canonical": "#8F4D08",
         "tonalRamp": [
           "oklch(15% 0.060 75)",
           "oklch(26% 0.098 75)",
@@ -492,7 +522,7 @@
       "daylight-blocked": {
         "role": "tertiary",
         "displayName": "Blocked Red (daylight)",
-        "canonical": "#B82B27",
+        "canonical": "#B4123A",
         "tonalRamp": [
           "oklch(15% 0.076 27)",
           "oklch(26% 0.124 27)",
@@ -507,7 +537,7 @@
       "daylight-info": {
         "role": "tertiary",
         "displayName": "Info Blue (daylight)",
-        "canonical": "#2459C9",
+        "canonical": "#1E4FD0",
         "tonalRamp": [
           "oklch(15% 0.068 264)",
           "oklch(26% 0.111 264)",
@@ -517,6 +547,81 @@
           "oklch(72% 0.145 264)",
           "oklch(84% 0.085 264)",
           "oklch(95% 0.034 264)"
+        ]
+      },
+      "daylight-ok-soft": {
+        "role": "neutral",
+        "displayName": "daylight-ok-soft (daylight)",
+        "canonical": "#DCF5EA",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-attention-soft": {
+        "role": "neutral",
+        "displayName": "daylight-attention-soft (daylight)",
+        "canonical": "#FDF1DA",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-blocked-soft": {
+        "role": "neutral",
+        "displayName": "daylight-blocked-soft (daylight)",
+        "canonical": "#FFE6EB",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-info-soft": {
+        "role": "neutral",
+        "displayName": "daylight-info-soft (daylight)",
+        "canonical": "#E3EBFD",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
+        ]
+      },
+      "daylight-muted-soft": {
+        "role": "neutral",
+        "displayName": "daylight-muted-soft (daylight)",
+        "canonical": "#EEF1F4",
+        "tonalRamp": [
+          "#141311",
+          "#1C1A17",
+          "#262421",
+          "#3A3631",
+          "#66615A",
+          "#A6A199",
+          "#E3E0DB",
+          "#F6F5F2"
         ]
       },
       "tape-orange": {
@@ -822,9 +927,9 @@
   ],
   "narrative": {
     "northStar": "Night Session",
-    "overview": "The track's own sound is the cover. Every surface is a warm charcoal (or, for operators, warm daylight) room in which the loudest, brightest object is the playing track's waveform. There is no catalogue imagery and none is needed: a title set large and tight, a line of measured facts in mono, and a bar waveform that fills with tape orange as it plays carry the whole storefront. The same session continues into the seller portal and admin console with the house lights up: identical type, ink ramp, radii and single accent, on a light ground built for eight-hour queue work.\n\nDensity follows the job. The storefront is Persuade mode: one stage hero, a scannable results list, and a sticky license receipt that states the exact price with GST. The console is Operate mode: a queue table, a detail pane and a sticky decision bar, at 13 to 14px, where status, age and the next action read in one glance. Proof over promise governs both: the record, the tax lines, the status and the process are shown exactly, never dressed up.\n\nConfirmed rejections: the category's look (hoopr.ai: pure black, hot-pink pills, AI cover art on every row, gradient subscription cards, sale banners, \"no copyright claims\" promises), the cover-art grid, the streaming-app clone, and the generic SaaS dashboard of KPI tiles and coloured sidebars.",
+    "overview": "The track's own sound is the cover. Every surface is a warm charcoal (or, for operators, warm daylight) room in which the loudest, brightest object is the playing track's waveform. There is no catalogue imagery and none is needed: a title set large and tight, a line of measured facts in mono, and a bar waveform that fills with tape orange as it plays carry the whole storefront. The same session continues into the seller portal and admin console with the house lights up: identical type, radii and single accent, on a cool-grey daylight console aligned with the team's BigSocials app (owner decision 2026-11-14) and built for eight-hour queue work.\n\nDensity follows the job. The storefront is Persuade mode: one stage hero, a scannable results list, and a sticky license receipt that states the exact price with GST. The console is Operate mode: a queue table, a detail pane and a sticky decision bar, at 13 to 14px, where status, age and the next action read in one glance. Proof over promise governs both: the record, the tax lines, the status and the process are shown exactly, never dressed up.\n\nConfirmed rejections: the category's look (hoopr.ai: pure black, hot-pink pills, AI cover art on every row, gradient subscription cards, sale banners, \"no copyright claims\" promises), the cover-art grid, the streaming-app clone, and the generic SaaS dashboard of KPI tiles and coloured sidebars.",
     "keyCharacteristics": [
-      "Warm charcoal ground in stacked tonal steps (R >= G > B, never blue-black, never #000); warm off-white ink.",
+      "Night: warm charcoal ground in stacked tonal steps (R >= G > B, never blue-black, never #000); warm off-white ink. Daylight (seller, admin): BigSocials' cool greys, a sidebar shell and tinted status.",
       "A named four-step ink ramp: ink, ink-2, ink-muted, ink-faint.",
       "Neutral ink is the primary colour: every default button, checked control and focus ring is ink.",
       "Tape orange belongs to sound alone, plus one sanctioned non-sound use: the wordmark's on-air light.",
@@ -833,6 +938,11 @@
       "Flat, hairline-divided, softly rounded (6 to 18px); depth by tonal step, not shadow."
     ],
     "rules": [
+      {
+        "name": "The Status Rule",
+        "body": "In daylight (seller portal, admin console) status is a pill: a 7px dot plus the word in the status colour on its `-soft` tint (`StatusLabel`), and a message is a tinted band with a 25% status-coloured border (`Notice`). At night (storefront) the same components drop the fill and show dot plus word on the surface. Status colours never fill buttons, cards or whole rows.",
+        "section": "colors"
+      },
       {
         "name": "The Sound-Only Rule",
         "body": "Tape orange marks sound and nothing else: play while playing, played waveform, playhead or progress, beat dot, stage glow. The single exception is the wordmark's on-air light (the 8 to 9px dot beside the name). It never colours selection, links, primary actions, badges, focus or hover. A `signal` Button variant may be added only where sound is controlled.",
@@ -885,7 +995,7 @@
       "**Do** lead every storefront listing and track page with the stage: display title, facts, play, License and a full-width waveform.",
       "**Do** run all playback motion on one clock (`--beat = 60/BPM`): played bars breathe at scaleY 1.12, the head bar at 1.5, and stop completely when audio stops or reduced motion is on.",
       "**Do** show money exactly: license fee, CGST + SGST or IGST, total, all in Red Hat Mono from integer paise, and put the total in the button label.",
-      "**Do** show status as a 7px dot plus a word, and ages and due dates in mono, red when overdue.",
+      "**Do** show status with `StatusLabel` (a tinted pill in daylight, dot plus word at night), and ages and due dates in mono, red when overdue.",
       "**Do** state why an action is disabled, next to the disabled action, with a link to fix it.",
       "**Do** mark every sample screen with the amber \"Sample data\" (or \"Sample prices\") marker and use fictional names for artists, sellers, rightsholders and admins.",
       "**Do** describe clearance as a process (\"our clearance desk takes it up with the rightsholder\").",
@@ -896,9 +1006,9 @@
       "**Don't** promise \"no copyright claims\", \"zero strikes\", \"instant protection\" or any guaranteed outcome.",
       "**Don't** use eyebrow labels or uppercase tracked kickers above headings.",
       "**Don't** build cover-art grids or album-tile layouts; there is no catalogue imagery, and the waveform is the cover.",
-      "**Don't** build KPI-tile dashboards, stat cards or coloured sidebars on seller or admin screens; use tables, receipt lines and dot-plus-label status.",
+      "**Don't** build KPI-tile dashboards or stat cards on seller or admin screens, or colour the sidebar; use tables, receipt lines and status pills.",
       "**Don't** set words, names or statuses in Red Hat Mono; mono is for measurements only.",
-      "**Don't** use filled status banners or filled coloured badges.",
+      "**Don't** fill buttons, cards or rows with status colour, or use saturated status fills; status tints are the `-soft` values only, and only in daylight.",
       "**Don't** add drop shadows to cards, rows or panels at rest.",
       "**Don't** use #000, blue-black or cool greys for any ground or surface.",
       "**Don't** fabricate artists, testimonials, customer logos, sales numbers or press."

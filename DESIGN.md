@@ -22,23 +22,30 @@ colors:
   night-blocked: "#FF6B6B"
   night-info: "#7AB0FF"
   # Daylight theme (:root / .light): seller portal and admin console
-  daylight-ground: "#F6F5F2"
+  daylight-ground: "#F5F7F9"
+  daylight-shell: "#EEF1F4"
+  daylight-nav-active: "#E2E7EC"
   daylight-surface: "#FFFFFF"
-  daylight-secondary: "#EDEBE7"
-  daylight-accent: "#E6E3DE"
-  daylight-border: "#E3E0DB"
-  daylight-input: "#D4D0CA"
-  daylight-ink: "#1A1815"
-  daylight-ink-2: "#403C36"
-  daylight-ink-muted: "#66615A"
-  daylight-ink-faint: "#A6A199"
-  daylight-wave-idle: "#D2CEC7"
+  daylight-secondary: "#EEF1F4"
+  daylight-accent: "#E7EBEF"
+  daylight-border: "#E0E5EA"
+  daylight-input: "#CDD5DC"
+  daylight-ink: "#1E2B35"
+  daylight-ink-2: "#33404C"
+  daylight-ink-muted: "#58626D"
+  daylight-ink-faint: "#9AA4AE"
+  daylight-wave-idle: "#CDD5DC"
   daylight-wave-played: "#F05A1C"
   daylight-stage-glow: "rgba(255, 106, 43, 0.14)"
-  daylight-ok: "#12804F"
-  daylight-attention: "#9A5B00"
-  daylight-blocked: "#B82B27"
-  daylight-info: "#2459C9"
+  daylight-ok: "#05704F"
+  daylight-attention: "#8F4D08"
+  daylight-blocked: "#B4123A"
+  daylight-info: "#1E4FD0"
+  daylight-ok-soft: "#DCF5EA"
+  daylight-attention-soft: "#FDF1DA"
+  daylight-blocked-soft: "#FFE6EB"
+  daylight-info-soft: "#E3EBFD"
+  daylight-muted-soft: "#EEF1F4"
   # Shared by both themes: sound only
   tape-orange: "#FF6A2B"
   tape-orange-ink: "#160A03"
@@ -290,11 +297,13 @@ components:
 
 **Status: locked 2026-11-13 by the owner** (decision recorded in `docs/STATE.md`). Changes to the rules below go back to the owner.
 
+**Amended 2026-11-14 by the owner:** the daylight console (seller portal, admin console) aligns with the team's BigSocials app: cool-grey daylight palette, a sidebar shell, tinted status pills and notice bands. The night storefront, the sound-only orange, mono for measurements and every other rule are unchanged. `docs/design/admin-verification.html` predates this amendment; for console chrome and status, `components/console/shell.tsx`, `components/ui/status.tsx` and `Notice` in `app/seller/ui.tsx` are the reference.
+
 ## Overview
 
 **Creative North Star: "Night Session"**
 
-The track's own sound is the cover. Every surface is a warm charcoal (or, for operators, warm daylight) room in which the loudest, brightest object is the playing track's waveform. There is no catalogue imagery and none is needed: a title set large and tight, a line of measured facts in mono, and a bar waveform that fills with tape orange as it plays carry the whole storefront. The same session continues into the seller portal and admin console with the house lights up: identical type, ink ramp, radii and single accent, on a light ground built for eight-hour queue work.
+The track's own sound is the cover. Every surface is a warm charcoal (or, for operators, warm daylight) room in which the loudest, brightest object is the playing track's waveform. There is no catalogue imagery and none is needed: a title set large and tight, a line of measured facts in mono, and a bar waveform that fills with tape orange as it plays carry the whole storefront. The same session continues into the seller portal and admin console with the house lights up: identical type, radii and single accent, on a cool-grey daylight console aligned with the team's BigSocials app (owner decision 2026-11-14) and built for eight-hour queue work.
 
 Density follows the job. The storefront is Persuade mode: one stage hero, a scannable results list, and a sticky license receipt that states the exact price with GST. The console is Operate mode: a queue table, a detail pane and a sticky decision bar, at 13 to 14px, where status, age and the next action read in one glance. Proof over promise governs both: the record, the tax lines, the status and the process are shown exactly, never dressed up.
 
@@ -303,7 +312,7 @@ Confirmed rejections: the category's look (hoopr.ai: pure black, hot-pink pills,
 World provenance: Night Session, grounded candidate from the safer re-roll, `seed:c71607a50c192dcb`. Reference build: `docs/design/tokens.css`, `docs/design/discovery.html` (storefront, 390 to 1440), `docs/design/admin-verification.html` (admin queue, 1440, daylight plus night).
 
 **Key Characteristics:**
-- Warm charcoal ground in stacked tonal steps (R >= G > B, never blue-black, never #000); warm off-white ink.
+- Night: warm charcoal ground in stacked tonal steps (R >= G > B, never blue-black, never #000); warm off-white ink. Daylight (seller, admin): BigSocials' cool greys, a sidebar shell and tinted status.
 - A named four-step ink ramp: ink, ink-2, ink-muted, ink-faint.
 - Neutral ink is the primary colour: every default button, checked control and focus ring is ink.
 - Tape orange belongs to sound alone, plus one sanctioned non-sound use: the wordmark's on-air light.
@@ -326,13 +335,13 @@ A warm, near-monochrome ink-on-charcoal palette with one hot accent that only ev
 - **Amber Pending** (night-attention / daylight-attention): unavailable, needs attention, and the sample-data marker.
 - **Blocked Red** (night-blocked / daylight-blocked, equal to `--destructive`): failed, matched, overdue ages, Reject text, overdue area counts.
 - **Info Blue** (night-info / daylight-info): processing and in-flight states.
-Status hues appear only as a 7px dot plus a label, a coloured age, or a 30 to 40% tinted hairline border; never as filled banners or filled badges.
+**The Status Rule.** In daylight (seller portal, admin console) status is a pill: a 7px dot plus the word in the status colour on its `-soft` tint (`StatusLabel`), and a message is a tinted band with a 25% status-coloured border (`Notice`). At night (storefront) the same components drop the fill and show dot plus word on the surface. Status colours never fill buttons, cards or whole rows.
 
 ### Neutral
 - **Charcoal Ground** (night-ground): the storefront page.
 - **Stage Surface** (night-surface): cards, the stage, the receipt, search fields, hovered and selected rows.
 - **Raised Surface** (night-popover): popovers, the mobile mini player.
-- **Daylight Ground** (daylight-ground) and **Paper White** (daylight-surface): console page and work surfaces (top bar, table, decision bar, documents).
+- **Daylight Ground** (daylight-ground), **Shell** (daylight-shell) and **Paper White** (daylight-surface): the raised content panel, the frame behind the sidebar, and work surfaces (table, cards, decision bar, documents). **Nav Active** (daylight-nav-active) fills the current and hovered sidebar item.
 - **Secondary / Accent** (night-secondary, night-accent, daylight-secondary, daylight-accent): idle play buttons, secondary buttons, hover fills, the segmented control track, the selected queue row.
 - **Hairline** (night-border / daylight-border, also `--surface-3` on light): every divider and card edge. **Input Stroke** (night-input / daylight-input, also `--surface-3` on dark): field and outline-button borders, the receipt's dashed rule, scrollbars, range track.
 - **Ink-2** (night-ink-2 / daylight-ink-2): secondary prose, artist line, ghost-button text, receipt line items.
@@ -376,7 +385,9 @@ Status hues appear only as a 7px dot plus a label, a coloured age, or a 30 to 40
 
 **Result rows:** a six-column grid (44px play, 1.1fr title, 2fr waveform, 64px tempo, 48px time, 36px menu) with 16px gaps, 10px by 12px padding and hairline separators.
 
-**Console (desktop 1440, full-height, no page scroll):** a 52px top bar with area tabs, a filter bar (headline, segmented filter, sample marker, 280px search), then a split of a fluid queue table and a 540px detail pane. The table and the detail body scroll independently; the decision bar is pinned to the pane's bottom. Cells are 10px by 12px with 20px first-column inset.
+**Console shell (seller portal and admin console, `components/console/shell.tsx`):** a 240px sidebar on the shell grey (wordmark with the on-air dot and the product label, icon links 36px high with the current item filled nav-active, identity and MFA state at the foot) beside a raised content panel (ground, hairline border, 16px radius, 8px inset from the window edge). Below 768px the sidebar becomes a sticky white top bar with the wordmark and a scrolling tab row.
+
+**Admin queue (desktop 1440, full-height, no page scroll):** inside the shell, a filter bar (headline, segmented filter, sample marker, 280px search), then a split of a fluid queue table and a 540px detail pane. The table and the detail body scroll independently; the decision bar is pinned to the pane's bottom. Cells are 10px by 12px with 20px first-column inset.
 
 **Rhythm:** spacing steps of 4, 8, 12, 16, 20, 24 and 32px, with 6, 10 and 14px used as tight intra-component gaps. Control heights: 46px pay button, 44px storefront search, 40px storefront buttons and play, 38px fields, 36px console buttons and selects, 34px chips and console search.
 
@@ -435,7 +446,7 @@ Quiet, dense and ink-led; the press gives a small physical give.
 
 ### Navigation
 - **Storefront top bar:** sticky, 64px (56px mobile), translucent blurred ground with a hairline bottom. Wordmark (20px/700, -0.035em, with the on-air dot), a search field, then muted 14px/600 links that turn ink with a secondary fill on hover, and Sign in as a secondary button. Mobile collapses to wordmark plus menu.
-- **Console top bar:** 52px white bar; wordmark plus a muted "Admin" label; area tabs at 13px/600 with a 2px ink underline for the current area, queue counts in muted text, overdue counts in blocked red; admin name, MFA state as an ok-green outlined label, theme switch.
+- **Console sidebar:** see the console shell under Layout. Links are 14px, ink-2 at rest and ink/600 when current, with 16px 1.8-stroke icons from `components/console/icons.tsx` (no icon package). The admin's email and an ok-soft "MFA on" pill sit at the foot.
 
 ### Waveform (signature)
 Bars drawn from the track's peaks: wave-idle at rest, wave-played for the played portion, the last played bar marked as the head. Row strips are 28px (20px mobile), console strips 34px, the stage 112px (64px mobile). Hovering a row lifts idle bars toward ink-muted. Clicking or pressing Left/Right (5s steps) seeks; the stage strip is a `role="slider"`.
@@ -451,7 +462,7 @@ The hero of every storefront listing and track page: display title, an artist li
 A sticky card titled "License “Track”" with tier radios (title, one-line terms, mono price; the checked tier gets an ink-faint border and secondary fill, the radio an ink centre dot), an enquiry link for TV/OTT/cinema, client name (non-Creator tiers), billing state, then the dashed rule and exact lines: license fee, then CGST 9% and SGST 9% (same state as supplier) or IGST 18%, then a bold total, then the full-width primary button carrying the total, then one line of plain fine print about the certificate, verify link, invoice and the clearance process.
 
 ### Queue Table, Detail Pane and Decision Bar
-A sticky-header table sorted oldest first: title with a muted sub-line, mono waiting age (overdue in blocked red), dot-plus-label status columns, mono counts. Selected row is secondary-filled with 700 titles. The 540px detail pane shows the title, a muted meta line with mono ID, version and age, a small player, a four-fact row, then hairline-separated sections (screening, rights and documents, ingest) whose headings carry their status on the right. The pinned decision bar holds the assignment selects, the reason an action is blocked (with a link to fix it) or the keyboard hint, then the destructive outline action and the primary action. J/K move, Space plays, approve advances to the next row; outcomes report in a bottom-centre ink toast.
+A sticky-header table sorted oldest first: title with a muted sub-line, mono waiting age (overdue in blocked red), status-pill columns, mono counts. Selected row is secondary-filled with 700 titles. The 540px detail pane shows the title, a muted meta line with mono ID, version and age, a small player, a four-fact row, then hairline-separated sections (screening, rights and documents, ingest) whose headings carry their status on the right. The pinned decision bar holds the assignment selects, the reason an action is blocked (with a link to fix it) or the keyboard hint, then the destructive outline action and the primary action. J/K move, Space plays, approve advances to the next row; outcomes report in a bottom-centre ink toast.
 
 ### Status Label
 A 7px circle in the status hue followed by the label in ink at 13px. Waiting ages use mono with blocked red when overdue. The sample-data marker is an amber 11px/600 label in a 20px outlined pill with a 40% amber border.
@@ -509,7 +520,7 @@ Patterns proven in the comps: **[A] queue table, detail pane and pinned decision
 | Refunds, reconciliation | light | A with C lines in the detail pane | inferred |
 | Payouts | light | A with C lines; approve in the decision bar requires TOTP | inferred |
 | Catalog admin, legal documents, users and orgs | light | A; publish/suspend in the decision bar | inferred |
-| Impersonation banner | light | a single attention-outlined dot-plus-label bar under the top bar, never a filled band | inferred |
+| Impersonation banner | light | an attention `Notice` band pinned to the top of the content panel | inferred |
 | Audit log | light | A table only, read-only, mono IDs and timestamps | inferred |
 
 ## Do's and Don'ts
@@ -520,7 +531,7 @@ Patterns proven in the comps: **[A] queue table, detail pane and pinned decision
 - **Do** lead every storefront listing and track page with the stage: display title, facts, play, License and a full-width waveform.
 - **Do** run all playback motion on one clock (`--beat = 60/BPM`): played bars breathe at scaleY 1.12, the head bar at 1.5, and stop completely when audio stops or reduced motion is on.
 - **Do** show money exactly: license fee, CGST + SGST or IGST, total, all in Red Hat Mono from integer paise, and put the total in the button label.
-- **Do** show status as a 7px dot plus a word, and ages and due dates in mono, red when overdue.
+- **Do** show status with `StatusLabel` (a tinted pill in daylight, dot plus word at night), and ages and due dates in mono, red when overdue.
 - **Do** state why an action is disabled, next to the disabled action, with a link to fix it.
 - **Do** mark every sample screen with the amber "Sample data" (or "Sample prices") marker and use fictional names for artists, sellers, rightsholders and admins.
 - **Do** describe clearance as a process ("our clearance desk takes it up with the rightsholder").
@@ -531,9 +542,9 @@ Patterns proven in the comps: **[A] queue table, detail pane and pinned decision
 - **Don't** promise "no copyright claims", "zero strikes", "instant protection" or any guaranteed outcome.
 - **Don't** use eyebrow labels or uppercase tracked kickers above headings.
 - **Don't** build cover-art grids or album-tile layouts; there is no catalogue imagery, and the waveform is the cover.
-- **Don't** build KPI-tile dashboards, stat cards or coloured sidebars on seller or admin screens; use tables, receipt lines and dot-plus-label status.
+- **Don't** build KPI-tile dashboards or stat cards on seller or admin screens, or colour the sidebar; use tables, receipt lines and status pills.
 - **Don't** set words, names or statuses in Red Hat Mono; mono is for measurements only.
-- **Don't** use filled status banners or filled coloured badges.
+- **Don't** fill buttons, cards or rows with status colour, or use saturated status fills; status tints are the `-soft` values only, and only in daylight.
 - **Don't** add drop shadows to cards, rows or panels at rest.
 - **Don't** use #000, blue-black or cool greys for any ground or surface.
 - **Don't** fabricate artists, testimonials, customer logos, sales numbers or press.

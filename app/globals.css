@@ -1,45 +1,54 @@
 @import "tailwindcss";
 
 /* Night Session (DESIGN.md). Values mirror docs/design/tokens.css. The theme follows the surface, not the OS:
-   no class = daylight (seller portal, admin); a `.dark` ancestor = night (storefront route group). */
+   no class = daylight (seller portal, admin console; cool grey, aligned with BigSocials); a `.dark` ancestor = night
+   (storefront route group; warm charcoal). */
 @custom-variant dark (&:is(.dark *));
 
 :root,
 .light {
   --night-ground: #141311; /* the night surface, also painted behind the storefront on <html> */
-  --background: #F6F5F2;
-  --foreground: #1A1815;
+  --background: #F5F7F9;
+  --foreground: #18212A;
   --card: #FFFFFF;
-  --card-foreground: #1A1815;
+  --card-foreground: #18212A;
   --popover: #FFFFFF;
-  --popover-foreground: #1A1815;
-  --primary: #1A1815;
-  --primary-foreground: #F6F5F2;
-  --secondary: #EDEBE7;
-  --secondary-foreground: #1A1815;
-  --muted: #EDEBE7;
-  --muted-foreground: #66615A;
-  --accent: #E6E3DE;
-  --accent-foreground: #1A1815;
-  --destructive: #B82B27;
-  --border: #E3E0DB;
-  --input: #D4D0CA;
-  --ring: #1A1815;
+  --popover-foreground: #18212A;
+  --primary: #1E2B35;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EEF1F4;
+  --secondary-foreground: #18212A;
+  --muted: #EEF1F4;
+  --muted-foreground: #58626D;
+  --accent: #E7EBEF;
+  --accent-foreground: #18212A;
+  --destructive: #B4123A;
+  --border: #E0E5EA;
+  --input: #CDD5DC;
+  --ring: #1E2B35;
 
-  --fg-2: #403C36;
-  --fg-4: #A6A199;
-  --surface-3: #E3E0DB;
+  --fg-2: #33404C;
+  --fg-4: #9AA4AE;
+  --surface-3: #E0E5EA;
+  --shell: #EEF1F4; /* console frame behind the sidebar and the raised content panel */
+  --nav-active: #E2E7EC;
 
   --signal: #FF6A2B;
   --signal-foreground: #160A03;
-  --wave-idle: #D2CEC7;
+  --wave-idle: #CDD5DC;
   --wave-played: #F05A1C;
   --stage-glow: rgba(255, 106, 43, 0.14);
 
-  --ok: #12804F;
-  --attention: #9A5B00;
-  --blocked: #B82B27;
-  --info: #2459C9;
+  --ok: #05704F;
+  --attention: #8F4D08;
+  --blocked: #B4123A;
+  --info: #1E4FD0;
+  /* Tinted status fills (pills and notice bands) exist only in daylight; at night status stays dot plus word. */
+  --ok-soft: #DCF5EA;
+  --attention-soft: #FDF1DA;
+  --blocked-soft: #FFE6EB;
+  --info-soft: #E3EBFD;
+  --muted-soft: #EEF1F4;
 
   --radius: 10px;
 }
@@ -67,6 +76,8 @@
   --fg-2: #CDC8BF;
   --fg-4: #6F6A62;
   --surface-3: #3A3631;
+  --shell: var(--night-ground);
+  --nav-active: #302D29;
 
   --signal: #FF6A2B;
   --signal-foreground: #160A03;
@@ -78,6 +89,11 @@
   --attention: #F5B83D;
   --blocked: #FF6B6B;
   --info: #7AB0FF;
+  --ok-soft: transparent;
+  --attention-soft: transparent;
+  --blocked-soft: transparent;
+  --info-soft: transparent;
+  --muted-soft: transparent;
 }
 
 @theme inline {
@@ -111,6 +127,13 @@
   --color-attention: var(--attention);
   --color-blocked: var(--blocked);
   --color-info: var(--info);
+  --color-ok-soft: var(--ok-soft);
+  --color-attention-soft: var(--attention-soft);
+  --color-blocked-soft: var(--blocked-soft);
+  --color-info-soft: var(--info-soft);
+  --color-muted-soft: var(--muted-soft);
+  --color-shell: var(--shell);
+  --color-nav-active: var(--nav-active);
 
   /* Tailwind's scale lands on the design radii: rounded-sm 6 (xs), rounded-md 10 (sm: buttons, inputs),
      rounded-lg 14 (md: cards, rows), rounded-xl 18 (lg: stage, receipt). */

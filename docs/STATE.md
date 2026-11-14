@@ -481,6 +481,13 @@ Assumptions / flags (flag if wrong):
 - **Deviation from the F-flow: the golden path pays by the client callback, not the webhook.** Both call the same `markPaid`; the webhook route (HMAC, `payment_events` dedupe) stays covered by Vitest on Postgres. A posted-webhook step in the e2e is a possible follow-up.
 - **Review fixes (same PR):** `seed:e2e` and the e2e `globalSetup` refuse a non-local or unset `DATABASE_URL` (`tests/e2e/local-db.ts`); the workflow has `permissions: contents: read`, a concurrency group and a cached Playwright browser; in CI Playwright no longer falls back to starting a dev server, so a dead `next start` fails loudly; fixture names live in `tests/e2e/fixtures.ts`; the golden path needs `RAZORPAY_KEY_SECRET` set to the app's value.
 
+### Design amendment: daylight console aligned with BigSocials, 2026-11-14 (user)
+Owner compared the seller screen with the team's BigSocials app side by side and chose the aligned version for the seller portal and admin console. Recorded in DESIGN.md ("Amended 2026-11-14"); the night storefront is unchanged.
+- Daylight tokens moved to BigSocials' cool greys (`--background` #F5F7F9, ink #1E2B35, muted #58626D, borders #E0E5EA) plus `--shell`, `--nav-active` and `-soft` status tints; every text pair measured at 4.99:1 or better. The `.dark` theme sets the tints to transparent.
+- `StatusLabel` is a tinted pill in daylight and stays dot plus word under `.dark`; `Notice` is a tinted band in daylight and the card row at night. The buyer pages use both too and keep their look.
+- New `components/console/` (`ConsoleShell`, `ConsoleNav`, inline icons): a 240px sidebar on the shell grey with a raised content panel; below 768px a top bar with scrolling tabs. Seller and admin layouts use it; the admin email and MFA state moved to the sidebar foot; `app/admin/areas.ts` gained an icon per area. The old tab-bar navs were removed.
+- Visual only; checked with a temporary preview route (seller, admin, phone, and a dark strip), removed before commit. No count badges or search/notifications in the sidebar: those need data or features that do not exist yet.
+
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.
 - docs/PRD-analysis.md written by Phase 1 "PRD analyst" sub-agent (sonnet/medium): covers actors, module breakdown w/ ambiguities, 16 proposed data entities, 6 user flows, integration risk table, non-functional needs, 9 explicit assumptions, 15 open questions.

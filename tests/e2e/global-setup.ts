@@ -1,15 +1,20 @@
-import { startFakeAuth } from './fake-auth';
+import type { Server } from 'node:http';
+import { startFakeRazorpay } from './fake-razorpay';
+import { startFakeSupabase } from './fake-supabase';
+import { assertLocalDatabase } from './local-db';
 
-// One fake Auth server for the whole run (the desktop and mobile projects share it). If something already answers on
-// the port, such as a real local Supabase, leave it alone: the signed-in specs then say they were redirected to sign-in.
+// One set of fakes for the whole run (the projects share them). A port that is already taken, such as by a real local
+// Supabase, stops the run with a clear message instead of letting the specs fail in confusing ways.
 export default async function globalSetup() {
-  // The signed-in specs insert an admin user and read real rows: never point them at a shared or production database.
-  const host = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : 'localhost';
-  if (!['localhost', '127.0.0.1', '[::1]', '::1'].includes(host)) throw new Error('e2e needs DATABASE_URL set to a local database');
-  try {
-    const server = await startFakeAuth();
-    return () => void server.close();
-  } catch (e) {
-    console.warn(`fake Auth server not started: ${e instanceof Error ? e.message : e}`);
+  assertLocalDatabase();
+  const started: Server[] = [];
+  for (const [name, start] of [['Supabase', startFakeSupabase], ['Razorpay', startFakeRazorpay]] as const) {
+    try {
+      started.push(await start());
+    } catch (e) {
+      started.forEach((s) => s.close());
+      throw new Error(`The fake ${name} server could not start (${e instanceof Error ? e.message : e}). Stop whatever uses that port, for example a local Supabase.`);
+    }
   }
+  return () => started.forEach((s) => s.close());
 }

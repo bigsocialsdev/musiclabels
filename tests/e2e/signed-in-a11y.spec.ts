@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import postgres from 'postgres';
 import { AREAS } from '../../app/admin/areas';
 import { expectAccessible } from './axe';
-import { signIn } from './fake-auth';
+import { signIn } from './fake-supabase';
 
 // Signed-in pages, against the database's existing data (run `npm test` or seed first) and a fake Auth server.
 // A missing row fails the test rather than skipping it, so an empty database cannot pass as a clean one.

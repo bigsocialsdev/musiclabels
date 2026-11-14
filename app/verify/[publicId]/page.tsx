@@ -34,7 +34,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ publicI
         <span className="font-mono">{v.publicId}</span>
       </h1>
       <p className={`mt-2 font-semibold ${v.status === 'active' ? 'text-green-700' : 'text-red-700'}`}>{statusText}</p>
-      <dl className="mt-4 grid grid-cols-[10rem_1fr] gap-1 text-sm">
+      <dl className="mt-4 grid grid-cols-[10rem_1fr] gap-1 text-sm [&>dd]:min-w-0 [&>dd]:break-words">
         <dt>Track</dt>
         <dd>
           {v.trackTitle} — {v.primaryArtist}

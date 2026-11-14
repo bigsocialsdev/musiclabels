@@ -5,6 +5,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return (
     <main className="mx-auto max-w-sm p-8">
       <h1 className="text-xl font-semibold">Sign in</h1>
+      {next?.startsWith('/seller') && <p className="mt-1 text-sm text-muted-foreground">Sign in or create an account to start selling. The same account can also license tracks.</p>}
       {error && (
         <p role="alert" className="mt-2 text-red-600">
           Sign-in failed. Please try again.

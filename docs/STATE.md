@@ -502,6 +502,13 @@ New scope:
 
 Owner decision 2026-11-14: expand scope to cover the above; implementation handed to a new Opus session.
 
+### Scope addition (parts 1 and 2): storefront account menu and seller entry points, 2026-11-14 (Opus)
+- Top bar: signed out shows Browse, "Sell your music" and a Sign in button (returns to the current page via `next`). Signed in shows an account menu (Radix DropdownMenu from the existing `radix-ui` dependency): identity (email, else phone), "My licenses" when the user is in a buyer org, "Seller dashboard" when in a seller org or "Sell your music" when not, and Sign out. The old standalone "My licenses" button moved into the menu. Night top bar kept, no sidebar (per the scope note).
+- Org lookups reuse `loadSession` + `listBuyerOrgs`/`listSellerOrgs` keyed by the session's own user id. An unverified session (OTP not confirmed) shows as signed out, matching how every gated page treats it.
+- Sign out did not exist anywhere: added `endSession()` to `lib/identity` and a `signOut` server action in `app/auth/actions.ts` (redirects to `/`).
+- "Sell your music" points at `/seller/onboarding`, which already sends signed-out visitors to `/auth/sign-in?next=/seller/onboarding` (`requireSellerSession`), so there is one path and no new redirect logic. It is in the top bar on desktop, in the menu, and in a new one-line storefront footer on every screen size (the mobile top bar has room for the wordmark and one button only). The sign-in page adds one line of context when `next` is a seller page, stating that one account can both buy and sell.
+- Tests: `account-links.test.ts` (menu links per org combination, `next` round-trips through `safeNext`); `tests/e2e/account-menu.spec.ts` (signed-out → footer link → sign-in with `next`; buyer menu and sign-out clears the session cookie; seller reaches the dashboard), desktop and mobile; the existing axe gate passes on the changed header.
+
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.
 - docs/PRD-analysis.md written by Phase 1 "PRD analyst" sub-agent (sonnet/medium): covers actors, module breakdown w/ ambiguities, 16 proposed data entities, 6 user flows, integration risk table, non-functional needs, 9 explicit assumptions, 15 open questions.

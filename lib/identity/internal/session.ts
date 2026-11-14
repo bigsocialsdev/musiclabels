@@ -16,3 +16,9 @@ export async function loadSession(): Promise<Session | null> {
     aal: claims.data?.claims.aal === 'aal2' ? 'aal2' : 'aal1',
   };
 }
+
+/** Revokes the session and clears its cookies. Call from a server action or route handler (cookies are writable there). */
+export async function endSession(): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut();
+}

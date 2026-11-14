@@ -11,14 +11,18 @@ export async function expectAccessible(page: Page, url: string, name = url) {
   const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   const serious = violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
   expect(serious.map((v) => `${name}: ${v.id} ${v.nodes.map((n) => `${n.target} ${n.any[0]?.message ?? ''}`).join('; ')}`), name).toEqual([]);
-  // Name the elements that stick out, so a failure on another machine can be fixed without reproducing it.
+  // Name the boxes that stick out, so a failure on another machine can be fixed without reproducing it.
   const wide = await page.evaluate(() => {
     const limit = document.documentElement.clientWidth;
     if (document.documentElement.scrollWidth <= limit) return [];
-    return [...document.body.querySelectorAll('*')]
-      .filter((el) => el.getBoundingClientRect().right > limit + 0.5)
-      .slice(0, 6)
-      .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)} right=${Math.round(el.getBoundingClientRect().right)} "${(el.textContent ?? '').trim().slice(0, 40)}"`);
+    const describe = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 50)} left=${Math.round(r.left)} width=${Math.round(r.width)} display=${getComputedStyle(el).display}`;
+    };
+    const first = [...document.body.querySelectorAll('*')].find((el) => el.getBoundingClientRect().right > limit + 0.5);
+    const chain: string[] = [];
+    for (let el = first; el && el !== document.body; el = el.parentElement as Element) chain.push(describe(el));
+    return chain;
   });
-  expect(wide, `${name} scrolls sideways`).toEqual([]);
+  expect(wide, `${name} scrolls sideways (the widest box and its ancestors, limit is the screen width)`).toEqual([]);
 }

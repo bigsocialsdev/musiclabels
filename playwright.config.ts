@@ -12,7 +12,7 @@ export default defineConfig({
   timeout: 180_000, // one test walks many pages, and a dev server compiles each on first visit
   webServer: { command: 'npm run dev', url: baseURL, reuseExistingServer: true },
   // E2E_CHANNEL=chrome drives an installed Chrome instead of Playwright's own download.
-  use: { baseURL, channel: process.env.E2E_CHANNEL },
+  use: { baseURL, channel: process.env.E2E_CHANNEL, screenshot: 'only-on-failure' },
   projects: [
     // Buys a license through the real flow; the page specs then find it, like any existing data.
     { name: 'golden-path', testMatch: /golden-path\.spec\.ts/, use: desktop },

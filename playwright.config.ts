@@ -10,7 +10,9 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   timeout: 180_000, // one test walks many pages, and a dev server compiles each on first visit
-  webServer: { command: 'npm run dev', url: baseURL, reuseExistingServer: true },
+  // Locally a dev server is started when none runs. In CI the workflow starts the production build itself, so Playwright
+  // never quietly falls back to a dev server there.
+  webServer: process.env.CI ? undefined : { command: 'npm run dev', url: baseURL, reuseExistingServer: true },
   // E2E_CHANNEL=chrome drives an installed Chrome instead of Playwright's own download.
   use: { baseURL, channel: process.env.E2E_CHANNEL, screenshot: 'only-on-failure' },
   projects: [

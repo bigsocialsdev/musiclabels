@@ -8,6 +8,13 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
@@ -63,7 +70,16 @@ jobs:
           for i in $(seq 1 60); do curl -sf http://localhost:3000/auth/sign-in > /dev/null && exit 0; sleep 2; done
           cat app.log; exit 1
 
+      # The browser download is the slow part; the system packages are installed every run.
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - run: npx playwright install-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
       - run: npm run e2e
 
       - name: Upload the report and the app log

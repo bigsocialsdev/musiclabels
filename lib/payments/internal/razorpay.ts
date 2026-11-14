@@ -5,6 +5,7 @@ import { getEnv } from '@/lib/platform/env';
 import type { GatewayPayment, GatewayRefund, PaymentGateway } from '../index';
 
 const DEFAULT_API = 'https://api.razorpay.com/v1';
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]', '::1'];
 
 const paymentSchema = z.object({
   id: z.string(),
@@ -51,8 +52,8 @@ export class RazorpayGateway implements PaymentGateway {
     this.keyId = c.keyId;
     this.keySecret = c.keySecret;
     this.webhookSecret = c.webhookSecret;
-    // The key secret goes to this host in a Basic auth header: a live key must never be pointed anywhere but Razorpay.
-    if (c.apiUrl && c.keyId.startsWith('rzp_live_')) throw new Error('RAZORPAY_API_URL cannot be used with a live key');
+    // The key secret goes to this host in a Basic auth header, so the override may only name this machine (the e2e stand-in).
+    if (c.apiUrl && !LOOPBACK_HOSTS.includes(new URL(c.apiUrl).hostname)) throw new Error('RAZORPAY_API_URL must point at this machine (localhost or 127.0.0.1)');
     this.api = c.apiUrl ?? DEFAULT_API;
   }
 

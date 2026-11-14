@@ -15,7 +15,7 @@ const b64 = (v: object | string) => Buffer.from(typeof v === 'string' ? v : JSON
 
 export const supabaseUrl = () => process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
 
-export function startFakeAuth(): Promise<Server> {
+export function startFakeSupabase(): Promise<Server> {
   const objects = new Map<string, { body: Buffer; type: string }>();
   const server = createServer(async (req, res) => {
     const chunks: Buffer[] = [];

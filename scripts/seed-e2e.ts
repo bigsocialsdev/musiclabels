@@ -1,20 +1,21 @@
 /**
  * Fixtures for the Playwright specs (tests/e2e): the reference data plus one verified seller with a published,
- * sellable track and one buyer organisation who has accepted the terms, found by the specs through their fixed names.
- * Idempotent. Run with: DATABASE_URL=... npm run seed:e2e   (a migrated local database; refuses to run in production)
+ * sellable track and one buyer organisation who has accepted the terms, found by the specs through the names in
+ * tests/e2e/fixtures.ts. Idempotent.
+ * Run with: DATABASE_URL=... npm run seed:e2e   (a migrated local database; refuses to run in production or against a non-local database)
  */
 import { eq } from 'drizzle-orm';
-import { memberships, organizations } from '@/db/schema';
+import { memberships, organizations, tracks } from '@/db/schema';
 import { getCurrentDocument, recordAcceptance } from '@/lib/legal/server';
 import { closeDb, getDb } from '@/lib/platform/db';
+import { E2E_BUYER, E2E_SELLER, E2E_TRACK_TITLE } from '../tests/e2e/fixtures';
+import { assertLocalDatabase } from '../tests/e2e/local-db';
 import { makeBuyer, makeSellableTrack, makeSeller } from '../tests/factories';
 import { seedReference } from './seed-reference';
 
-const E2E_SELLER = 'E2E Seller Pvt Ltd';
-const E2E_BUYER = 'E2E Buyer LLP';
-
 async function main() {
   if (process.env.NODE_ENV === 'production') throw new Error('seed:e2e refuses to run in production');
+  assertLocalDatabase();
   const db = getDb();
   await seedReference(db);
   const orgByName = async (name: string) => (await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.legalName, name)).limit(1))[0];
@@ -22,7 +23,8 @@ async function main() {
   if (!(await orgByName(E2E_SELLER))) {
     const seller = await makeSeller(db);
     await db.update(organizations).set({ legalName: E2E_SELLER, displayName: E2E_SELLER }).where(eq(organizations.id, seller.orgId));
-    await makeSellableTrack(db, { sellerOrgId: seller.orgId });
+    const track = await makeSellableTrack(db, { sellerOrgId: seller.orgId });
+    await db.update(tracks).set({ title: E2E_TRACK_TITLE }).where(eq(tracks.id, track.trackId));
   }
   const buyer = (await orgByName(E2E_BUYER)) ?? { id: (await makeBuyer(db, E2E_BUYER)).orgId };
 

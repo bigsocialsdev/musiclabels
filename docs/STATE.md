@@ -491,6 +491,17 @@ Owner compared the seller screen with the team's BigSocials app side by side and
 - New `components/console/` (`ConsoleShell`, `ConsoleNav`, inline icons): a 240px sidebar on the shell grey with a raised content panel; below 768px a top bar with scrolling tabs. Seller and admin layouts use it; the admin email and MFA state moved to the sidebar foot; `app/admin/areas.ts` gained an icon per area. The old tab-bar navs were removed.
 - Visual only; checked with a temporary preview route (seller, admin, phone, and a dark strip), removed before commit. No count badges or search/notifications in the sidebar: those need data or features that do not exist yet.
 
+## Scope addition: account/portal discoverability + landing experience, 2026-11-14 (user)
+Beyond the original PLAN.md milestones. Triggered by a user Q&A session surfacing real gaps: no account/login widget on the storefront, no visible path from the storefront to seller onboarding, no clear statement that buyer/seller are org-level roles (not account types) a single login can hold both of, and no distinct landing moment for a brand-new visitor (root is the functional Browse page). Confirmed NOT in scope from the same discussion: no auth bypass/mock login (security risk, rejected), no seller-side automated catalog-API-fetch (already a locked decision against it), no subscription/content-access model (confirmed the per-transaction pricing model is correct, no change).
+
+New scope:
+1. Global account/identity widget on the storefront: sign-in/out, current user, and — once signed in — links to the user's buyer dashboard and seller dashboard if they hold orgs of both kinds; a clear "Sign in" affordance if signed out.
+2. "Sell your music" entry point surfaced from the public storefront, linking to seller onboarding.
+3. A distinct first-visit landing moment for brand-new visitors, as the product's entry point beyond the functional Browse grid.
+4. Design direction: continue the sidebar/BigSocials-aligned direction already shipped for seller + admin for any new account/portal-switching surface this work adds. The storefront's night-theme top bar is a deliberate, already-settled differentiation (immersive buyer browsing vs. operational seller/admin) — add the account widget within that existing top bar, don't convert the storefront's browse/discovery experience into a sidebar.
+
+Owner decision 2026-11-14: expand scope to cover the above; implementation handed to a new Opus session.
+
 ## Notes
 - docs/PRD.md created from "Simple PRD - Music Rights Marketplace.pdf" supplied by the user.
 - docs/PRD-analysis.md written by Phase 1 "PRD analyst" sub-agent (sonnet/medium): covers actors, module breakdown w/ ambiguities, 16 proposed data entities, 6 user flows, integration risk table, non-functional needs, 9 explicit assumptions, 15 open questions.

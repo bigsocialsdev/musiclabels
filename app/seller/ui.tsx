@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { StatusTone } from '@/components/ui/status';
+import { TONE_DOT, type StatusTone } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 
 /** Shared by the seller forms. */
@@ -24,13 +24,19 @@ export function PageHeader({ title, aside, children }: { title: ReactNode; aside
   );
 }
 
-const NOTICE_DOT: Record<StatusTone, string> = { ok: 'bg-ok', attention: 'bg-attention', blocked: 'bg-blocked', info: 'bg-info', muted: 'bg-fg-4' };
+const NOTICE_BAND: Record<StatusTone, string> = {
+  ok: 'bg-ok-soft border-ok/25',
+  attention: 'bg-attention-soft border-attention/25',
+  blocked: 'bg-blocked-soft border-blocked/25',
+  info: 'bg-info-soft border-info/25',
+  muted: 'bg-card',
+};
 
-/** A message row: dot plus text on the card surface, never a filled colour band. */
+/** A message row: a tinted band in daylight (seller, admin); dot plus text on the card surface at night (storefront). */
 export function Notice({ tone, role, children }: { tone: StatusTone; role?: 'alert' | 'status'; children: ReactNode }) {
   return (
-    <p role={role} className="flex items-start gap-2.5 rounded-md border bg-card px-3.5 py-2.5 text-sm text-foreground">
-      <span aria-hidden className={cn('mt-[7px] size-[7px] shrink-0 rounded-full', NOTICE_DOT[tone])} />
+    <p role={role} className={cn('flex items-start gap-2.5 rounded-md border px-3.5 py-2.5 text-sm text-foreground', NOTICE_BAND[tone], 'dark:border-border dark:bg-card')}>
+      <span aria-hidden className={cn('mt-[7px] size-[7px] shrink-0 rounded-full', TONE_DOT[tone])} />
       <span>{children}</span>
     </p>
   );

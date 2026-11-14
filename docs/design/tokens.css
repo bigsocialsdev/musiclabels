@@ -6,40 +6,48 @@
 
 :root,
 .light {
-  --background: #F6F5F2;
-  --foreground: #1A1815;
+  /* Daylight console (seller, admin): cool greys aligned with BigSocials (owner amendment 2026-11-14). */
+  --background: #F5F7F9;
+  --foreground: #18212A;
   --card: #FFFFFF;
-  --card-foreground: #1A1815;
+  --card-foreground: #18212A;
   --popover: #FFFFFF;
-  --popover-foreground: #1A1815;
-  --primary: #1A1815;
-  --primary-foreground: #F6F5F2;
-  --secondary: #EDEBE7;
-  --secondary-foreground: #1A1815;
-  --muted: #EDEBE7;
-  --muted-foreground: #66615A;
-  --accent: #E6E3DE;
-  --accent-foreground: #1A1815;
-  --destructive: #B82B27;
-  --border: #E3E0DB;
-  --input: #D4D0CA;
-  --ring: #1A1815;
+  --popover-foreground: #18212A;
+  --primary: #1E2B35;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EEF1F4;
+  --secondary-foreground: #18212A;
+  --muted: #EEF1F4;
+  --muted-foreground: #58626D;
+  --accent: #E7EBEF;
+  --accent-foreground: #18212A;
+  --destructive: #B4123A;
+  --border: #E0E5EA;
+  --input: #CDD5DC;
+  --ring: #1E2B35;
 
   /* ink ramp: foreground > fg-2 > muted-foreground > fg-4 (fg-4 is never body text) */
-  --fg-2: #403C36;
-  --fg-4: #A6A199;
-  --surface-3: #E3E0DB;
+  --fg-2: #33404C;
+  --fg-4: #9AA4AE;
+  --surface-3: #E0E5EA;
+  --shell: #EEF1F4;
+  --nav-active: #E2E7EC;
 
   --signal: #FF6A2B;
   --signal-foreground: #160A03;
-  --wave-idle: #D2CEC7;
+  --wave-idle: #CDD5DC;
   --wave-played: #F05A1C;
   --stage-glow: rgba(255, 106, 43, 0.14);
 
-  --ok: #12804F;
-  --attention: #9A5B00;
-  --blocked: #B82B27;
-  --info: #2459C9;
+  --ok: #05704F;
+  --attention: #8F4D08;
+  --blocked: #B4123A;
+  --info: #1E4FD0;
+  --ok-soft: #DCF5EA;
+  --attention-soft: #FDF1DA;
+  --blocked-soft: #FFE6EB;
+  --info-soft: #E3EBFD;
+  --muted-soft: #EEF1F4;
 }
 
 .dark {
@@ -76,6 +84,14 @@
   --attention: #F5B83D;
   --blocked: #FF6B6B;
   --info: #7AB0FF;
+  --shell: #141311;
+  --nav-active: #302D29;
+  /* status stays dot plus word at night: no tinted fills */
+  --ok-soft: transparent;
+  --attention-soft: transparent;
+  --blocked-soft: transparent;
+  --info-soft: transparent;
+  --muted-soft: transparent;
 }
 
 :root {

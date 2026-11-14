@@ -1,19 +1,19 @@
 import type { ReactNode } from 'react';
-import { SellerNav } from './nav';
+import { ConsoleShell } from '@/components/console/shell';
+import type { ConsoleNavItem } from '@/components/console/nav';
+
+const ITEMS: readonly ConsoleNavItem[] = [
+  { href: '/seller/onboarding', label: 'Onboarding', icon: 'onboarding' },
+  { href: '/seller/tracks', label: 'Tracks', icon: 'tracks' },
+  { href: '/seller/sales', label: 'Sales', icon: 'sales' },
+  { href: '/seller/payouts', label: 'Payouts', icon: 'payouts' },
+  { href: '/seller/clearance', label: 'Clearance', icon: 'clearance' },
+];
 
 export default function SellerLayout({ children }: { children: ReactNode }) {
   return (
-    <>
-      <header className="sticky top-0 z-20 border-b bg-card">
-        <div className="mx-auto flex h-13 max-w-5xl items-stretch gap-6 px-5">
-          <span className="flex items-center gap-[7px] text-[17px] font-bold tracking-[-0.03em]">
-            <span aria-hidden className="size-2 rounded-full bg-signal" />
-            MRM <span className="text-[13px] font-semibold tracking-normal text-muted-foreground">Seller</span>
-          </span>
-          <SellerNav />
-        </div>
-      </header>
+    <ConsoleShell product="Seller" navLabel="Seller" items={ITEMS}>
       {children}
-    </>
+    </ConsoleShell>
   );
 }

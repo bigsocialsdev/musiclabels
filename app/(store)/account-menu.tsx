@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { listBuyerOrgs, listSellerOrgs, loadSession } from '@/lib/identity/server';
+import { listBuyerOrgs, listSellerOrgs } from '@/lib/identity/server';
 import { getDb } from '@/lib/platform/db';
 import { AccountDropdown, SignInLink } from './account-dropdown';
 import { SELL_HREF, accountLinks } from './account-links';
+import { storeSession } from './intro';
 
 const sellLink = (
   <Link href={SELL_HREF} className="rounded-sm px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground max-[900px]:hidden">
@@ -15,7 +16,7 @@ const sellLink = (
  * treats it. Org lookups are keyed by the session's own user id, never by client input.
  */
 export async function AccountMenu() {
-  const session = await loadSession();
+  const session = await storeSession();
   if (!session?.verified) {
     return (
       <>

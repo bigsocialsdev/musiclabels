@@ -394,6 +394,8 @@ A warm, near-monochrome ink-on-charcoal palette with one hot accent that only ev
 ### Named Rules
 **The Stage-First Rule.** On any storefront listing, the selected track's stage card (title, facts, play, License, full-width waveform, beat dot, timecode) is the first and largest object in the content column, above the list it belongs to.
 
+**Amended 2026-11-14 by the owner: the first-visit band.** One exception sits above the grid, not inside the content column: on the unfiltered home page, a signed-out visitor who has not dismissed it sees a short band (a headline-size heading, one line of plain fact about screening, certificate, verify link and GST invoice, a "Sell your music" link, and a dismiss button). It stays quieter than the stage: no card, no glow, no display type, a hairline below it. Dismissal is remembered (`mrm_intro` cookie), so it appears once. Filtered views, track pages and signed-in users never see it.
+
 **The One-Viewport Decision Rule.** The decision is reachable without scrolling: the receipt with its total and License action fits inside 1440x900; the console's decision bar is always pinned and visible.
 
 ## Elevation & Depth

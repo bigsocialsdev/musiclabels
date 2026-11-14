@@ -6,7 +6,10 @@ import { formatInr } from '@/lib/invoicing';
 import { getActivePriceGrid } from '@/lib/pricing/server';
 import { RateLimited, storefrontLimited } from '@/components/store/rate-limited';
 import { getDb } from '@/lib/platform/db';
+import { cookies } from 'next/headers';
 import { Discovery } from './discovery';
+import { INTRO_COOKIE, INTRO_DISMISSED, storeSession } from './intro';
+import { IntroBand } from './intro-band';
 import { Chips, FilterGroups } from './rail';
 import { parseSearch, searchHref, withParams } from './search-params';
 import { SearchBox } from './search-box';
@@ -79,25 +82,31 @@ export default async function BrowsePage({ searchParams }: Props) {
       </nav>
     ) : null;
 
+  // First visit: the plain home page, signed out, not dismissed before. Filtered and paged views go straight to work.
+  const intro = !filtered(search) && (await cookies()).get(INTRO_COOKIE)?.value !== INTRO_DISMISSED && !(await storeSession())?.verified;
+
   return (
-    <Discovery
-      key={searchHref(search)}
-      tracks={result.tracks}
-      rail={<FilterGroups search={search} facets={facets} priceLabels={priceLabels} />}
-      chips={
-        <>
-          <SearchBox defaultValue={search.q} />
-          <Chips search={search} facets={facets} />
-          <details className="rounded-md border bg-card">
-            <summary className="cursor-pointer px-3.5 py-2.5 text-[13px] font-semibold text-fg-2">More filters</summary>
-            <div className="flex flex-col gap-5 px-2 pt-1 pb-4">
-              <FilterGroups search={search} facets={facets} priceLabels={priceLabels} />
-            </div>
-          </details>
-        </>
-      }
-      header={header}
-      footer={footer}
-    />
+    <>
+      {intro && <IntroBand cookie={`${INTRO_COOKIE}=${INTRO_DISMISSED}`} />}
+      <Discovery
+        key={searchHref(search)}
+        tracks={result.tracks}
+        rail={<FilterGroups search={search} facets={facets} priceLabels={priceLabels} />}
+        chips={
+          <>
+            <SearchBox defaultValue={search.q} />
+            <Chips search={search} facets={facets} />
+            <details className="rounded-md border bg-card">
+              <summary className="cursor-pointer px-3.5 py-2.5 text-[13px] font-semibold text-fg-2">More filters</summary>
+              <div className="flex flex-col gap-5 px-2 pt-1 pb-4">
+                <FilterGroups search={search} facets={facets} priceLabels={priceLabels} />
+              </div>
+            </details>
+          </>
+        }
+        header={header}
+        footer={footer}
+      />
+    </>
   );
 }

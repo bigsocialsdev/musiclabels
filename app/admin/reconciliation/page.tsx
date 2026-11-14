@@ -60,7 +60,7 @@ export default async function ReconciliationPage({ searchParams }: { searchParam
                   <div className="font-semibold">{own(KINDS, i.kind) ?? i.kind}</div>
                   <div className="font-mono text-[12px] text-fg-2">{i.gatewayRef}</div>
                   {i.orderId && <div className="font-mono text-[12px] text-fg-2">order {i.orderId}</div>}
-                  <pre className="mt-1 max-w-md overflow-x-auto text-[12px] text-muted-foreground">{JSON.stringify(i.details, null, 1)}</pre>
+                  <pre tabIndex={0} className="mt-1 max-w-md overflow-x-auto text-[12px] text-muted-foreground">{JSON.stringify(i.details, null, 1)}</pre>
                 </Td>
                 <Td>
                   <StatusLabel tone={i.status === 'open' ? 'attention' : 'ok'}>{i.status === 'open' ? 'Open' : 'Resolved'}</StatusLabel>
